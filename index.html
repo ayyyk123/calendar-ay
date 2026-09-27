@@ -4,15 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
-  <title>캘린더 v1.44</title>
-  <link rel="manifest" href="manifest.json?v=1.44">
+  <title>캘린더 v1.46</title>
+  <link rel="manifest" href="manifest.json?v=1.46">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="icon-180.png">
-  <link rel="stylesheet" href="style.css?v=1.44">
+  <link rel="stylesheet" href="style.css?v=1.46">
 </head>
 <body>
 <header>
-  <div class="brand"><b>캘린더</b><small> v1.44</small></div>
+  <div class="brand"><b>캘린더</b><small> v1.46</small></div>
   <div id="saveBadge" class="saveBadge loading" title="Firebase 저장 상태"><span class="saveDot"></span><span id="saveBadgeText">Firebase 확인 중</span></div>
   <button id="manualSaveBtn" class="manualSaveBtn" type="button" title="현재 데이터를 Firebase에 즉시 저장"><span class="manualSaveFull">최신자료 저장</span><span class="manualSaveMobile">저장</span></button>
   <button id="sidebarToggle" class="mobileOnly" type="button" aria-label="메뉴">☰</button>
@@ -133,6 +133,13 @@
       </div>
       <p class="hint">납부일정은 예상 소요시간을 계산하지 않습니다. 달력의 체크박스로 날짜별 납부완료 여부를 표시할 수 있습니다.</p>
     </div>
+    <div id="availabilityBlockFields" class="availabilityBlockFields">
+      <label class="check"><input type="checkbox" id="availabilityBlock"> 이 일정이 있는 날 가용시간 차단</label>
+      <div id="availabilityTargetWrap" class="availabilityTargetWrap hidden">
+        <label>가용시간을 0h로 만들 캘린더<select id="availabilityTarget"></select></label>
+        <p class="hint">예: 헬스장을 2일마다 반복으로 등록하고 개인업무를 선택하면, 헬스장 발생일에는 개인업무와 모든 부속캘린더가 공유하는 가용시간이 0h가 됩니다. 특정 발생일을 다른 날로 옮기면 원래 날짜는 복구되고 이동한 날짜가 차단됩니다.</p>
+      </div>
+    </div>
     <label>장소<input id="place"></label>
     <label>반복<select id="repeat"><option value="none">없음</option><option value="daily">매일</option><option value="weekly">매주</option><option value="monthly">매월</option><option value="yearly">매년</option></select></label>
 
@@ -217,6 +224,19 @@
   </form>
 </dialog>
 
+<dialog id="repeatMoveDlg" class="smallDlg">
+  <form method="dialog">
+    <h3>반복 일정 이동</h3>
+    <p id="repeatMoveInfo" class="hint">이동 범위를 선택하세요.</p>
+    <div class="scopeActions">
+      <button type="button" id="moveOccurrenceOnly"><b>이 일정만 이동</b><small>선택한 날짜의 일정만 옮기고 이후 반복은 그대로 둡니다.</small></button>
+      <button type="button" id="moveFutureSeries"><b>이 일정부터 이후 반복일정 이동</b><small>옮긴 날짜를 새 기준일로 삼아 이후 반복 간격을 다시 이어갑니다.</small></button>
+      <button type="button" id="moveWholeSeries"><b>전체 반복일정 기준 변경</b><small>반복 시리즈 전체의 기준 날짜를 같은 간격만큼 옮깁니다.</small></button>
+    </div>
+    <menu><span></span><button type="button" id="cancelRepeatMove">취소</button></menu>
+  </form>
+</dialog>
+
 <dialog id="carryDlg" class="smallDlg">
   <form id="carryForm">
     <h3>다음날로 이어하기</h3>
@@ -258,7 +278,8 @@
         <div class="weekdayCapacityCell weekend"><b>토</b><input type="number" data-cap-dow="6" min="0" max="24" step="0.25" value="0"><label class="check"><input type="checkbox" data-cap-unknown="6"> 미정</label></div>
         <div class="weekdayCapacityCell weekend"><b>일</b><input type="number" data-cap-dow="0" min="0" max="24" step="0.25" value="0"><label class="check"><input type="checkbox" data-cap-unknown="0"> 미정</label></div>
       </div>
-      <small class="hint">요일마다 가용시간을 따로 설정할 수 있습니다. 미정인 요일도 이번 주 업무량에 표시됩니다.</small>
+      <small class="hint" id="capacityOwnHint">요일마다 상위 캘린더의 총 가용시간을 설정합니다. 모든 부속캘린더 업무가 이 시간을 함께 사용합니다.</small>
+      <small class="hint hidden" id="sharedCapacityNote"><b>부속캘린더는 별도 가용시간을 사용하지 않습니다.</b> 상위 캘린더의 가용시간을 모든 부속캘린더와 함께 공유합니다.</small>
     </div>
     <menu>
       <button type="button" id="deleteCal" class="danger">삭제</button>
@@ -396,6 +417,6 @@
   <div><span class="spinner"></span><b>Firebase 최신 데이터 불러오는 중…</b><small>저장된 최신 일정을 확인하고 있어요.</small></div>
 </div>
 
-<script type="module" src="app.js?v=1.44"></script>
+<script type="module" src="app.js?v=1.46"></script>
 </body>
 </html>

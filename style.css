@@ -350,3 +350,11 @@ aside{min-height:0}
 .weekdayCapacityCell .check{justify-content:center;gap:3px;font-size:9px;white-space:nowrap}.weekdayCapacityCell.weekend b{color:#5b6f9d}.weekdayCapacityField .hint{display:block;margin-top:7px}
 @media(max-width:760px){.weekdayCapacityGrid{grid-template-columns:repeat(4,minmax(0,1fr))}.weekdayCapacityCell{padding:5px 4px}}
 @media(max-width:430px){.weekdayCapacityGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* v1.45: 가용시간 공유 / 차단 일정 */
+.availabilityBlockFields{margin:4px 0 8px;padding:9px 10px;border:1px solid #e3e6ea;border-radius:8px;background:#fafbfc}
+.availabilityBlockFields>.check{margin:0;font-weight:700}
+.availabilityTargetWrap{margin-top:8px;padding-top:8px;border-top:1px dashed #d9dde3}
+.weekdayCapacityField.sharedFromParent{background:#f7f8fa}
+.weekdayCapacityField.sharedFromParent .weekdayCapacityGrid{opacity:.42}
+.sharedCapacityText{font-size:10px;color:#7a7f87;font-weight:500}

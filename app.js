@@ -68,7 +68,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.44',
+  version: '1.46',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -311,7 +311,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.44',
+    version: '1.46',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -321,6 +321,8 @@ function normalizeState(raw){
       noDuration:!!e.noDuration,
       kind:e.kind||'event',
       important:!!e.important,
+      availabilityBlock:!!e.availabilityBlock,
+      availabilityTargetCalId:typeof e.availabilityTargetCalId==='string'?e.availabilityTargetCalId:'',
       repeat:e.repeat||'none',
       repeatRule:e.repeatRule||null,
       paymentAmount:Math.max(0,Number(e.paymentAmount)||0),
@@ -517,22 +519,54 @@ function calendarPath(id){
 }
 function duration(e){ return e?.noDuration ? 0 : (Number(e?.hours)||0); }
 function durationLabel(e){ return e?.noDuration ? '소요시간 미체크' : fmtH(Number(e?.hours)||0); }
+function availabilityBlockTargetRootId(e){
+  const raw=e?.availabilityTargetCalId || e?.calId || '';
+  const root=topAncestor(raw);
+  return root?.id || raw;
+}
+function availabilityBlockOnDate(rootId,date){
+  if(!rootId || !date) return false;
+  const targetRoot=topAncestor(rootId)?.id || rootId;
+  for(const e of state.events){
+    if(!e?.availabilityBlock || e.kind==='payment' || e.kind==='anniversary') continue;
+    if(availabilityBlockTargetRootId(e)!==targetRoot) continue;
+    const span=Math.max(0,diffDays(e.date,e.endDate||e.date));
+    const starts=generateOccurrenceStarts(e,ds(add(parse(date),-span)),date);
+    for(const start of starts){
+      const occ=ds(start);
+      if((e.excludedDates||[]).includes(occ)) continue;
+      const end=add(start,span);
+      if(start<=parse(date) && end>=parse(date)) return true;
+    }
+  }
+  return false;
+}
 function capacityForDate(c,date){
+  const root=topAncestor(c)||c;
+  if(!root) return {hours:0,unknown:false,blocked:false};
+  if(availabilityBlockOnDate(root.id,date)) return {hours:0,unknown:false,blocked:true};
   const dow=parse(date).getDay();
-  const src=c?.capacityByDay?.[dow]??c?.capacityByDay?.[String(dow)];
-  if(src) return {hours:Number(src.hours)||0,unknown:!!src.unknown};
-  return {hours:Number(c?.capacity)||0,unknown:!!c?.capacityUnknown};
+  const src=root?.capacityByDay?.[dow]??root?.capacityByDay?.[String(dow)];
+  if(src) return {hours:Number(src.hours)||0,unknown:!!src.unknown,blocked:false};
+  return {hours:Number(root?.capacity)||0,unknown:!!root?.capacityUnknown,blocked:false};
 }
 function capacityForWeek(c,startDate){
-  let hours=0,unknownDays=0;
-  for(let i=0;i<7;i++){ const info=capacityForDate(c,ds(add(startDate,i))); if(info.unknown) unknownDays++; else hours+=info.hours; }
-  return {hours,unknownDays,unknown:unknownDays>0};
+  let hours=0,unknownDays=0,blockedDays=0;
+  for(let i=0;i<7;i++){
+    const info=capacityForDate(c,ds(add(startDate,i)));
+    if(info.blocked) blockedDays++;
+    else if(info.unknown) unknownDays++;
+    else hours+=info.hours;
+  }
+  return {hours,unknownDays,blockedDays,unknown:unknownDays>0};
 }
 function capacitySidebarLabel(c){
+  if(c?.parentId) return '상위 공유';
   const vals=[0,1,2,3,4,5,6].map(d=>{ const x=c?.capacityByDay?.[d]??c?.capacityByDay?.[String(d)]; return x?`${!!x.unknown?'u':'k'}:${Number(x.hours)||0}`:`${!!c?.capacityUnknown?'u':'k'}:${Number(c?.capacity)||0}`; });
   if(new Set(vals).size===1){ const [flag,val]=vals[0].split(':'); return flag==='u'?'미정':`${val}h`; }
   return '요일별';
 }
+function workloadDuration(e){ return e?.availabilityBlock ? 0 : duration(e); }
 function fmtH(h){
   const value = Math.max(0, Number(h) || 0);
   const rounded = Math.round(value * 100) / 100;
@@ -961,6 +995,10 @@ function dayCalHeadHtml(date,c,sum,cap,unknown,label=''){
   const collapsed=isDayCalCollapsed(date,c.id);
   return `<button type="button" class="dayCalToggle" data-daycal-toggle="1" data-date="${esc(date)}" data-cal-id="${esc(c.id)}" aria-expanded="${collapsed?'false':'true'}" title="${esc(c.name)} 접기/펴기"><span class="dayCalHeadLabel">${label}${esc(c.name)} · ${esc(c.period)}</span><span class="dayCalHeadRight">${capacityText(sum,cap,unknown)} <b>${collapsed?'▸':'▾'}</b></span></button>`;
 }
+function daySubCalHeadHtml(date,c,label='↳ '){
+  const collapsed=isDayCalCollapsed(date,c.id);
+  return `<button type="button" class="dayCalToggle" data-daycal-toggle="1" data-date="${esc(date)}" data-cal-id="${esc(c.id)}" aria-expanded="${collapsed?'false':'true'}" title="${esc(c.name)} 접기/펴기 · 가용시간은 상위 캘린더와 공유"><span class="dayCalHeadLabel">${label}${esc(c.name)}</span><span class="dayCalHeadRight sharedCapacityText">상위 공유 <b>${collapsed?'▸':'▾'}</b></span></button>`;
+}
 function groupHtml(date, es){
   const anniversaryHtml=anniversaryLaneHtml(es,false);
   const appointmentHtml=appointmentLaneHtml(es,false);
@@ -969,39 +1007,36 @@ function groupHtml(date, es){
   const workEvents=(es||[]).filter(e=>e.kind!=='payment' && e.kind!=='appointment' && e.kind!=='anniversary');
   let html='';
   const visible=visibleCals(), visibleIds=new Set(visible.map(c=>c.id));
-  let total=appointmentEvents.reduce((sum,e)=>sum+duration(e),0), totalCapacity=0, hasUnknownCapacity=false;
+  let total=appointmentEvents.reduce((sum,e)=>sum+workloadDuration(e),0), totalCapacity=0, hasUnknownCapacity=false, blockedRootCount=0;
   for(const root of topLevelCals()){
     const members=[root,...descendants(root.id)].filter(c=>visibleIds.has(c.id));
     if(!members.length) continue;
     const memberIds=new Set(members.map(c=>c.id));
     const groupEvents=workEvents.filter(e=>memberIds.has(e.calId));
     if(!groupEvents.length) continue;
-    const rootSum=groupEvents.reduce((sum,e)=>sum+duration(e),0);
+    const rootSum=groupEvents.reduce((sum,e)=>sum+workloadDuration(e),0);
     total+=rootSum;
-    const activeChildren=members.filter(c=>c.id!==root.id && groupEvents.some(e=>e.calId===c.id));
-    const childCaps=activeChildren.map(c=>capacityForDate(c,date));
-    const fallbackCap=childCaps.filter(x=>!x.unknown).reduce((sum,x)=>sum+x.hours,0);
-    const fallbackUnknown=childCaps.some(x=>x.unknown);
     const rootCapInfo=capacityForDate(root,date);
-    const rootUnknown=rootCapInfo.unknown || (!(Number(rootCapInfo.hours)||0) && fallbackUnknown);
-    const effectiveRootCap=rootUnknown?0:((Number(rootCapInfo.hours)||0) || fallbackCap);
-    if(rootUnknown) hasUnknownCapacity=true; else totalCapacity+=effectiveRootCap;
+    if(rootCapInfo.blocked) blockedRootCount++;
+    if(rootCapInfo.unknown) hasUnknownCapacity=true; else totalCapacity+=rootCapInfo.hours;
     const rootCollapsed=isDayCalCollapsed(date,root.id);
-    html += `<div class="group calendarTreeGroup ${rootCollapsed?'collapsed':''}" style="--group-color:${esc(root.color)}"><div class="groupHead" style="background:${esc(root.color)}55">${dayCalHeadHtml(date,root,rootSum,effectiveRootCap,rootUnknown)}</div><div class="dayCalGroupBody">`;
+    const blockedTitle=rootCapInfo.blocked?' · 가용시간 차단 일정 있음':'';
+    html += `<div class="group calendarTreeGroup ${rootCollapsed?'collapsed':''}" style="--group-color:${esc(root.color)}"><div class="groupHead" style="background:${esc(root.color)}55" title="${esc(root.name)}${blockedTitle}">${dayCalHeadHtml(date,root,rootSum,rootCapInfo.hours,rootCapInfo.unknown)}</div><div class="dayCalGroupBody">`;
     const direct=groupEvents.filter(e=>e.calId===root.id);
     if(direct.length) html += quickLaneHtml(direct,false)+nonQuickItemsHtml(direct,false);
     for(const child of members.filter(c=>c.id!==root.id)){
       const xs=groupEvents.filter(e=>e.calId===child.id); if(!xs.length) continue;
-      const sum=xs.reduce((n,e)=>n+duration(e),0), depth=Math.max(1,calendarDepth(child.id));
-      const childCollapsed=isDayCalCollapsed(date,child.id), childCapInfo=capacityForDate(child,date);
-      html += `<div class="subCalGroup ${childCollapsed?'collapsed':''}" style="--sub-depth:${depth}"><div class="subCalHead" style="border-left-color:${esc(child.color)};background:color-mix(in srgb, ${esc(child.color)} 14%, white)">${dayCalHeadHtml(date,child,sum,childCapInfo.hours,childCapInfo.unknown,'↳ ')}</div><div class="dayCalGroupBody">${quickLaneHtml(xs,false)}${nonQuickItemsHtml(xs,false)}</div></div>`;
+      const depth=Math.max(1,calendarDepth(child.id));
+      const childCollapsed=isDayCalCollapsed(date,child.id);
+      html += `<div class="subCalGroup ${childCollapsed?'collapsed':''}" style="--sub-depth:${depth}"><div class="subCalHead" style="border-left-color:${esc(child.color)};background:color-mix(in srgb, ${esc(child.color)} 14%, white)">${daySubCalHeadHtml(date,child,'↳ ')}</div><div class="dayCalGroupBody">${quickLaneHtml(xs,false)}${nonQuickItemsHtml(xs,false)}</div></div>`;
     }
     html += `</div></div>`;
   }
   const overallOver=!hasUnknownCapacity && totalCapacity>0 && total>totalCapacity;
-  const capacitySummary=hasUnknownCapacity
+  let capacitySummary=hasUnknownCapacity
     ? `${totalCapacity?` · 확인된 가용 ${fmtH(totalCapacity)}`:''} · 일부 가용시간 미정`
     : (totalCapacity?` / 캘린더 가용 ${fmtH(totalCapacity)}`:'');
+  if(blockedRootCount) capacitySummary += ` · 가용차단 ${blockedRootCount}개`;
   return anniversaryHtml + appointmentHtml + paymentHtml + html + `<div class="dayTotal ${overallOver?'overallOver':''}">총 계획 ${fmtH(total)}${capacitySummary}</div>`;
 }
 
@@ -1015,6 +1050,8 @@ function syncSelects(){
   const fixedPrev = selectedFixedFilter, flexiblePrev=selectedFlexibleFilter, paymentPrev=selectedPaymentFilter;
   const opts=calendarOptionsHtml();
   $('#cal').innerHTML=opts; $('#fcal').innerHTML=opts;
+  const rootOpts=topLevelCals().map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
+  if($('#availabilityTarget')) $('#availabilityTarget').innerHTML=rootOpts;
   if($('#flexcal')) $('#flexcal').innerHTML=opts;
   $('#fixedFilter').innerHTML=`<option value="all">전체 캘린더</option>${opts}`;
   $('#flexibleFilter').innerHTML=`<option value="all">전체 캘린더</option>${opts}`;
@@ -1335,26 +1372,15 @@ function renderLoad(){
   for(const root of topLevelCals()){
     const members=[root,...descendants(root.id)].filter(c=>visibleIds.has(c.id));
     if(!members.length) continue;
+    const memberIds=new Set(members.map(c=>c.id));
     let rootSum=0;
-    for(const day of Object.values(map)) rootSum += day.filter(x=>members.some(c=>c.id===x.calId) && x.kind!=='payment').reduce((a,x)=>a+duration(x),0);
-    const children=members.filter(c=>c.id!==root.id);
-    const childWeekInfos=children.map(c=>capacityForWeek(c,s));
-    const childCapFallback=childWeekInfos.reduce((sum,x)=>sum+x.hours,0);
-    const childUnknownDays=childWeekInfos.reduce((sum,x)=>sum+x.unknownDays,0);
+    for(const day of Object.values(map)) rootSum += day.filter(x=>memberIds.has(x.calId) && x.kind!=='payment').reduce((a,x)=>a+workloadDuration(x),0);
     const rootWeek=capacityForWeek(root,s);
-    const useChildFallback=!rootWeek.hours && rootWeek.unknownDays===0 && (childCapFallback>0 || childUnknownDays>0);
-    const cap=useChildFallback?childCapFallback:rootWeek.hours;
-    const unknownDays=useChildFallback?childUnknownDays:rootWeek.unknownDays;
+    const cap=rootWeek.hours, unknownDays=rootWeek.unknownDays, blockedDays=rootWeek.blockedDays||0;
     const p=cap?rootSum/cap*100:0;
-    const capText=unknownDays?` / ${cap?`${fmtH(cap)} + `:''}미정 ${unknownDays}일`:(cap?` / ${fmtH(cap)}`:'');
-    rows.push(`<div class="loadLine ${unknownDays?'unknownCapacity':''}"><b>${esc(root.name)}</b> ${fmtH(rootSum)}${capText}<div class="loadBar ${unknownDays?'unknownLoadBar':''}"><i class="${!unknownDays&&p>100?'overBar':''}" style="width:${unknownDays?0:Math.min(100,p)}%"></i></div></div>`);
-    for(const child of children){
-      let sum=0; for(const day of Object.values(map)) sum += day.filter(x=>x.calId===child.id && x.kind!=='payment').reduce((a,x)=>a+duration(x),0);
-      const wi=capacityForWeek(child,s), ccap=wi.hours, unknownDaysChild=wi.unknownDays;
-      if(!sum && !ccap && !unknownDaysChild) continue;
-      const cp=ccap?sum/ccap*100:0, childCapText=unknownDaysChild?` / ${ccap?`${fmtH(ccap)} + `:''}미정 ${unknownDaysChild}일`:(ccap?` / ${fmtH(ccap)}`:'');
-      rows.push(`<div class="loadLine subLoad ${unknownDaysChild?'unknownCapacity':''}" style="--cal-depth:${Math.max(1,calendarDepth(child.id))}"><b>↳ ${esc(child.name)}</b> ${fmtH(sum)}${childCapText}<div class="loadBar ${unknownDaysChild?'unknownLoadBar':''}"><i class="${!unknownDaysChild&&cp>100?'overBar':''}" style="width:${unknownDaysChild?0:Math.min(100,cp)}%"></i></div></div>`);
-    }
+    let capText=unknownDays?` / ${cap?`${fmtH(cap)} + `:''}미정 ${unknownDays}일`:(cap?` / ${fmtH(cap)}`:' / 0h');
+    if(blockedDays) capText += ` · 차단 ${blockedDays}일`;
+    rows.push(`<div class="loadLine ${unknownDays?'unknownCapacity':''}"><b>${esc(root.name)}</b> ${fmtH(rootSum)}${capText}<div class="loadBar ${unknownDays?'unknownLoadBar':''}"><i class="${!unknownDays&&cap>0&&p>100?'overBar':''}" style="width:${unknownDays||!cap?0:Math.min(100,p)}%"></i></div></div>`);
   }
   $('#weekLoad').innerHTML=rows.join('') || '<div class="empty">표시 중인 캘린더가 없습니다.</div>';
 }
@@ -1607,6 +1633,103 @@ function bindItems(){
   $$('[data-more-date]').forEach(b=>b.onclick=e=>{e.stopPropagation();openDayList(b.dataset.moreDate);});
   $$('.diaryBtn').forEach(b=>b.onclick=e=>{e.stopPropagation();openDiary(b.dataset.diarydate);});
 }
+let pendingRepeatMove=null;
+function shiftedDateString(date,delta){ return ds(add(parse(date),delta)); }
+function shiftedDateArray(arr,delta,predicate=()=>true){
+  return (Array.isArray(arr)?arr:[]).filter(predicate).map(d=>shiftedDateString(String(d),delta));
+}
+function shiftedDateMap(obj,delta,predicate=()=>true){
+  const out={};
+  for(const [k,v] of Object.entries((obj&&typeof obj==='object')?obj:{})) if(predicate(k)) out[shiftedDateString(k,delta)]=structuredClone(v);
+  return out;
+}
+function shiftRepeatRuleForAnchor(e,oldAnchor,newAnchor){
+  const r=normalizedRule(e), delta=diffDays(oldAnchor,newAnchor), nd=parse(newAnchor);
+  if(r.endType==='date' && r.until) r.until=shiftedDateString(r.until,delta);
+  if(e.repeat==='weekly'){
+    r.weekdays=[...new Set((r.weekdays||[]).map(w=>(Number(w)+delta%7+7)%7))].sort((a,b)=>((a+6)%7)-((b+6)%7));
+  }else if(e.repeat==='monthly'){
+    if(r.monthlyMode==='date') r.monthDay=nd.getDate();
+    else if(r.monthlyMode==='monthEnd'){
+      const isMonthEnd=nd.getDate()===daysInMonth(nd.getFullYear(),nd.getMonth());
+      if(!isMonthEnd){ r.monthlyMode='date'; r.monthDay=nd.getDate(); }
+    }else if(r.monthlyMode==='nthWeekday'){
+      r.weekday=nd.getDay(); r.nth=Math.floor((nd.getDate()-1)/7)+1;
+    }else if(r.monthlyMode==='lastWeekday'){
+      const last=lastWeekday(nd.getFullYear(),nd.getMonth(),nd.getDay());
+      if(ds(last)===newAnchor) r.weekday=nd.getDay();
+      else { r.monthlyMode='date'; r.monthDay=nd.getDate(); }
+    }
+  }else if(e.repeat==='yearly'){
+    if(r.yearlyCalendar==='lunar'){
+      const lp=lunarPartsFromSolar(nd);
+      if(lp){ r.lunarMonth=lp.month; r.lunarDay=lp.day; r.lunarLeap=!!lp.leap; }
+    }else{
+      r.yearlyMonth=nd.getMonth()+1; r.yearlyDay=nd.getDate();
+    }
+  }
+  return r;
+}
+function moveRecurringOccurrenceOnly(e,newDate,occ){
+  const span=Math.max(0,diffDays(e.date,e.endDate||e.date));
+  e.excludedDates=Array.isArray(e.excludedDates)?e.excludedDates:[];
+  if(!e.excludedDates.includes(occ)) e.excludedDates.push(occ);
+  const wasDone=(e.doneDates||[]).includes(occ);
+  const movedChecklistDone=Array.isArray(e.checklistDoneByDate?.[occ])?[...e.checklistDoneByDate[occ]]:[];
+  const detached={...structuredClone(e),id:uid(),date:newDate,endDate:ds(add(parse(newDate),span)),repeat:'none',repeatRule:null,excludedDates:[],done:wasDone,doneDates:[],checklistDoneByDate:movedChecklistDone.length?{[newDate]:movedChecklistDone}:{},orderByDate:{},repeatOrder:0,fixedId:null,detachedFromRepeatId:e.id,detachedOccurrence:occ};
+  if(e.checklistDoneByDate?.[occ]) delete e.checklistDoneByDate[occ];
+  detached.carryoverHistory=[];
+  state.events.push(detached);
+}
+function moveRecurringFuture(e,newDate,occ){
+  const span=Math.max(0,diffDays(e.date,e.endDate||e.date));
+  const delta=diffDays(occ,newDate);
+  const oldRule=normalizedRule(e);
+  const future={...structuredClone(e),id:uid(),date:newDate,endDate:ds(add(parse(newDate),span))};
+  future.repeatRule=shiftRepeatRuleForAnchor(e,occ,newDate);
+  // 종료 횟수형은 이미 지나간 발생 횟수를 제외한 남은 횟수만 새 시리즈로 넘깁니다.
+  if(oldRule.endType==='count'){
+    const prevEnd=ds(add(parse(occ),-1));
+    const beforeCount=generateOccurrenceStarts(e,e.date,prevEnd).length;
+    future.repeatRule.endType='count';
+    future.repeatRule.count=Math.max(1,Number(oldRule.count||1)-beforeCount);
+  }
+  future.excludedDates=shiftedDateArray(e.excludedDates,delta,d=>String(d)>=occ);
+  future.doneDates=shiftedDateArray(e.doneDates,delta,d=>String(d)>=occ);
+  future.checklistDoneByDate=shiftedDateMap(e.checklistDoneByDate,delta,d=>String(d)>=occ);
+  future.orderByDate=shiftedDateMap(e.orderByDate,delta,d=>String(d)>=occ);
+  future.detachedFromRepeatId=''; future.detachedOccurrence='';
+
+  if(occ<=e.date){
+    future.id=e.id;
+    Object.keys(e).forEach(k=>delete e[k]); Object.assign(e,future);
+  }else{
+    const pastRule=normalizedRule(e);
+    pastRule.endType='date'; pastRule.until=ds(add(parse(occ),-1));
+    e.repeatRule=pastRule;
+    e.excludedDates=(e.excludedDates||[]).filter(d=>String(d)<occ);
+    e.doneDates=(e.doneDates||[]).filter(d=>String(d)<occ);
+    e.checklistDoneByDate=Object.fromEntries(Object.entries(e.checklistDoneByDate||{}).filter(([k])=>k<occ));
+    e.orderByDate=Object.fromEntries(Object.entries(e.orderByDate||{}).filter(([k])=>k<occ));
+    state.events.push(future);
+  }
+}
+function moveRecurringWholeSeries(e,newDate,occ){
+  const delta=diffDays(occ,newDate);
+  const shiftedRule=shiftRepeatRuleForAnchor(e,occ,newDate);
+  const oldDate=e.date, oldEnd=e.endDate||e.date;
+  e.date=shiftedDateString(oldDate,delta);
+  e.endDate=shiftedDateString(oldEnd,delta);
+  e.repeatRule=shiftedRule;
+  e.excludedDates=shiftedDateArray(e.excludedDates,delta);
+  e.doneDates=shiftedDateArray(e.doneDates,delta);
+  e.checklistDoneByDate=shiftedDateMap(e.checklistDoneByDate,delta);
+  e.orderByDate=shiftedDateMap(e.orderByDate,delta);
+  if(e.carryoverHistory?.length){
+    e.carryoverHistory=e.carryoverHistory.map(r=>({...r,fromDate:shiftedDateString(r.fromDate,delta),toDate:shiftedDateString(r.toDate,delta)}));
+  }
+}
+function finishRepeatMove(){ pendingRepeatMove=null; closeDialog($('#repeatMoveDlg')); save(); }
 function moveEventToDate(id,newDate,occurrence='',sourceDay=''){
   const e=state.events.find(x=>x.id===id); if(!e) return;
   if(sourceDay && sourceDay===newDate) return;
@@ -1617,17 +1740,27 @@ function moveEventToDate(id,newDate,occurrence='',sourceDay=''){
     if(e.checklistDoneByDate?.[oldDate]){ e.checklistDoneByDate[newDate]=e.checklistDoneByDate[oldDate]; delete e.checklistDoneByDate[oldDate]; }
     save(); return;
   }
-  // 반복 일정은 드래그한 발생일만 시리즈에서 제외하고, 이동한 날짜에 일회성 일정으로 분리합니다.
   const occ=occurrence||e.date;
-  e.excludedDates=Array.isArray(e.excludedDates)?e.excludedDates:[];
-  if(!e.excludedDates.includes(occ)) e.excludedDates.push(occ);
-  const wasDone=(e.doneDates||[]).includes(occ);
-  const movedChecklistDone=Array.isArray(e.checklistDoneByDate?.[occ])?[...e.checklistDoneByDate[occ]]:[];
-  const detached={...structuredClone(e),id:uid(),date:newDate,endDate:ds(add(parse(newDate),span)),repeat:'none',repeatRule:null,excludedDates:[],done:wasDone,doneDates:[],checklistDoneByDate:movedChecklistDone.length?{[newDate]:movedChecklistDone}:{},orderByDate:{},repeatOrder:0,fixedId:null,detachedFromRepeatId:e.id,detachedOccurrence:occ};
-  if(e.checklistDoneByDate?.[occ]) delete e.checklistDoneByDate[occ];
-  detached.carryoverHistory=[];
-  state.events.push(detached); save();
+  pendingRepeatMove={id:e.id,newDate,occ,sourceDay};
+  const delta=diffDays(occ,newDate);
+  const dir=delta>0?`${delta}일 뒤로`:delta<0?`${Math.abs(delta)}일 앞으로`:'같은 날짜로';
+  $('#repeatMoveInfo').textContent=`${occ} 일정을 ${newDate}(으)로 ${dir} 이동합니다. 적용 범위를 선택하세요.`;
+  openDialog($('#repeatMoveDlg'));
 }
+$('#moveOccurrenceOnly').onclick=()=>{
+  const p=pendingRepeatMove, e=p&&state.events.find(x=>x.id===p.id); if(!p||!e) return;
+  moveRecurringOccurrenceOnly(e,p.newDate,p.occ); finishRepeatMove();
+};
+$('#moveFutureSeries').onclick=()=>{
+  const p=pendingRepeatMove, e=p&&state.events.find(x=>x.id===p.id); if(!p||!e) return;
+  moveRecurringFuture(e,p.newDate,p.occ); finishRepeatMove();
+};
+$('#moveWholeSeries').onclick=()=>{
+  const p=pendingRepeatMove, e=p&&state.events.find(x=>x.id===p.id); if(!p||!e) return;
+  moveRecurringWholeSeries(e,p.newDate,p.occ); finishRepeatMove();
+};
+$('#cancelRepeatMove').onclick=()=>{ pendingRepeatMove=null; closeDialog($('#repeatMoveDlg')); render(); };
+
 function toggleImportant(id){
   const e=state.events.find(x=>x.id===id); if(!e) return;
   e.important=!e.important;
@@ -1787,10 +1920,23 @@ function updateDurationMode(){
   }
   cb.disabled=false; hint.textContent=''; hint.classList.add('hidden'); updateDurationUI();
 }
+function updateAvailabilityBlockUI(){
+  const unavailableKind=['payment','anniversary'].includes($('#kind').value);
+  const field=$('#availabilityBlockFields'), cb=$('#availabilityBlock'), wrap=$('#availabilityTargetWrap');
+  if(!field||!cb||!wrap) return;
+  field.classList.toggle('hidden',unavailableKind);
+  if(unavailableKind) cb.checked=false;
+  wrap.classList.toggle('hidden',unavailableKind || !cb.checked);
+}
+function defaultAvailabilityTargetForSelectedCalendar(){
+  const root=topAncestor($('#cal')?.value||'');
+  return root?.id || topLevelCals()[0]?.id || '';
+}
 function updateKindUI(){
   const payment=$('#kind').value==='payment';
   $('#paymentFields').classList.toggle('hidden',!payment);
   $('#carryEvent').classList.toggle('paymentHidden',payment);
+  updateAvailabilityBlockUI();
   updateDurationMode();
 }
 function updateAllDayUI(){ $('#timeFields').classList.toggle('hidden',$('#allDay').checked); updateDurationMode(); }
@@ -1925,6 +2071,9 @@ function openEvent(date,id,options={}){
   $('#kind').value=e?.kind||(paymentPreset?'payment':(recurringPreset?'todo':'event')); $('#place').value=e?.place||''; $('#repeat').value=e?.repeat||(paymentPreset?'monthly':(recurringPreset?'weekly':'none')); $('#memo').value=e?.memo||'';
   $('#checklistText').value=checklistItems(e||{}).map(x=>x.text).join('\n');
   $('#paymentAmount').value=e?.paymentAmount||''; $('#paymentMethod').value=e?.paymentMethod||'';
+  $('#availabilityBlock').checked=!!e?.availabilityBlock;
+  const preferredAvailabilityTarget=e?.availabilityTargetCalId||defaultAvailabilityTargetForSelectedCalendar();
+  if($('#availabilityTarget') && [...$('#availabilityTarget').options].some(o=>o.value===preferredAvailabilityTarget)) $('#availabilityTarget').value=preferredAvailabilityTarget;
   $('#repeat').disabled=false;
   $('#deleteEvent').style.visibility=e?'visible':'hidden'; $('#copyEvent').style.visibility=e?'visible':'hidden';
   const occurrenceView=e?{...e,_occurrenceStart:activeEventOccurrence}:null;
@@ -1959,6 +2108,8 @@ $('#eventForm').onsubmit=e=>{
     start:$('#allDay').checked?'':$('#start').value, end:$('#allDay').checked?'':$('#end').value,
     hours:$('#kind').value==='payment'?0:(timedHoursFromForm()??getDurationInputs()), noDuration:$('#kind').value==='payment'?true:($('#noDuration').checked && timedHoursFromForm()===null), kind:$('#kind').value, place:$('#place').value.trim(),
     paymentAmount:$('#kind').value==='payment'?Math.max(0,Number($('#paymentAmount').value)||0):0, paymentMethod:$('#kind').value==='payment'?$('#paymentMethod').value.trim():'',
+    availabilityBlock:!['payment','anniversary'].includes($('#kind').value) && !!$('#availabilityBlock').checked,
+    availabilityTargetCalId:(!['payment','anniversary'].includes($('#kind').value) && $('#availabilityBlock').checked)?($('#availabilityTarget').value||defaultAvailabilityTargetForSelectedCalendar()):'',
     repeat, repeatRule:repeat==='none'?null:getRepeatRule(), memo:$('#memo').value,
     checklist, checklistDoneByDate, orderByDate:old?.orderByDate||{},
     done:old?.done||false, doneDates:old?.doneDates||[], excludedDates:old?.excludedDates||[], fixedId:old?.fixedId||null
@@ -2070,7 +2221,7 @@ $('#togglePurchase').onclick=()=>{ state.settings.fixedPanelsCollapsed.purchase=
 $('#purchaseForm').onsubmit=e=>{ e.preventDefault(); const id=$('#purchaseId').value, old=state.purchases.find(x=>x.id===id), obj={id:id||uid(),name:$('#purchaseName').value.trim(),qty:Math.max(1,Number($('#purchaseQty').value)||1),memo:$('#purchaseMemo').value,done:$('#purchaseDone').checked,createdAt:old?.createdAt||new Date().toISOString()}; if(!obj.name) return; if(id) state.purchases[state.purchases.findIndex(x=>x.id===id)]=obj; else state.purchases.push(obj); closeDialog($('#purchaseDlg')); save(); };
 $('#cancelPurchase').onclick=()=>closeDialog($('#purchaseDlg'));
 $('#deletePurchase').onclick=()=>{ const id=$('#purchaseId').value; if(id&&confirm('이 구매항목을 삭제할까요?')){ state.purchases=state.purchases.filter(x=>x.id!==id); closeDialog($('#purchaseDlg')); save(); } };
-$('#allDay').onchange=updateAllDayUI; $('#noDuration').onchange=()=>updateDurationMode(); $('#kind').onchange=updateKindUI; $('#start').onchange=updateDurationMode; $('#end').onchange=updateDurationMode; $('#endDate').onchange=updateDurationMode; $('#repeat').onchange=updateRepeatUI; $('#date').onchange=()=>{
+$('#allDay').onchange=updateAllDayUI; $('#noDuration').onchange=()=>updateDurationMode(); $('#kind').onchange=updateKindUI; $('#availabilityBlock').onchange=updateAvailabilityBlockUI; $('#cal').onchange=()=>{ if($('#availabilityBlock').checked){ const v=defaultAvailabilityTargetForSelectedCalendar(); if([...$('#availabilityTarget').options].some(o=>o.value===v)) $('#availabilityTarget').value=v; } }; $('#start').onchange=updateDurationMode; $('#end').onchange=updateDurationMode; $('#endDate').onchange=updateDurationMode; $('#repeat').onchange=updateRepeatUI; $('#date').onchange=()=>{
   if(!$('#endDate').value || $('#endDate').value<$('#date').value) $('#endDate').value=$('#date').value;
   const d=parse($('#date').value), lp=lunarPartsFromSolar(d);
   $('#yearlyMonth').value=d.getMonth()+1; $('#yearlyDay').value=d.getDate();
@@ -2102,6 +2253,20 @@ function applySuggestedCalendarColor(){
   const parentId=$('#cparent').value||''; if(!parentId) return;
   $('#ccolor').value=suggestSubCalendarColor(parentId,$('#cid').value||'');
 }
+function updateCalendarCapacityMode(){
+  const shared=!!($('#cparent')?.value||'');
+  const field=document.querySelector('.weekdayCapacityField');
+  if(field) field.classList.toggle('sharedFromParent',shared);
+  document.querySelectorAll('[data-cap-dow],[data-cap-unknown]').forEach(el=>{
+    if(shared) el.disabled=true;
+    else if(el.matches('[data-cap-dow]')){
+      const dow=el.dataset.capDow, chk=document.querySelector(`[data-cap-unknown="${dow}"]`);
+      el.disabled=!!chk?.checked;
+    }else el.disabled=false;
+  });
+  const note=$('#sharedCapacityNote'); if(note) note.classList.toggle('hidden',!shared);
+  const hint=$('#capacityOwnHint'); if(hint) hint.classList.toggle('hidden',shared);
+}
 function openCal(id){
   const c=state.calendars.find(x=>x.id===id);
   $('#cid').value=c?.id||''; $('#cname').value=c?.name||''; $('#ccolor').value=c?.color||'#d9d9d9';
@@ -2115,15 +2280,17 @@ function openCal(id){
     if(chk) chk.checked=!!src.unknown;
   }
   updateCalColorHint();
+  updateCalendarCapacityMode();
   $('#deleteCal').style.visibility=c?'visible':'hidden'; openDialog($('#calDlg'));
 }
 $('#cparent').onchange=()=>{
   updateCalColorHint();
+  updateCalendarCapacityMode();
   // 새 부속캘린더를 만들 때만 자동 적용합니다. 기존 캘린더의 수동 색상은 임의로 덮어쓰지 않습니다.
   if(!$('#cid').value && $('#cparent').value) applySuggestedCalendarColor();
 };
 $('#suggestCalColor').onclick=applySuggestedCalendarColor;
-document.querySelectorAll('[data-cap-unknown]').forEach(chk=>chk.onchange=()=>{ const dow=chk.dataset.capUnknown, inp=document.querySelector(`[data-cap-dow="${dow}"]`); if(inp) inp.disabled=chk.checked; });
+document.querySelectorAll('[data-cap-unknown]').forEach(chk=>chk.onchange=()=>{ if($('#cparent')?.value) return; const dow=chk.dataset.capUnknown, inp=document.querySelector(`[data-cap-dow="${dow}"]`); if(inp) inp.disabled=chk.checked; });
 $('#calForm').onsubmit=e=>{
   e.preventDefault();
   const id=$('#cid').value, parentId=$('#cparent').value||'';
@@ -2408,7 +2575,7 @@ $('#restoreBackupBtn').onclick=()=>$('#restoreFile').click();
 $('#restoreFile').onchange=e=>restoreBackupFile(e.target.files?.[0]);
 
 // Native dialog cancel/ESC never saves. Explicit cancel buttons above only close dialogs.
-['eventDlg','repeatDeleteDlg','carryDlg','calDlg','fixedDlg','diaryDlg','searchDlg','settingsDlg'].forEach(id=>{
+['eventDlg','repeatDeleteDlg','repeatMoveDlg','carryDlg','calDlg','fixedDlg','diaryDlg','searchDlg','settingsDlg'].forEach(id=>{
   const d=$(`#${id}`); d.addEventListener('cancel',()=>{});
 });
 
