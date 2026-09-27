@@ -37,11 +37,11 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.13',
+  version: '1.14',
   calendars: [
-    {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5},
-    {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3},
-    {id:'family',name:'가족/개인',color:'#f6e8a6',order:3,period:'저녁',capacity:2}
+    {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,parentId:''},
+    {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,parentId:''},
+    {id:'family',name:'가족/개인',color:'#f6e8a6',order:3,period:'저녁',capacity:2,parentId:''}
   ],
   events: [],
   fixed: [],
@@ -121,12 +121,28 @@ async function loadHolidayData(){
 function normalizeState(raw){
   const d = defaultState();
   const s = raw && typeof raw === 'object' ? raw : {};
-  return {
-    version: '1.13',
-    calendars: Array.isArray(s.calendars) && s.calendars.length ? s.calendars.map((c,i)=>({
+  const calendars = Array.isArray(s.calendars) && s.calendars.length ? s.calendars.map((c,i)=>(
+    {
       id:c.id||uid(), name:c.name||`캘린더 ${i+1}`, color:c.color||'#d9d9d9',
-      order:Number(c.order)||i+1, period:c.period||'종일', capacity:Number(c.capacity)||0
-    })) : d.calendars,
+      order:Number(c.order)||i+1, period:c.period||'종일', capacity:Number(c.capacity)||0,
+      parentId:typeof c.parentId==='string'?c.parentId:''
+    }
+  )) : d.calendars;
+  const ids = new Set(calendars.map(c=>c.id));
+  calendars.forEach(c=>{ if(!c.parentId || c.parentId===c.id || !ids.has(c.parentId)) c.parentId=''; });
+  // 손상된 백업 등에서 부모 순환참조가 들어와도 자동으로 최상위 캘린더로 복구합니다.
+  calendars.forEach(c=>{
+    const seen=new Set([c.id]); let cur=c;
+    while(cur.parentId){
+      if(seen.has(cur.parentId)){ c.parentId=''; break; }
+      seen.add(cur.parentId);
+      cur=calendars.find(x=>x.id===cur.parentId);
+      if(!cur) break;
+    }
+  });
+  return {
+    version: '1.14',
+    calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
       endDate:e.endDate||e.date,
@@ -211,7 +227,7 @@ async function writeRemoteNow(reason='save'){
   if(!syncReady || !remoteRef || applyingRemote) return false;
   clearTimeout(saveTimer); saveTimer=null;
   localDirty=true; writeInFlight=true;
-  setSyncStatus(reason==='restore'?'백업 복원 저장 중…':'저장 중…','saving');
+  setSyncStatus(reason==='restore'?'백업 복원 저장 중…':reason==='manual'?'최신자료 저장 중…':'저장 중…','saving');
   try{
     await setDoc(remoteRef,{state,updatedAt:serverTimestamp()},{merge:false});
     localDirty=false; writeInFlight=false;
@@ -239,12 +255,60 @@ function save({rerender=true}={}){
   if(rerender) render();
 }
 
-function cals(){ return [...state.calendars].sort((a,b)=>(a.order-b.order)||a.name.localeCompare(b.name)); }
-function visibleCals(){
-  const hidden = new Set(state.settings.hiddenCalendars||[]);
-  return cals().filter(c=>!hidden.has(c.id));
+function sortedRawCals(list=state.calendars){ return [...list].sort((a,b)=>(a.order-b.order)||a.name.localeCompare(b.name)); }
+function cal(id){ return state.calendars.find(x=>x.id===id) || state.calendars[0] || {id:'',name:'미지정',color:'#ddd',order:999,capacity:0,period:'종일',parentId:''}; }
+function directChildren(parentId){ return sortedRawCals(state.calendars.filter(c=>c.parentId===parentId)); }
+function calendarDepth(id){
+  let depth=0, cur=state.calendars.find(c=>c.id===id), seen=new Set();
+  while(cur?.parentId && depth<20 && !seen.has(cur.parentId)){
+    seen.add(cur.id); depth++; cur=state.calendars.find(c=>c.id===cur.parentId);
+  }
+  return depth;
 }
-function cal(id){ return state.calendars.find(x=>x.id===id) || state.calendars[0] || {id:'',name:'미지정',color:'#ddd',order:999,capacity:0,period:'종일'}; }
+function descendants(id){
+  const out=[]; const seen=new Set();
+  const walk=pid=>{ for(const child of directChildren(pid)){ if(seen.has(child.id)) continue; seen.add(child.id); out.push(child); walk(child.id); } };
+  walk(id); return out;
+}
+function topAncestor(cOrId){
+  let cur=typeof cOrId==='string'?state.calendars.find(c=>c.id===cOrId):cOrId;
+  if(!cur) return null;
+  const seen=new Set([cur.id]);
+  while(cur.parentId){
+    const p=state.calendars.find(c=>c.id===cur.parentId);
+    if(!p || seen.has(p.id)) break;
+    seen.add(p.id); cur=p;
+  }
+  return cur;
+}
+function topLevelCals(){
+  const ids=new Set(state.calendars.map(c=>c.id));
+  return sortedRawCals(state.calendars.filter(c=>!c.parentId || !ids.has(c.parentId)));
+}
+function cals(){
+  const out=[], visited=new Set();
+  const walk=c=>{ if(!c || visited.has(c.id)) return; visited.add(c.id); out.push(c); directChildren(c.id).forEach(walk); };
+  topLevelCals().forEach(walk);
+  sortedRawCals().forEach(walk);
+  return out;
+}
+function isCalendarHidden(id){
+  const hidden=new Set(state.settings.hiddenCalendars||[]);
+  let cur=state.calendars.find(c=>c.id===id), seen=new Set();
+  while(cur){
+    if(hidden.has(cur.id)) return true;
+    if(!cur.parentId || seen.has(cur.parentId)) break;
+    seen.add(cur.id); cur=state.calendars.find(c=>c.id===cur.parentId);
+  }
+  return false;
+}
+function visibleCals(){ return cals().filter(c=>!isCalendarHidden(c.id)); }
+function calendarPath(id){
+  let cur=state.calendars.find(c=>c.id===id); if(!cur) return '미지정';
+  const parts=[], seen=new Set();
+  while(cur && !seen.has(cur.id)){ parts.unshift(cur.name); seen.add(cur.id); cur=cur.parentId?state.calendars.find(c=>c.id===cur.parentId):null; }
+  return parts.join(' › ');
+}
 function duration(e){ return Number(e.hours)||0; }
 function fmtH(h){
   const m = Math.round((Number(h)||0)*60);
@@ -426,25 +490,48 @@ function eventItemHtml(e, compact=false){
     ${compact?'':`<div class="meta">${meta.join(' · ')}</div>`}
   </div>`;
 }
+function capacityText(sum, cap){
+  const n=Number(cap)||0;
+  if(!n) return `<span>${fmtH(sum)}</span>`;
+  return `<span class="${sum>n?'over':'ok'}">${fmtH(sum)} / ${fmtH(n)}</span>`;
+}
 function groupHtml(date, es){
   let html='';
-  let total=0, totalCap=0;
-  for(const c of visibleCals()){
-    const xs=es.filter(e=>e.calId===c.id);
-    if(!xs.length) continue;
-    const sum=xs.reduce((s,e)=>s+duration(e),0);
-    total += sum; totalCap += Number(c.capacity)||0;
-    const over=sum>(Number(c.capacity)||0);
-    html += `<div class="group"><div class="groupHead" style="background:${esc(c.color)}55"><span>${esc(c.name)} · ${esc(c.period)}</span><span class="${over?'over':'ok'}">${fmtH(sum)} / ${fmtH(c.capacity)}</span></div>${xs.map(e=>eventItemHtml(e)).join('')}</div>`;
+  const visible=visibleCals(), visibleIds=new Set(visible.map(c=>c.id));
+  let total=0, totalCapacity=0;
+  for(const root of topLevelCals().filter(c=>visibleIds.has(c.id))){
+    const members=[root,...descendants(root.id)].filter(c=>visibleIds.has(c.id));
+    const memberIds=new Set(members.map(c=>c.id));
+    const groupEvents=es.filter(e=>memberIds.has(e.calId));
+    if(!groupEvents.length) continue;
+    const rootSum=groupEvents.reduce((sum,e)=>sum+duration(e),0);
+    total+=rootSum;
+    const fallbackCap=members.filter(c=>c.id!==root.id && groupEvents.some(e=>e.calId===c.id)).reduce((sum,c)=>sum+(Number(c.capacity)||0),0);
+    const effectiveRootCap=(Number(root.capacity)||0) || fallbackCap;
+    totalCapacity+=effectiveRootCap;
+    html += `<div class="group calendarTreeGroup"><div class="groupHead" style="background:${esc(root.color)}55"><span>${esc(root.name)} · ${esc(root.period)}</span>${capacityText(rootSum,effectiveRootCap)}</div>`;
+    const direct=groupEvents.filter(e=>e.calId===root.id);
+    if(direct.length) html += direct.map(e=>eventItemHtml(e)).join('');
+    for(const child of members.filter(c=>c.id!==root.id)){
+      const xs=groupEvents.filter(e=>e.calId===child.id); if(!xs.length) continue;
+      const sum=xs.reduce((n,e)=>n+duration(e),0), depth=Math.max(1,calendarDepth(child.id));
+      html += `<div class="subCalGroup" style="--sub-depth:${depth}"><div class="subCalHead" style="border-left-color:${esc(child.color)}"><span>↳ ${esc(child.name)} · ${esc(child.period)}</span>${capacityText(sum,child.capacity)}</div>${xs.map(e=>eventItemHtml(e)).join('')}</div>`;
+    }
+    html += `</div>`;
   }
-  const allVisibleCaps = visibleCals().filter(c=>es.some(e=>e.calId===c.id)).reduce((s,c)=>s+(Number(c.capacity)||0),0);
-  const overallOver = allVisibleCaps>0 && total>allVisibleCaps;
-  return html + `<div class="dayTotal ${overallOver?'overallOver':''}">총 계획 ${fmtH(total)}${allVisibleCaps?` / 배치된 캘린더 가용 ${fmtH(allVisibleCaps)}`:''}</div>`;
+  const overallOver=totalCapacity>0 && total>totalCapacity;
+  return html + `<div class="dayTotal ${overallOver?'overallOver':''}">총 계획 ${fmtH(total)}${totalCapacity?` / 캘린더 가용 ${fmtH(totalCapacity)}`:''}</div>`;
 }
 
+function calendarOptionsHtml(){
+  return cals().map(c=>{
+    const depth=calendarDepth(c.id), prefix=depth?`${'　'.repeat(Math.max(0,depth-1))}↳ `:'';
+    return `<option value="${esc(c.id)}">${prefix}${esc(c.name)}</option>`;
+  }).join('');
+}
 function syncSelects(){
   const fixedPrev = selectedFixedFilter;
-  const opts=cals().map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
+  const opts=calendarOptionsHtml();
   $('#cal').innerHTML=opts; $('#fcal').innerHTML=opts;
   $('#fixedFilter').innerHTML=`<option value="all">전체 캘린더</option>${opts}`;
   if([...$('#fixedFilter').options].some(o=>o.value===fixedPrev)) $('#fixedFilter').value=fixedPrev;
@@ -453,12 +540,15 @@ function syncSelects(){
 function renderSide(){
   syncSelects();
   const hidden=new Set(state.settings.hiddenCalendars||[]);
-  $('#calList').innerHTML=cals().map(c=>`<div class="calRow" data-cid="${esc(c.id)}"><input class="calVisible" type="checkbox" ${hidden.has(c.id)?'':'checked'} title="표시/숨김"><i class="dot" style="background:${esc(c.color)}"></i><span class="name">${esc(c.name)}</span><small>${esc(c.period)} · ${esc(c.capacity)}h</small></div>`).join('');
+  $('#calList').innerHTML=cals().map(c=>{
+    const depth=calendarDepth(c.id), kids=directChildren(c.id).length;
+    return `<div class="calRow ${depth?'subCalendarRow':''}" data-cid="${esc(c.id)}" style="--cal-depth:${depth}"><input class="calVisible" type="checkbox" ${isCalendarHidden(c.id)?'':'checked'} title="표시/숨김"><i class="dot" style="background:${esc(c.color)}"></i><span class="name">${depth?'↳ ':''}${esc(c.name)}</span><small>${esc(c.period)} · ${esc(c.capacity)}h${kids?` · 부속 ${kids}`:''}</small></div>`;
+  }).join('');
   $$('.calRow').forEach(row=>{
     row.querySelector('.calVisible').onclick=e=>{
       e.stopPropagation();
-      const id=row.dataset.cid, set=new Set(state.settings.hiddenCalendars||[]);
-      e.target.checked ? set.delete(id) : set.add(id);
+      const id=row.dataset.cid, set=new Set(state.settings.hiddenCalendars||[]), ids=[id,...descendants(id).map(c=>c.id)];
+      if(e.target.checked) ids.forEach(x=>set.delete(x)); else ids.forEach(x=>set.add(x));
       state.settings.hiddenCalendars=[...set]; save();
     };
     row.onclick=()=>openCal(row.dataset.cid);
@@ -468,9 +558,10 @@ function renderSide(){
 function renderFixed(){
   const f=selectedFixedFilter||'all';
   const month=`${cursor.getFullYear()}-${pad(cursor.getMonth()+1)}`;
-  const rows=state.fixed.filter(x=>f==='all'||x.calId===f).map(x=>{
+  const allowed=f==='all'?null:new Set([f,...descendants(f).map(c=>c.id)]);
+  const rows=state.fixed.filter(x=>!allowed||allowed.has(x.calId)).map(x=>{
     const c=cal(x.calId), used=state.events.some(e=>e.fixedId===x.id && (e.date||'').startsWith(month));
-    return `<div class="fixed ${used?'used':''}" draggable="true" data-fid="${esc(x.id)}" style="border-left-color:${esc(c.color)}"><b>${used?'✓ ':''}${esc(x.name)}</b><small>${esc(c.name)} · ${fmtH(x.hours)}</small></div>`;
+    return `<div class="fixed ${used?'used':''}" draggable="true" data-fid="${esc(x.id)}" style="border-left-color:${esc(c.color)}"><b>${used?'✓ ':''}${esc(x.name)}</b><small>${esc(calendarPath(c.id))} · ${fmtH(x.hours)}</small></div>`;
   }).join('');
   $('#fixedList').innerHTML=rows||`<div class="empty">고정업무를 등록하세요.</div>`;
   $$('.fixed').forEach(x=>{
@@ -479,13 +570,23 @@ function renderFixed(){
   });
 }
 function renderLoad(){
-  const s=startWeek(cursor), e=add(s,6), map=buildOccurrenceMap(ds(s),ds(e));
-  $('#weekLoad').innerHTML=visibleCals().map(c=>{
-    let sum=0;
-    for(const day of Object.values(map)) sum += day.filter(x=>x.calId===c.id).reduce((a,x)=>a+duration(x),0);
-    const cap=(Number(c.capacity)||0)*7, p=cap?sum/cap*100:0;
-    return `<div class="loadLine"><b>${esc(c.name)}</b> ${fmtH(sum)} / ${fmtH(cap)}<div class="loadBar"><i class="${p>100?'overBar':''}" style="width:${Math.min(100,p)}%"></i></div></div>`;
-  }).join('') || '<div class="empty">표시 중인 캘린더가 없습니다.</div>';
+  const s=startWeek(cursor), e=add(s,6), map=buildOccurrenceMap(ds(s),ds(e)), visibleIds=new Set(visibleCals().map(c=>c.id));
+  const rows=[];
+  for(const root of topLevelCals().filter(c=>visibleIds.has(c.id))){
+    const members=[root,...descendants(root.id)].filter(c=>visibleIds.has(c.id));
+    let rootSum=0;
+    for(const day of Object.values(map)) rootSum += day.filter(x=>members.some(c=>c.id===x.calId)).reduce((a,x)=>a+duration(x),0);
+    const childCapFallback=members.filter(c=>c.id!==root.id).reduce((sum,c)=>sum+(Number(c.capacity)||0),0)*7;
+    const cap=(Number(root.capacity)||0)*7 || childCapFallback, p=cap?rootSum/cap*100:0;
+    rows.push(`<div class="loadLine"><b>${esc(root.name)}</b> ${fmtH(rootSum)}${cap?` / ${fmtH(cap)}`:''}<div class="loadBar"><i class="${p>100?'overBar':''}" style="width:${Math.min(100,p)}%"></i></div></div>`);
+    for(const child of members.filter(c=>c.id!==root.id)){
+      let sum=0; for(const day of Object.values(map)) sum += day.filter(x=>x.calId===child.id).reduce((a,x)=>a+duration(x),0);
+      if(!sum && !Number(child.capacity)) continue;
+      const ccap=(Number(child.capacity)||0)*7, cp=ccap?sum/ccap*100:0;
+      rows.push(`<div class="loadLine subLoad" style="--cal-depth:${Math.max(1,calendarDepth(child.id))}"><b>↳ ${esc(child.name)}</b> ${fmtH(sum)}${ccap?` / ${fmtH(ccap)}`:''}<div class="loadBar"><i class="${cp>100?'overBar':''}" style="width:${Math.min(100,cp)}%"></i></div></div>`);
+    }
+  }
+  $('#weekLoad').innerHTML=rows.join('') || '<div class="empty">표시 중인 캘린더가 없습니다.</div>';
 }
 function nextOccurrenceFor(e, from=ds(new Date()), horizonDays=740){
   const ends=ds(add(parse(from),horizonDays));
@@ -692,15 +793,26 @@ $('#allDay').onchange=updateAllDayUI; $('#repeat').onchange=updateRepeatUI; $('#
   $('#yearlyMonth').value=parse($('#date').value).getMonth()+1; $('#yearlyDay').value=parse($('#date').value).getDate(); updateRepeatUI();
 }; $('#repeatEndType').onchange=updateRepeatEndUI;
 
+function parentOptionsFor(editId=''){
+  const blocked=new Set(editId?[editId,...descendants(editId).map(c=>c.id)]:[]);
+  return cals().filter(c=>!blocked.has(c.id)).map(c=>{
+    const depth=calendarDepth(c.id), prefix=depth?`${'　'.repeat(Math.max(0,depth-1))}↳ `:'';
+    return `<option value="${esc(c.id)}">${prefix}${esc(c.name)}</option>`;
+  }).join('');
+}
 function openCal(id){
   const c=state.calendars.find(x=>x.id===id);
   $('#cid').value=c?.id||''; $('#cname').value=c?.name||''; $('#ccolor').value=c?.color||'#d9d9d9';
+  $('#cparent').innerHTML=`<option value="">없음 (기본 캘린더)</option>${parentOptionsFor(c?.id||'')}`;
+  $('#cparent').value=c?.parentId||'';
   $('#corder').value=c?.order||state.calendars.length+1; $('#cperiod').value=c?.period||'오전'; $('#ccap').value=c?.capacity??8;
   $('#deleteCal').style.visibility=c?'visible':'hidden'; openDialog($('#calDlg'));
 }
 $('#calForm').onsubmit=e=>{
   e.preventDefault();
-  const id=$('#cid').value, obj={id:id||uid(),name:$('#cname').value.trim(),color:$('#ccolor').value,order:Number($('#corder').value)||1,period:$('#cperiod').value,capacity:Number($('#ccap').value)||0};
+  const id=$('#cid').value, parentId=$('#cparent').value||'';
+  if(id && (parentId===id || descendants(id).some(c=>c.id===parentId))){ alert('자기 자신 또는 자신의 부속캘린더를 상위 캘린더로 지정할 수 없습니다.'); return; }
+  const obj={id:id||uid(),name:$('#cname').value.trim(),color:$('#ccolor').value,order:Number($('#corder').value)||1,period:$('#cperiod').value,capacity:Number($('#ccap').value)||0,parentId};
   if(id) state.calendars[state.calendars.findIndex(x=>x.id===id)]=obj; else state.calendars.push(obj);
   closeDialog($('#calDlg')); save();
 };
@@ -708,7 +820,11 @@ $('#cancelCal').onclick=()=>closeDialog($('#calDlg'));
 $('#deleteCal').onclick=()=>{
   const id=$('#cid').value; if(!id) return;
   if(state.calendars.length<=1){ alert('캘린더는 최소 1개가 필요합니다.'); return; }
-  if(confirm('이 캘린더와 포함된 일정·고정업무를 모두 삭제할까요?')){
+  const target=state.calendars.find(c=>c.id===id), kids=directChildren(id);
+  const msg=kids.length?`이 캘린더의 일정·고정업무를 삭제할까요? 부속캘린더 ${kids.length}개는 한 단계 위로 이동되어 유지됩니다.`:'이 캘린더와 포함된 일정·고정업무를 모두 삭제할까요?';
+  if(confirm(msg)){
+    const newParent=target?.parentId||'';
+    kids.forEach(c=>c.parentId=newParent);
     state.calendars=state.calendars.filter(x=>x.id!==id); state.events=state.events.filter(x=>x.calId!==id); state.fixed=state.fixed.filter(x=>x.calId!==id);
     state.settings.hiddenCalendars=(state.settings.hiddenCalendars||[]).filter(x=>x!==id); closeDialog($('#calDlg')); save();
   }
@@ -858,12 +974,32 @@ onAuthStateChanged(auth,async user=>{
 });
 
 
+async function manualSaveNow(){
+  if(!currentUser){ alert('먼저 로그인하세요.'); return; }
+  saveLocal();
+  const btn=$('#manualSaveBtn'), original=btn.textContent;
+  btn.disabled=true; btn.textContent='저장 중…';
+  try{
+    if(!navigator.onLine){ setSyncStatus('오프라인 · 기기 저장완료','offline'); alert('인터넷 연결이 없어 기기에만 저장했습니다. 온라인이 된 뒤 다시 최신자료 저장을 눌러주세요.'); return; }
+    if(!remoteRef){ alert('Firebase 연결이 아직 준비되지 않았습니다. 잠시 후 다시 눌러주세요.'); return; }
+    const wasReady=syncReady; syncReady=true;
+    const ok=await writeRemoteNow('manual');
+    syncReady=wasReady || ok;
+    if(ok){ btn.textContent='저장완료 ✓'; setTimeout(()=>{btn.textContent=original;},1200); }
+    else alert('Firebase 저장에 실패했습니다. 인터넷 연결과 로그인 상태를 확인하세요.');
+  }finally{
+    btn.disabled=false;
+    if(btn.textContent==='저장 중…') btn.textContent=original;
+  }
+}
+$('#manualSaveBtn').onclick=manualSaveNow;
+
 function downloadBackup(){
   if(!currentUser) return;
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'1.13',
+    appVersion:'1.14',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
@@ -872,7 +1008,7 @@ function downloadBackup(){
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
   a.href=url;
-  a.download=`나만의캘린더_백업_${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}.json`;
+  a.download=`캘린더_백업_${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}.json`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
@@ -894,7 +1030,7 @@ async function restoreBackupFile(file){
       alert('기기에는 복원했습니다. Firebase가 다시 연결되면 저장 상태를 확인하세요.');
     }
   }catch(err){
-    console.error(err); alert('올바른 나만의 캘린더 백업 파일이 아닙니다.');
+    console.error(err); alert('올바른 캘린더 백업 파일이 아닙니다.');
   }finally{
     $('#restoreFile').value='';
   }

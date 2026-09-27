@@ -36,3 +36,9 @@ dialog{border:0;border-radius:12px;box-shadow:0 10px 40px #0003;width:min(560px,
 .month .holidayName{margin:0 0 4px;font-size:10px}
 .dayHolidayBanner{margin:0 0 10px;padding:8px 10px;border:1px solid #f1cccc;background:#fff7f7;color:#c33;border-radius:8px;font-weight:700}
 .listDate.holiday{color:#c33}
+
+
+/* v1.14: 수동 최신자료 저장 + 부속캘린더 */
+.manualSaveBtn{white-space:nowrap;padding:6px 10px;border-color:#cbd5e1;background:#fff;font-size:12px;font-weight:700}.manualSaveMobile{display:none}.manualSaveBtn:hover{background:#f7f9fc}.manualSaveBtn:disabled{opacity:.55;cursor:wait}
+.calRow.subCalendarRow{padding-left:calc(7px + var(--cal-depth,1)*14px)}.calRow.subCalendarRow .name{font-size:13px}.subCalGroup{margin:3px 0 7px;padding-left:calc(var(--sub-depth,1)*8px)}.subCalHead{display:flex;justify-content:space-between;gap:5px;padding:4px 6px;border-left:3px solid;background:#fafafa;font-size:11px;font-weight:700}.subCalGroup .item{margin-left:4px}.subLoad{margin-left:calc(var(--cal-depth,1)*12px);font-size:11px}.calendarTreeGroup>.groupHead{font-size:12px}
+@media(max-width:760px){.manualSaveBtn{order:1;padding:4px 7px;font-size:11px}.manualSaveFull{display:none}.manualSaveMobile{display:inline}.calRow.subCalendarRow{padding-left:calc(7px + var(--cal-depth,1)*12px)}}
