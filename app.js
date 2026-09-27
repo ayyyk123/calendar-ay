@@ -68,7 +68,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.23',
+  version: '1.24',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,parentId:''},
@@ -251,7 +251,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.23',
+    version: '1.24',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -415,16 +415,19 @@ function cals(){
   return out;
 }
 function isCalendarHidden(id){
-  const hidden=new Set(state.settings.hiddenCalendars||[]);
-  let cur=state.calendars.find(c=>c.id===id), seen=new Set();
-  while(cur){
-    if(hidden.has(cur.id)) return true;
-    if(!cur.parentId || seen.has(cur.parentId)) break;
-    seen.add(cur.id); cur=state.calendars.find(c=>c.id===cur.parentId);
-  }
-  return false;
+  return new Set(state.settings.hiddenCalendars||[]).has(id);
 }
 function visibleCals(){ return cals().filter(c=>!isCalendarHidden(c.id)); }
+function focusedCalendarIds(){
+  if(!calendarFocusId) return null;
+  const focus=state.calendars.find(c=>c.id===calendarFocusId);
+  if(!focus){ calendarFocusId=null; return null; }
+  return new Set([focus.id,...descendants(focus.id).map(c=>c.id)]);
+}
+function focusSuffix(){
+  const focus=calendarFocusId?state.calendars.find(c=>c.id===calendarFocusId):null;
+  return focus?` · ${calendarPath(focus.id)}만 보기`:'';
+}
 function calendarPath(id){
   let cur=state.calendars.find(c=>c.id===id); if(!cur) return '미지정';
   const parts=[], seen=new Set();
@@ -669,8 +672,9 @@ function groupHtml(date, es){
   let html='';
   const visible=visibleCals(), visibleIds=new Set(visible.map(c=>c.id));
   let total=0, totalCapacity=0;
-  for(const root of topLevelCals().filter(c=>visibleIds.has(c.id))){
+  for(const root of topLevelCals()){
     const members=[root,...descendants(root.id)].filter(c=>visibleIds.has(c.id));
+    if(!members.length) continue;
     const memberIds=new Set(members.map(c=>c.id));
     const groupEvents=es.filter(e=>memberIds.has(e.calId));
     if(!groupEvents.length) continue;
@@ -712,7 +716,7 @@ function renderSide(){
   const hidden=new Set(state.settings.hiddenCalendars||[]);
   $('#calList').innerHTML=cals().map(c=>{
     const depth=calendarDepth(c.id), kids=directChildren(c.id).length, focused=calendarFocusId===c.id;
-    return `<div class="calRow ${depth?'subCalendarRow':''} ${focused?'calendarFocused':''}" data-cid="${esc(c.id)}" style="--cal-depth:${depth}"><input class="calVisible" type="checkbox" ${isCalendarHidden(c.id)?'':'checked'} title="표시/숨김"><i class="dot" style="background:${esc(c.color)}"></i><button type="button" class="calNameBtn" title="${esc(c.name)} 관련 일정·할 일 보기">${depth?'↳ ':''}${esc(c.name)}</button><small>${esc(c.period)} · ${esc(c.capacity)}h${kids?` · 부속 ${kids}`:''}</small><button type="button" class="calEdit" title="캘린더 수정" aria-label="${esc(c.name)} 수정">✎</button></div>`;
+    return `<div class="calRow ${depth?'subCalendarRow':''} ${focused?'calendarFocused':''}" data-cid="${esc(c.id)}" style="--cal-depth:${depth}"><input class="calVisible" type="checkbox" ${isCalendarHidden(c.id)?'':'checked'} title="표시/숨김"><i class="dot" style="background:${esc(c.color)}"></i><button type="button" class="calNameBtn" title="${esc(c.name)}만 현재 달력 화면에서 보기 (다시 누르면 전체 보기)">${depth?'↳ ':''}${esc(c.name)}</button><small>${esc(c.period)} · ${esc(c.capacity)}h${kids?` · 부속 ${kids}`:''}</small><button type="button" class="calEdit" title="캘린더 수정" aria-label="${esc(c.name)} 수정">✎</button></div>`;
   }).join('');
   $$('.calRow').forEach(row=>{
     row.querySelector('.calVisible').onclick=e=>{
@@ -723,9 +727,21 @@ function renderSide(){
     };
     row.querySelector('.calNameBtn').onclick=e=>{
       e.stopPropagation();
-      calendarFocusId=row.dataset.cid;
-      view='list';
-      render();
+      const id=row.dataset.cid;
+      if(calendarFocusId===id){
+        calendarFocusId=null;
+        render();
+      }else{
+        calendarFocusId=id;
+        // 이름을 눌러 '이 캘린더만 보기'를 선택하면 해당 캘린더(및 하위)는 바로 보이도록 체크 상태도 복구합니다.
+        const showIds=[id,...descendants(id).map(c=>c.id)];
+        const set=new Set(state.settings.hiddenCalendars||[]);
+        const before=set.size;
+        showIds.forEach(x=>set.delete(x));
+        state.settings.hiddenCalendars=[...set];
+        if(set.size!==before) save({rerender:false});
+        render();
+      }
       $('#sidebar').classList.remove('open');
     };
     row.querySelector('.calEdit').onclick=e=>{ e.stopPropagation(); openCal(row.dataset.cid); };
@@ -799,8 +815,9 @@ function renderFixed(){
 function renderLoad(){
   const s=startWeek(cursor), e=add(s,6), map=buildOccurrenceMap(ds(s),ds(e)), visibleIds=new Set(visibleCals().map(c=>c.id));
   const rows=[];
-  for(const root of topLevelCals().filter(c=>visibleIds.has(c.id))){
+  for(const root of topLevelCals()){
     const members=[root,...descendants(root.id)].filter(c=>visibleIds.has(c.id));
+    if(!members.length) continue;
     let rootSum=0;
     for(const day of Object.values(map)) rootSum += day.filter(x=>members.some(c=>c.id===x.calId)).reduce((a,x)=>a+duration(x),0);
     const childCapFallback=members.filter(c=>c.id!==root.id).reduce((sum,c)=>sum+(Number(c.capacity)||0),0)*7;
@@ -907,8 +924,8 @@ function toggleDone(id,occ){
 }
 
 function renderWeek(){
-  const s=startWeek(cursor), days=[0,1,2,3,4,5,6].map(i=>add(s,i)), map=buildOccurrenceMap(ds(s),ds(days[6]));
-  $('#range').textContent=`${s.getFullYear()}. ${s.getMonth()+1}. ${s.getDate()} - ${days[6].getFullYear()}. ${days[6].getMonth()+1}. ${days[6].getDate()}`;
+  const s=startWeek(cursor), days=[0,1,2,3,4,5,6].map(i=>add(s,i)), map=buildOccurrenceMap(ds(s),ds(days[6]),{calendarIds:focusedCalendarIds()});
+  $('#range').textContent=`${s.getFullYear()}. ${s.getMonth()+1}. ${s.getDate()} - ${days[6].getFullYear()}. ${days[6].getMonth()+1}. ${days[6].getDate()}${focusSuffix()}`;
   $('#main').className='week';
   $('#main').innerHTML=days.map(d=>{
     const key=ds(d), hasDiary=!!state.diary[key]?.text, h=holidayLabel(key), dow=d.getDay();
@@ -918,8 +935,8 @@ function renderWeek(){
   bindItems();
 }
 function renderMonth(){
-  const y=cursor.getFullYear(),m=cursor.getMonth(),first=new Date(y,m,1),s=startWeek(first),end=add(s,41),map=buildOccurrenceMap(ds(s),ds(end));
-  $('#range').textContent=`${y}년 ${m+1}월`;
+  const y=cursor.getFullYear(),m=cursor.getMonth(),first=new Date(y,m,1),s=startWeek(first),end=add(s,41),map=buildOccurrenceMap(ds(s),ds(end),{calendarIds:focusedCalendarIds()});
+  $('#range').textContent=`${y}년 ${m+1}월${focusSuffix()}`;
   $('#main').className='month';
   const heads=['월','화','수','목','금','토','일'].map((x,i)=>`<div class="weekdayHeader ${i===5?'saturday':i===6?'sunday':''}">${x}</div>`).join('');
   const cells=[...Array(42)].map((_,i)=>{
@@ -930,15 +947,15 @@ function renderMonth(){
   $('#main').innerHTML=heads+cells; bindItems();
 }
 function renderDay(){
-  const d=ds(cursor),map=buildOccurrenceMap(d,d),hasDiary=!!state.diary[d]?.text;
-  const h=holidayLabel(d); $('#range').textContent=d; $('#main').className='daySingle';
+  const d=ds(cursor),map=buildOccurrenceMap(d,d,{calendarIds:focusedCalendarIds()}),hasDiary=!!state.diary[d]?.text;
+  const h=holidayLabel(d); $('#range').textContent=`${d}${focusSuffix()}`; $('#main').className='daySingle';
   $('#main').innerHTML=`${h?`<div class="dayHolidayBanner">${esc(h)}</div>`:''}<div class="diaryStrip"><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${d}">📝 ${hasDiary?'다이어리 보기':'다이어리 작성'}</button></div><div data-dropdate="${d}" ondblclick="window.__newEvent?.('${d}')">${groupHtml(d,map[d]||[])}</div>`; bindItems();
 }
 function renderList(){
   const start=ds(add(new Date(),-30)),end=ds(add(new Date(),365));
   const focus=calendarFocusId?state.calendars.find(c=>c.id===calendarFocusId):null;
   const allowed=focus?new Set([focus.id,...descendants(focus.id).map(c=>c.id)]):null;
-  const map=buildOccurrenceMap(start,end,{includeHidden:!!focus,calendarIds:allowed});
+  const map=buildOccurrenceMap(start,end,{calendarIds:allowed});
   const rows=[]; for(const [date,es] of Object.entries(map)) for(const e of es){ if((e._occurrenceStart||e.date)===date) rows.push({date,e}); }
   $('#range').textContent=focus?`${focus.name} 관련 일정`:'일정 목록'; $('#main').className='listView';
   let last='';
@@ -1234,7 +1251,7 @@ $('#prev').onclick=()=>{ cursor=view==='month'?new Date(cursor.getFullYear(),cur
 $('#next').onclick=()=>{ cursor=view==='month'?new Date(cursor.getFullYear(),cursor.getMonth()+1,1):add(cursor,view==='week'?7:1); render(); };
 $('#today').onclick=()=>{cursor=new Date();render();};
 $('#jumpDate').onchange=e=>{ if(e.target.value){cursor=parse(e.target.value);render();} };
-$$('.views [data-view]').forEach(b=>b.onclick=()=>{view=b.dataset.view; if(view==='list') calendarFocusId=null; render();});
+$$('.views [data-view]').forEach(b=>b.onclick=()=>{view=b.dataset.view; render();});
 $('#sidebarToggle').onclick=()=>$('#sidebar').classList.toggle('open');
 $('#main').addEventListener('click',()=>{ if(isMobileSidebar()) $('#sidebar').classList.remove('open'); });
 initSidebarResizer();
@@ -1368,7 +1385,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'1.23',
+    appVersion:'1.24',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
