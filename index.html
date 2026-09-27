@@ -4,15 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
-  <title>캘린더 v1.34</title>
-  <link rel="manifest" href="manifest.json?v=1.34">
+  <title>캘린더 v1.36</title>
+  <link rel="manifest" href="manifest.json?v=1.36">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="icon-180.png">
-  <link rel="stylesheet" href="style.css?v=1.34">
+  <link rel="stylesheet" href="style.css?v=1.36">
 </head>
 <body>
 <header>
-  <div class="brand"><b>캘린더</b><small> v1.34</small></div>
+  <div class="brand"><b>캘린더</b><small> v1.36</small></div>
   <div id="saveBadge" class="saveBadge loading" title="Firebase 저장 상태"><span class="saveDot"></span><span id="saveBadgeText">Firebase 확인 중</span></div>
   <button id="manualSaveBtn" class="manualSaveBtn" type="button" title="현재 데이터를 Firebase에 즉시 저장"><span class="manualSaveFull">최신자료 저장</span><span class="manualSaveMobile">저장</span></button>
   <button id="sidebarToggle" class="mobileOnly" type="button" aria-label="메뉴">☰</button>
@@ -92,6 +92,7 @@
     <h3 id="eventTitle">일정 등록</h3>
     <input type="hidden" id="eid">
     <label>제목<input id="title" required></label>
+    <label class="check importantField"><input type="checkbox" id="important"> ★ 중요 일정</label>
     <label>캘린더<select id="cal"></select></label>
     <div class="row">
       <label>날짜<input type="date" id="date" required></label>
@@ -152,6 +153,11 @@
     </div>
 
     <label>메모<textarea id="memo" rows="4"></textarea></label>
+    <div class="checklistEditor">
+      <div class="checklistEditorHead"><b>세부 체크리스트</b><button type="button" id="importMemoChecklist">메모 줄 가져오기</button></div>
+      <textarea id="checklistText" rows="4" placeholder="한 줄에 하나씩 입력하세요. 예: 거래처 A 정리"></textarea>
+      <small class="hint">체크리스트가 있으면 각 항목을 체크해서 진행하며, 모두 완료되면 업무가 자동으로 완료됩니다.</small>
+    </div>
     <button type="button" id="carryEvent" class="carryAction hidden">↪ 다음날로 이어하기</button>
     <menu>
       <button type="button" id="deleteEvent" class="danger">삭제</button>
@@ -206,7 +212,11 @@
     </label>
     <label>표시 순서<input type="number" id="corder" min="1" required></label>
     <label>주 활동시간<select id="cperiod"><option>오전</option><option>오후</option><option>저녁</option><option>종일</option></select></label>
-    <label>하루 가용시간<input type="number" id="ccap" min="0" max="24" step="0.25" value="8"></label>
+    <div class="capacityField">
+      <label>하루 가용시간<input type="number" id="ccap" min="0" max="24" step="0.25" value="8"></label>
+      <label class="check capacityUnknownField"><input type="checkbox" id="ccapUnknown"> 미정</label>
+      <small class="hint">미정으로 설정해도 이번 주 업무량에는 항목이 표시됩니다.</small>
+    </div>
     <menu>
       <button type="button" id="deleteCal" class="danger">삭제</button>
       <span></span>
@@ -221,6 +231,7 @@
     <h3 id="fixedTitle">날짜 지정 배치 업무</h3>
     <input type="hidden" id="fid">
     <label>업무명<input id="fname" required></label>
+    <label class="check importantField"><input type="checkbox" id="fimportant"> ★ 중요 업무</label>
     <label>캘린더<select id="fcal"></select></label>
     <div class="durationField">
       <label>예상 소요시간
@@ -229,6 +240,7 @@
       <label class="check durationSkip"><input type="checkbox" id="fnoDuration"> 소요시간 미체크</label>
     </div>
     <label>메모<textarea id="fmemo" rows="3"></textarea></label>
+    <label>세부 체크리스트<textarea id="fchecklistText" rows="3" placeholder="한 줄에 하나씩 입력"></textarea></label>
     <menu>
       <button type="button" id="deleteFixed" class="danger">삭제</button>
       <span></span>
@@ -243,6 +255,7 @@
     <h3 id="flexibleTitle">시간날때 업무 추가</h3>
     <input type="hidden" id="flexid">
     <label>업무명<input id="flexname" required></label>
+    <label class="check importantField"><input type="checkbox" id="fleximportant"> ★ 중요 업무</label>
     <label>캘린더<select id="flexcal"></select></label>
     <div class="durationField">
       <label>예상 소요시간
@@ -251,6 +264,7 @@
       <label class="check durationSkip"><input type="checkbox" id="flexnoDuration"> 소요시간 미체크</label>
     </div>
     <label>메모<textarea id="flexmemo" rows="3"></textarea></label>
+    <label>세부 체크리스트<textarea id="flexchecklistText" rows="3" placeholder="한 줄에 하나씩 입력"></textarea></label>
     <menu>
       <button type="button" id="deleteFlexible" class="danger">삭제</button>
       <span></span>
@@ -320,6 +334,6 @@
   <div><span class="spinner"></span><b>Firebase 최신 데이터 불러오는 중…</b><small>저장된 최신 일정을 확인하고 있어요.</small></div>
 </div>
 
-<script type="module" src="app.js?v=1.34"></script>
+<script type="module" src="app.js?v=1.36"></script>
 </body>
 </html>
