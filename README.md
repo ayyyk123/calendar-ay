@@ -1,26 +1,45 @@
-# 나만의 캘린더 v1.0
+# 나만의 캘린더 v1.1
 
 주간 화면 중심의 개인 일정/업무량 관리 웹앱입니다.
 
-## 포함 기능
-- 주/월/일/목록 보기 (기본: 주간)
-- 여러 캘린더, 색상, 표시 우선순위, 오전/오후/저녁 설정
-- 캘린더별 하루 가용시간
-- 일정/할 일, 예상 소요시간, 메모, 종일/시간 입력
-- 같은 날짜에서 캘린더 우선순위별 묶음 표시
-- 날짜별 캘린더 업무량 합계 및 초과 표시
-- 매월 고정업무 보관함 + 날짜로 드래그 배치 + 해당 월 배치 여부 체크
+## v1.1 핵심
+- Firebase Authentication 이메일/비밀번호 로그인
+- 로그인 사용자별 Firestore 데이터 분리 및 자동 실시간 동기화
+- 주간 화면 기본, 날짜 빈 공간 더블클릭으로 일정 등록 유지
+- 일정 등록 취소 시 저장되지 않는 버그 수정
+- 긴 일정 등록창/모달 스크롤 및 닫힘 처리 개선
+- 반복 일정 상세 설정
+  - 매일: N일마다
+  - 매주: N주마다 + 복수 요일
+  - 매월: 같은 날짜 / 몇째 주 같은 요일 / 마지막 같은 요일
+  - 매년: 월·일
+  - 종료 없음 / 종료 날짜 / 총 반복 횟수
+- 반복 일정은 v1.1에서 시리즈 전체 수정 방식
+- 할 일/습관은 발생일별 완료 체크
+- 캘린더별 묶음/우선순위 표시, 하루 가용시간 대비 업무량 초과 표시
+- 매월 고정업무 + 날짜로 드래그 배치
+- 일반 일정은 날짜로 드래그 이동
+- 일정 복사, 장소, 메모
+- 캘린더 표시/숨김
+- 기념일/D-Day 사이드 표시
+- 날짜별 다이어리
+- 일정/고정업무/다이어리 검색
+- 주/월/일/목록 보기
 - PC/모바일 반응형
-- 로컬 자동 저장
-- Firebase Firestore 실시간 동기화 설정 화면
 
-## Firebase 연결
-1. Firebase 프로젝트에서 Web App을 생성합니다.
-2. Firestore Database를 활성화합니다.
-3. 앱 오른쪽 위 ⚙ → Firebase config에 Firebase Web SDK 설정 JSON을 붙여 넣습니다.
-4. 같은 `동기화 문서 ID`를 PC와 모바일에서 사용하면 같은 데이터를 봅니다.
+## Firebase 보안 규칙
+Firestore Console → 규칙(Rules)에 `firestore.rules` 내용을 붙여넣고 게시하세요.
+이 규칙은 로그인한 사용자가 자신의 `users/{uid}/...` 데이터만 읽고 쓰게 합니다.
 
-주의: v1.0의 Firebase 연결은 빠른 개인용 시작본입니다. 공개 배포 전에는 Firebase Authentication과 Firestore Security Rules를 반드시 설정하세요.
+## GitHub Pages 업데이트
+기존 저장소 루트의 아래 파일을 v1.1 파일로 덮어쓰면 됩니다.
+- index.html
+- app.js
+- style.css
+- manifest.json
+- README.md
 
-## GitHub Pages
-이 폴더 전체를 GitHub 저장소 루트에 올리고 Settings → Pages에서 배포하면 됩니다.
+`firestore.rules`는 GitHub에 올려도 되지만, 실제 적용은 Firebase Console의 Firestore → 규칙에서 해야 합니다.
+
+## 참고
+Firebase Web config는 공개 웹앱에 포함되는 식별 설정값이며 비밀번호가 아닙니다. 실제 데이터 보호는 Firebase Authentication + Firestore Security Rules로 합니다.

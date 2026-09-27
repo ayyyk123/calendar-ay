@@ -1,8 +1,212 @@
-<!doctype html><html lang='ko'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1,viewport-fit=cover'><meta name='theme-color' content='#ffffff'><title>나만의 캘린더 v1.0</title><link rel='manifest' href='manifest.json'><link rel='stylesheet' href='style.css'></head><body>
-<header><div><b>나만의 캘린더</b><small> v1.0</small></div><nav><button id='prev'>‹</button><button id='today'>오늘</button><button id='next'>›</button><strong id='range'></strong></nav><div class='views'><button data-view='week' class='on'>주</button><button data-view='month'>월</button><button data-view='day'>일</button><button data-view='list'>목록</button><button id='settingsBtn'>⚙</button></div></header>
-<div class='layout'><aside><section><div class='secHead'><b>캘린더</b><button id='addCal'>＋</button></div><div id='calList'></div></section><section><div class='secHead'><b>매월 고정업무</b><button id='addFixed'>＋</button></div><select id='fixedFilter'></select><div id='fixedList'></div><small class='hint'>업무를 달력 날짜로 드래그하세요.</small></section><section><b>이번 주 업무량</b><div id='weekLoad'></div></section></aside><main id='main'></main></div>
-<dialog id='eventDlg'><form method='dialog' id='eventForm'><h3 id='eventTitle'>일정 등록</h3><input type='hidden' id='eid'><label>제목<input id='title' required></label><label>캘린더<select id='cal'></select></label><div class='row'><label>날짜<input type='date' id='date' required></label><label>종료일<input type='date' id='endDate'></label></div><label class='check'><input type='checkbox' id='allDay' checked> 종일 일정</label><div class='row timeRow'><label>시작<input type='time' id='start'></label><label>종료<input type='time' id='end'></label></div><div class='row'><label>예상 소요시간(시간)<input type='number' id='hours' min='0' step='.25' value='1'></label><label>종류<select id='kind'><option value='event'>일정</option><option value='todo'>할 일</option></select></label></div><label>반복<select id='repeat'><option value='none'>없음</option><option value='daily'>매일</option><option value='weekly'>매주</option><option value='monthly'>매월</option><option value='yearly'>매년</option></select></label><label>메모<textarea id='memo'></textarea></label><menu><button type='button' id='deleteEvent' class='danger'>삭제</button><span></span><button value='cancel'>취소</button><button type='submit' id='saveEvent' value='default'>저장</button></menu></form></dialog>
-<dialog id='calDlg'><form method='dialog' id='calForm'><h3>캘린더 설정</h3><input type='hidden' id='cid'><label>이름<input id='cname' required></label><label>색상<input type='color' id='ccolor'></label><label>표시 순서<input type='number' id='corder' min='1'></label><label>주 활동시간<select id='cperiod'><option>오전</option><option>오후</option><option>저녁</option><option>종일</option></select></label><label>하루 가용시간<input type='number' id='ccap' min='0' step='.5' value='8'></label><menu><button type='button' id='deleteCal' class='danger'>삭제</button><span></span><button value='cancel'>취소</button><button type='submit' value='default'>저장</button></menu></form></dialog>
-<dialog id='fixedDlg'><form method='dialog' id='fixedForm'><h3>고정업무</h3><input type='hidden' id='fid'><label>업무명<input id='fname' required></label><label>캘린더<select id='fcal'></select></label><label>예상 소요시간<input type='number' id='fhours' min='0' step='.25' value='1'></label><label>메모<textarea id='fmemo'></textarea></label><menu><button type='button' id='deleteFixed' class='danger'>삭제</button><span></span><button value='cancel'>취소</button><button type='submit' value='default'>저장</button></menu></form></dialog>
-<dialog id='settingsDlg'><form method='dialog'><h3>데이터 / Firebase</h3><p class='hint'>기본은 이 기기에 자동 저장됩니다. Firebase 설정을 입력하면 PC·모바일 실시간 동기화를 사용할 수 있습니다.</p><label>Firebase config (JSON)<textarea id='fbconfig' rows='8' placeholder='{"apiKey":"...","authDomain":"...","projectId":"...", ...}'></textarea></label><label>동기화 문서 ID<input id='syncId' value='my-calendar'></label><p id='syncState' class='hint'></p><menu><button value='cancel'>닫기</button><button type='button' id='connectFb'>Firebase 연결</button></menu></form></dialog>
-<script type='module' src='app.js'></script></body></html>
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#ffffff">
+  <title>나만의 캘린더 v1.1</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="brand"><b>나만의 캘린더</b><small> v1.1</small></div>
+  <button id="sidebarToggle" class="mobileOnly" type="button" aria-label="메뉴">☰</button>
+  <nav>
+    <button id="prev" type="button">‹</button>
+    <button id="today" type="button">오늘</button>
+    <button id="next" type="button">›</button>
+    <input id="jumpDate" type="date" aria-label="날짜 이동">
+    <strong id="range"></strong>
+  </nav>
+  <div class="views">
+    <button data-view="week" class="on" type="button">주</button>
+    <button data-view="month" type="button">월</button>
+    <button data-view="day" type="button">일</button>
+    <button data-view="list" type="button">목록</button>
+    <button id="searchBtn" type="button" title="검색">⌕</button>
+    <button id="settingsBtn" type="button" title="설정">⚙</button>
+  </div>
+</header>
+
+<div class="layout">
+  <aside id="sidebar">
+    <section>
+      <div class="secHead"><b>캘린더</b><button id="addCal" type="button">＋</button></div>
+      <div id="calList"></div>
+    </section>
+    <section>
+      <div class="secHead"><b>매월 고정업무</b><button id="addFixed" type="button">＋</button></div>
+      <select id="fixedFilter"></select>
+      <div id="fixedList"></div>
+      <small class="hint">PC에서는 업무를 원하는 날짜로 드래그하세요.</small>
+    </section>
+    <section>
+      <b>이번 주 업무량</b>
+      <div id="weekLoad"></div>
+    </section>
+    <section>
+      <b>D-Day / 기념일</b>
+      <div id="ddayList"></div>
+    </section>
+  </aside>
+  <main id="main"></main>
+</div>
+
+<dialog id="authDlg" class="smallDlg">
+  <form id="authForm">
+    <h3>나만의 캘린더 로그인</h3>
+    <p class="hint">같은 이메일 계정으로 로그인하면 PC와 모바일 일정이 자동으로 동기화됩니다.</p>
+    <label>이메일<input id="authEmail" type="email" autocomplete="username" required></label>
+    <label>비밀번호<input id="authPassword" type="password" autocomplete="current-password" minlength="6" required></label>
+    <p id="authState" class="statusText"></p>
+    <div class="authActions">
+      <button id="signupBtn" type="button">회원가입</button>
+      <button id="resetPasswordBtn" type="button" class="textBtn">비밀번호 재설정</button>
+      <span></span>
+      <button type="submit" class="primary">로그인</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="eventDlg">
+  <form id="eventForm">
+    <h3 id="eventTitle">일정 등록</h3>
+    <input type="hidden" id="eid">
+    <label>제목<input id="title" required></label>
+    <label>캘린더<select id="cal"></select></label>
+    <div class="row">
+      <label>날짜<input type="date" id="date" required></label>
+      <label>종료일<input type="date" id="endDate"></label>
+    </div>
+    <label class="check"><input type="checkbox" id="allDay" checked> 종일 일정</label>
+    <div class="row timeRow" id="timeFields">
+      <label>시작<input type="time" id="start"></label>
+      <label>종료<input type="time" id="end"></label>
+    </div>
+    <div class="row">
+      <label>예상 소요시간
+        <div class="durationInputs"><input type="number" id="hoursH" min="0" max="24" step="1" value="1"><span>시간</span><input type="number" id="hoursM" min="0" max="59" step="5" value="0"><span>분</span></div>
+      </label>
+      <label>종류<select id="kind"><option value="event">일정</option><option value="todo">할 일</option><option value="habit">습관/루틴</option><option value="anniversary">기념일/D-Day</option></select></label>
+    </div>
+    <label>장소<input id="place"></label>
+    <label>반복<select id="repeat"><option value="none">없음</option><option value="daily">매일</option><option value="weekly">매주</option><option value="monthly">매월</option><option value="yearly">매년</option></select></label>
+
+    <div id="repeatDetails" class="repeatBox hidden">
+      <div class="row" id="intervalRow">
+        <label>반복 간격<input type="number" id="repeatInterval" min="1" max="99" value="1"></label>
+        <label>단위<input id="repeatUnitLabel" value="주마다" readonly></label>
+      </div>
+      <div id="weeklyOptions" class="hidden">
+        <div class="fieldLabel">반복 요일</div>
+        <div class="weekdayChecks">
+          <label><input type="checkbox" value="0">일</label><label><input type="checkbox" value="1">월</label><label><input type="checkbox" value="2">화</label><label><input type="checkbox" value="3">수</label><label><input type="checkbox" value="4">목</label><label><input type="checkbox" value="5">금</label><label><input type="checkbox" value="6">토</label>
+        </div>
+      </div>
+      <div id="monthlyOptions" class="hidden">
+        <label>매월 반복 기준<select id="monthlyMode"><option value="date">같은 날짜</option><option value="nthWeekday">몇째 주 같은 요일</option><option value="lastWeekday">마지막 같은 요일</option></select></label>
+        <p id="monthlyHint" class="hint"></p>
+      </div>
+      <div id="yearlyOptions" class="hidden">
+        <div class="row">
+          <label>월<input type="number" id="yearlyMonth" min="1" max="12"></label>
+          <label>일<input type="number" id="yearlyDay" min="1" max="31"></label>
+        </div>
+      </div>
+      <div class="row">
+        <label>반복 종료<select id="repeatEndType"><option value="never">종료 없음</option><option value="date">종료 날짜</option><option value="count">반복 횟수</option></select></label>
+        <label id="repeatEndDateWrap" class="hidden">종료 날짜<input type="date" id="repeatEndDate"></label>
+        <label id="repeatCountWrap" class="hidden">총 반복 횟수<input type="number" id="repeatCount" min="1" max="999" value="10"></label>
+      </div>
+      <p class="hint">v1.1에서는 반복 일정 수정 시 해당 반복 시리즈 전체가 수정됩니다.</p>
+    </div>
+
+    <label>메모<textarea id="memo" rows="4"></textarea></label>
+    <menu>
+      <button type="button" id="deleteEvent" class="danger">삭제</button>
+      <button type="button" id="copyEvent">복사</button>
+      <span></span>
+      <button type="button" id="cancelEvent">취소</button>
+      <button type="submit" id="saveEvent" class="primary">저장</button>
+    </menu>
+  </form>
+</dialog>
+
+<dialog id="calDlg">
+  <form id="calForm">
+    <h3>캘린더 설정</h3>
+    <input type="hidden" id="cid">
+    <label>이름<input id="cname" required></label>
+    <label>색상<input type="color" id="ccolor"></label>
+    <label>표시 순서<input type="number" id="corder" min="1" required></label>
+    <label>주 활동시간<select id="cperiod"><option>오전</option><option>오후</option><option>저녁</option><option>종일</option></select></label>
+    <label>하루 가용시간<input type="number" id="ccap" min="0" max="24" step="0.25" value="8"></label>
+    <menu>
+      <button type="button" id="deleteCal" class="danger">삭제</button>
+      <span></span>
+      <button type="button" id="cancelCal">취소</button>
+      <button type="submit" class="primary">저장</button>
+    </menu>
+  </form>
+</dialog>
+
+<dialog id="fixedDlg">
+  <form id="fixedForm">
+    <h3>고정업무</h3>
+    <input type="hidden" id="fid">
+    <label>업무명<input id="fname" required></label>
+    <label>캘린더<select id="fcal"></select></label>
+    <label>예상 소요시간
+      <div class="durationInputs"><input type="number" id="fhoursH" min="0" max="24" step="1" value="1"><span>시간</span><input type="number" id="fhoursM" min="0" max="59" step="5" value="0"><span>분</span></div>
+    </label>
+    <label>메모<textarea id="fmemo" rows="3"></textarea></label>
+    <menu>
+      <button type="button" id="deleteFixed" class="danger">삭제</button>
+      <span></span>
+      <button type="button" id="cancelFixed">취소</button>
+      <button type="submit" class="primary">저장</button>
+    </menu>
+  </form>
+</dialog>
+
+<dialog id="diaryDlg">
+  <form id="diaryForm">
+    <h3 id="diaryTitle">다이어리</h3>
+    <input type="hidden" id="diaryDate">
+    <label>기록<textarea id="diaryText" rows="10" placeholder="이 날의 기록을 남겨보세요."></textarea></label>
+    <menu>
+      <button type="button" id="deleteDiary" class="danger">삭제</button>
+      <span></span>
+      <button type="button" id="cancelDiary">취소</button>
+      <button type="submit" class="primary">저장</button>
+    </menu>
+  </form>
+</dialog>
+
+<dialog id="searchDlg">
+  <form id="searchForm">
+    <h3>검색</h3>
+    <label>일정 · 할 일 · 고정업무 · 다이어리 검색<input id="searchInput" autocomplete="off" placeholder="검색어 입력"></label>
+    <div id="searchResults" class="searchResults"></div>
+    <menu><span></span><button type="button" id="closeSearch">닫기</button></menu>
+  </form>
+</dialog>
+
+<dialog id="settingsDlg" class="smallDlg">
+  <form id="settingsForm">
+    <h3>설정</h3>
+    <div class="settingsLine"><span>로그인</span><b id="accountEmail">-</b></div>
+    <div class="settingsLine"><span>Firebase</span><b id="syncState">연결 확인 중</b></div>
+    <p class="hint">Firebase 설정은 앱에 연결되어 있으며, 로그인한 계정별로 데이터를 분리해 저장합니다.</p>
+    <menu>
+      <button type="button" id="logoutBtn" class="danger">로그아웃</button>
+      <span></span>
+      <button type="button" id="closeSettings">닫기</button>
+    </menu>
+  </form>
+</dialog>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
