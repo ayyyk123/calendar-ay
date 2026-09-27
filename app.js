@@ -68,7 +68,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.36',
+  version: '1.37',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,parentId:''},
@@ -255,7 +255,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.36',
+    version: '1.37',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -774,6 +774,14 @@ function eventItemHtml(e, compact=false){
     ${compact?checklistHtml(e,true):''}
   </div>`;
 }
+function quickLaneHtml(es, compact=false){
+  const quick=(es||[]).filter(e=>e.kind==='todo');
+  if(!quick.length) return '';
+  return `<div class="quickLane ${compact?'compactQuickLane':''}"><div class="quickLaneHead"><span>Quick</span><small>${quick.length}건</small></div><div class="quickLaneItems">${quick.map(e=>eventItemHtml(e,compact)).join('')}</div></div>`;
+}
+function nonQuickItemsHtml(es, compact=false){
+  return (es||[]).filter(e=>e.kind!=='todo').map(e=>eventItemHtml(e,compact)).join('');
+}
 function paymentLaneHtml(es, compact=false){
   const payments=(es||[]).filter(e=>e.kind==='payment');
   if(!payments.length) return '';
@@ -807,11 +815,11 @@ function groupHtml(date, es){
     if(rootUnknown) hasUnknownCapacity=true; else totalCapacity+=effectiveRootCap;
     html += `<div class="group calendarTreeGroup"><div class="groupHead" style="background:${esc(root.color)}55"><span>${esc(root.name)} · ${esc(root.period)}</span>${capacityText(rootSum,effectiveRootCap,rootUnknown)}</div>`;
     const direct=groupEvents.filter(e=>e.calId===root.id);
-    if(direct.length) html += direct.map(e=>eventItemHtml(e)).join('');
+    if(direct.length) html += quickLaneHtml(direct,false)+nonQuickItemsHtml(direct,false);
     for(const child of members.filter(c=>c.id!==root.id)){
       const xs=groupEvents.filter(e=>e.calId===child.id); if(!xs.length) continue;
       const sum=xs.reduce((n,e)=>n+duration(e),0), depth=Math.max(1,calendarDepth(child.id));
-      html += `<div class="subCalGroup" style="--sub-depth:${depth}"><div class="subCalHead" style="border-left-color:${esc(child.color)};background:color-mix(in srgb, ${esc(child.color)} 14%, white)"><span>↳ ${esc(child.name)} · ${esc(child.period)}</span>${capacityText(sum,child.capacity,!!child.capacityUnknown)}</div>${xs.map(e=>eventItemHtml(e)).join('')}</div>`;
+      html += `<div class="subCalGroup" style="--sub-depth:${depth}"><div class="subCalHead" style="border-left-color:${esc(child.color)};background:color-mix(in srgb, ${esc(child.color)} 14%, white)"><span>↳ ${esc(child.name)} · ${esc(child.period)}</span>${capacityText(sum,child.capacity,!!child.capacityUnknown)}</div>${quickLaneHtml(xs,false)}${nonQuickItemsHtml(xs,false)}</div>`;
     }
     html += `</div>`;
   }
@@ -983,7 +991,7 @@ function renderFixed(){
 
   const recurringRows=groupedCalendarHtml('recurring',recurring,e=>{
     const c=cal(e.calId), rule=repeatRuleLabel(e);
-    const kindLabel={event:'일정',todo:'할 일',habit:'습관/루틴',anniversary:'기념일/D-Day',payment:'납부일정'}[e.kind]||'일정';
+    const kindLabel={event:'일정',todo:'Quick',habit:'습관/루틴',anniversary:'기념일/D-Day',payment:'납부일정'}[e.kind]||'일정';
     const progress=e.kind==='anniversary'?{label:'완료체크 대상 아님',complete:false}:recurringMonthProgress(e);
     return `<div class="fixed recurringFixed ${progress.complete?'monthComplete':'monthPending'}" data-eid="${esc(e.id)}" style="border-left-color:${esc(c.color)}" title="${esc(`${calendarPath(c.id)} · ${rule} · ${durationLabel(e)} · ${progress.label}`)}"><b>${e.important?'★ ':''}${esc(e.title)}</b><small>${esc(kindLabel)} · ${esc(rule)} · ${esc(durationLabel(e))}</small><span class="monthProgress ${progress.complete?'complete':''}">${esc(progress.label)}</span></div>`;
   },'자동반복 일정이 없습니다.');
@@ -1408,7 +1416,7 @@ function renderList(){
     const sourceEvents=state.events.filter(e=>allowed.has(e.calId));
     const manualFixed=state.fixed.filter(f=>allowed.has(f.calId));
     const kindCount=type=>sourceEvents.filter(e=>e.kind===type).length;
-    top=`<div class="calendarFocusHeader" style="border-left-color:${esc(focus.color)}"><div><b>${esc(calendarPath(focus.id))}</b><small>${descendants(focus.id).length?'부속 캘린더 포함 · ':''}일정 ${kindCount('event')} · 할 일 ${kindCount('todo')} · 습관 ${kindCount('habit')} · 기념일 ${kindCount('anniversary')} · 납부 ${kindCount('payment')} · 날짜지정 ${manualFixed.length}</small></div><button id="clearCalendarFocus" type="button">전체 일정 보기</button></div>`;
+    top=`<div class="calendarFocusHeader" style="border-left-color:${esc(focus.color)}"><div><b>${esc(calendarPath(focus.id))}</b><small>${descendants(focus.id).length?'부속 캘린더 포함 · ':''}일정 ${kindCount('event')} · Quick ${kindCount('todo')} · 습관 ${kindCount('habit')} · 기념일 ${kindCount('anniversary')} · 납부 ${kindCount('payment')} · 날짜지정 ${manualFixed.length}</small></div><button id="clearCalendarFocus" type="button">전체 일정 보기</button></div>`;
     if(manualFixed.length){
       top+=`<div class="calendarFocusFixed"><b>날짜 지정 배치 업무</b>${manualFixed.map(f=>`<button type="button" class="focusFixedItem" data-fid="${esc(f.id)}" style="border-left-color:${esc(cal(f.calId).color)}"><span>${esc(f.name)}</span><small>${esc(calendarPath(f.calId))} · ${esc(durationLabel(f))}</small></button>`).join('')}</div>`;
     }

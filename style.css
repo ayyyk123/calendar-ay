@@ -211,7 +211,7 @@ dialog{border:0;border-radius:12px;box-shadow:0 10px 40px #0003;width:min(560px,
 /* v1.35: 중요도 별표 + 긴 일정명 한 줄 말줄임 */
 .importanceBtn{flex:0 0 auto;border:0;background:transparent!important;padding:0 2px;color:#a5a5a5;font-size:14px;line-height:1;cursor:pointer}.importanceBtn.on{color:#e6a400}.importanceBtn:hover{color:#d29200}.itemRow{min-width:0}.itemTitle{white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;word-break:normal!important;display:block}.importantField{margin-top:-3px;color:#6b5a20}.importantField input{accent-color:#e6a400}.month .importanceBtn{font-size:10px;padding:0 1px}
 
-/* v1.36: 가용시간 미정 / 캘린더 색상 카드 배경 / 날짜 내 순서변경 / 세부 체크리스트 */
+/* v1.37: 가용시간 미정 / 캘린더 색상 카드 배경 / 날짜 내 순서변경 / 세부 체크리스트 */
 .item{
   background:color-mix(in srgb,var(--item-color,#d9d9d9) 22%, white)!important;
 }
@@ -233,3 +233,12 @@ dialog{border:0;border-radius:12px;box-shadow:0 10px 40px #0003;width:min(560px,
 .subtaskCheck{border:0;background:transparent!important;padding:0 2px;font-size:11px;line-height:1;color:#4d5967}
 .subtaskCheck:hover{color:#111}.checklistSummary{cursor:default;opacity:.88}.checklistCompact{margin-top:2px;font-size:8px;color:#657080;white-space:nowrap}
 @media(max-width:760px){.subtaskList{gap:1px}.subtaskRow{font-size:8px}.subtaskCheck{font-size:9px}.checklistCompact{font-size:7px}}
+
+/* v1.37: Quick tasks appear at the top of each calendar group */
+.quickLane{margin:2px 0 5px;padding:4px;border:1px dashed #cbd5e1;border-radius:6px;background:rgba(248,250,252,.92)}
+.quickLaneHead{display:flex;align-items:center;justify-content:space-between;gap:6px;margin:0 1px 3px;font-size:10px;font-weight:800;color:#475569;text-transform:none}
+.quickLaneItems .item{margin:1px 0;background:rgba(255,255,255,.82)}
+.quickLaneItems .itemTitle{font-size:11px}
+.month .quickLane{padding:2px;margin:1px 0 3px}
+.month .quickLaneHead{font-size:8px;margin-bottom:1px}
+.month .quickLaneItems .item{padding:3px 4px}
