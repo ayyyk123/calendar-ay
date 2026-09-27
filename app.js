@@ -31,13 +31,44 @@ const dayNum = s => { const [y,m,d] = s.split('-').map(Number); return Math.roun
 const diffDays = (a,b) => dayNum(b) - dayNum(a);
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 
+function hexToHsl(hex){
+  const h=String(hex||'#d9d9d9').replace('#','');
+  const full=h.length===3?h.split('').map(x=>x+x).join(''):h.padEnd(6,'0').slice(0,6);
+  let r=parseInt(full.slice(0,2),16)/255, g=parseInt(full.slice(2,4),16)/255, b=parseInt(full.slice(4,6),16)/255;
+  const max=Math.max(r,g,b), min=Math.min(r,g,b); let hue=0, sat=0; const light=(max+min)/2;
+  if(max!==min){
+    const d=max-min; sat=light>0.5?d/(2-max-min):d/(max+min);
+    if(max===r) hue=(g-b)/d+(g<b?6:0); else if(max===g) hue=(b-r)/d+2; else hue=(r-g)/d+4;
+    hue/=6;
+  }
+  return {h:hue*360,s:sat*100,l:light*100};
+}
+function hslToHex(h,s,l){
+  h=((h%360)+360)%360; s=clamp(s,0,100)/100; l=clamp(l,0,100)/100;
+  const c=(1-Math.abs(2*l-1))*s, x=c*(1-Math.abs((h/60)%2-1)), m=l-c/2;
+  let r=0,g=0,b=0;
+  if(h<60){r=c;g=x}else if(h<120){r=x;g=c}else if(h<180){g=c;b=x}else if(h<240){g=x;b=c}else if(h<300){r=x;b=c}else{r=c;b=x}
+  const hx=v=>Math.round((v+m)*255).toString(16).padStart(2,'0');
+  return `#${hx(r)}${hx(g)}${hx(b)}`;
+}
+function suggestSubCalendarColor(parentId, editId=''){
+  const parent=state.calendars.find(c=>c.id===parentId); if(!parent) return '#d9d9d9';
+  const siblings=state.calendars.filter(c=>c.parentId===parentId && c.id!==editId);
+  const {h,s,l}=hexToHsl(parent.color);
+  const lightDeltas=l>=72?[-10,-18,-26,-34,-14,-22]:l<=38?[14,24,34,18,28,38]:[14,-12,24,-20,32,-28];
+  const i=siblings.length, delta=lightDeltas[i%lightDeltas.length];
+  const newL=clamp(l+delta,18,92);
+  const newS=s<8?0:clamp(s+(i%2===0?3:-4),22,95);
+  return hslToHex(h,newS,newL);
+}
+
 const app = initializeApp(FIREBASE_CONFIG);
 const auth = getAuth(app);
 const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.14',
+  version: '1.15',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,parentId:''},
@@ -141,7 +172,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.14',
+    version: '1.15',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -800,14 +831,30 @@ function parentOptionsFor(editId=''){
     return `<option value="${esc(c.id)}">${prefix}${esc(c.name)}</option>`;
   }).join('');
 }
+function updateCalColorHint(){
+  const parentId=$('#cparent').value||'';
+  $('#calColorHint').textContent=parentId?'상위 캘린더와 같은 색 계열에서 밝기·채도만 달리해 구분합니다.':'기본 캘린더는 원하는 색상을 직접 선택하세요.';
+  $('#suggestCalColor').disabled=!parentId;
+}
+function applySuggestedCalendarColor(){
+  const parentId=$('#cparent').value||''; if(!parentId) return;
+  $('#ccolor').value=suggestSubCalendarColor(parentId,$('#cid').value||'');
+}
 function openCal(id){
   const c=state.calendars.find(x=>x.id===id);
   $('#cid').value=c?.id||''; $('#cname').value=c?.name||''; $('#ccolor').value=c?.color||'#d9d9d9';
   $('#cparent').innerHTML=`<option value="">없음 (기본 캘린더)</option>${parentOptionsFor(c?.id||'')}`;
   $('#cparent').value=c?.parentId||'';
   $('#corder').value=c?.order||state.calendars.length+1; $('#cperiod').value=c?.period||'오전'; $('#ccap').value=c?.capacity??8;
+  updateCalColorHint();
   $('#deleteCal').style.visibility=c?'visible':'hidden'; openDialog($('#calDlg'));
 }
+$('#cparent').onchange=()=>{
+  updateCalColorHint();
+  // 새 부속캘린더를 만들 때만 자동 적용합니다. 기존 캘린더의 수동 색상은 임의로 덮어쓰지 않습니다.
+  if(!$('#cid').value && $('#cparent').value) applySuggestedCalendarColor();
+};
+$('#suggestCalColor').onclick=applySuggestedCalendarColor;
 $('#calForm').onsubmit=e=>{
   e.preventDefault();
   const id=$('#cid').value, parentId=$('#cparent').value||'';
@@ -999,7 +1046,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'1.14',
+    appVersion:'1.15',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state

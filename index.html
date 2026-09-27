@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
-  <title>캘린더 v1.14</title>
+  <title>캘린더 v1.15</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="icon-180.png">
@@ -12,7 +12,7 @@
 </head>
 <body>
 <header>
-  <div class="brand"><b>캘린더</b><small> v1.14</small></div>
+  <div class="brand"><b>캘린더</b><small> v1.15</small></div>
   <div id="saveBadge" class="saveBadge loading" title="Firebase 저장 상태"><span class="saveDot"></span><span id="saveBadgeText">Firebase 확인 중</span></div>
   <button id="manualSaveBtn" class="manualSaveBtn" type="button" title="현재 데이터를 Firebase에 즉시 저장"><span class="manualSaveFull">최신자료 저장</span><span class="manualSaveMobile">저장</span></button>
   <button id="sidebarToggle" class="mobileOnly" type="button" aria-label="메뉴">☰</button>
@@ -146,7 +146,10 @@
       <select id="cparent"><option value="">없음 (기본 캘린더)</option></select>
       <small class="hint">예: 개인업무 아래에 결혼준비, 웨딩카페할일을 부속캘린더로 둘 수 있어요.</small>
     </label>
-    <label>색상<input type="color" id="ccolor"></label>
+    <label>색상
+      <div class="colorPickerRow"><input type="color" id="ccolor"><button type="button" id="suggestCalColor">상위색 계열 추천</button></div>
+      <small class="hint" id="calColorHint">부속캘린더는 상위 캘린더와 같은 색 계열로 자동 추천됩니다.</small>
+    </label>
     <label>표시 순서<input type="number" id="corder" min="1" required></label>
     <label>주 활동시간<select id="cperiod"><option>오전</option><option>오후</option><option>저녁</option><option>종일</option></select></label>
     <label>하루 가용시간<input type="number" id="ccap" min="0" max="24" step="0.25" value="8"></label>
