@@ -9,7 +9,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 const FIREBASE_CONFIG = {
-  apiKey: 'AIzaSyAG1fSeZNxx5I1---zM_bW0iVQu53ggRjDc',
+  apiKey: 'AIzaSyAG1fSeZNxx5I1--zM_bW0iVQu53ggRjDc',
   authDomain: 'calendar-ay.firebaseapp.com',
   projectId: 'calendar-ay',
   storageBucket: 'calendar-ay.firebasestorage.app',
@@ -37,7 +37,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.1',
+  version: '1.11',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3},
@@ -64,7 +64,7 @@ function normalizeState(raw){
   const d = defaultState();
   const s = raw && typeof raw === 'object' ? raw : {};
   return {
-    version: '1.1',
+    version: '1.11',
     calendars: Array.isArray(s.calendars) && s.calendars.length ? s.calendars.map((c,i)=>({
       id:c.id||uid(), name:c.name||`캘린더 ${i+1}`, color:c.color||'#d9d9d9',
       order:Number(c.order)||i+1, period:c.period||'종일', capacity:Number(c.capacity)||0
