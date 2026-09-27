@@ -202,9 +202,10 @@ dialog{border:0;border-radius:12px;box-shadow:0 10px 40px #0003;width:min(560px,
 .moreEventsBtn{display:block;width:100%;margin:3px 0 0;padding:2px 4px;border:0;border-radius:4px;background:#eef2f7;color:#475467;font-size:10px;font-weight:700;text-align:left;cursor:pointer}
 .moreEventsBtn:hover{background:#e2e8f0}
 .dayListDlg{width:min(560px,94vw)}.dayListBody{max-height:min(70vh,720px);overflow:auto;padding:2px}
-.month .cell{height:150px;min-height:150px;max-height:150px;overflow:hidden;position:relative}
-@media(max-width:760px){.month .cell{height:112px;min-height:112px;max-height:112px}.moreEventsBtn{font-size:8px;padding:1px 2px}}
-@media(max-width:470px){.month .cell{height:96px;min-height:96px;max-height:96px}.moreEventsBtn{font-size:7px}}
+.month{--month-weeks:5;--month-cell-min:150px;grid-template-rows:auto repeat(var(--month-weeks),minmax(var(--month-cell-min),1fr));min-height:100%;align-content:stretch}
+.month .cell{height:auto;min-height:var(--month-cell-min);max-height:none;overflow:hidden;position:relative}
+@media(max-width:760px){.month{--month-cell-min:112px}.moreEventsBtn{font-size:8px;padding:1px 2px}}
+@media(max-width:470px){.month{--month-cell-min:96px}.moreEventsBtn{font-size:7px}}
 .month .moreEventsBtn{position:absolute;left:3px;right:3px;bottom:3px;width:auto;z-index:3;background:#eef2f7}
 .month .cell:has(.moreEventsBtn){padding-bottom:22px}
 
@@ -337,3 +338,15 @@ aside{min-height:0}
 
 .secTitleWithGrip{display:flex;align-items:center;gap:5px;min-width:0}.sidebarSectionGrip{display:inline-flex;align-items:center;justify-content:center;width:14px;color:#9aa3ae;letter-spacing:-3px;cursor:grab;user-select:none;font-size:12px}.sidebarSectionGrip:active{cursor:grabbing}.sidebarSectionDragging{opacity:.48}.sidebarSectionDrop{outline:1px dashed #9db4d5;outline-offset:2px}.sidebarSection{transition:opacity .12s ease}
 @media(max-width:760px){.sidebarSectionGrip{display:none}.eventPopover{width:min(300px,calc(100vw - 12px));padding:9px}}
+
+/* v1.44: 월간은 실제 필요한 4/5/6주만 렌더링하고 남는 높이는 해당 월의 주 행에 균등 배분 */
+
+/* v1.44: 캘린더별 요일 가용시간 설정 */
+.weekdayCapacityField{display:block;margin-top:8px;padding:9px;border:1px solid #e1e5ea;border-radius:8px;background:#fafbfc}
+.weekdayCapacityField .capacityTitle{display:block;margin-bottom:7px;font-weight:700}
+.weekdayCapacityGrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+.weekdayCapacityCell{display:grid;grid-template-columns:1fr;gap:4px;min-width:0;padding:6px 5px;border:1px solid #e5e7eb;border-radius:7px;background:#fff;text-align:center}
+.weekdayCapacityCell b{font-size:11px}.weekdayCapacityCell input[type=number]{width:100%;min-width:0;padding:5px 4px;text-align:center}
+.weekdayCapacityCell .check{justify-content:center;gap:3px;font-size:9px;white-space:nowrap}.weekdayCapacityCell.weekend b{color:#5b6f9d}.weekdayCapacityField .hint{display:block;margin-top:7px}
+@media(max-width:760px){.weekdayCapacityGrid{grid-template-columns:repeat(4,minmax(0,1fr))}.weekdayCapacityCell{padding:5px 4px}}
+@media(max-width:430px){.weekdayCapacityGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}

@@ -68,11 +68,11 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.43',
+  version: '1.44',
   calendars: [
-    {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,parentId:''},
-    {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,parentId:''},
-    {id:'family',name:'가족/개인',color:'#f6e8a6',order:3,period:'저녁',capacity:2,capacityUnknown:false,parentId:''}
+    {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
+    {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
+    {id:'family',name:'가족/개인',color:'#f6e8a6',order:3,period:'저녁',capacity:2,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:2,unknown:false}])),parentId:''}
   ],
   events: [],
   fixed: [],
@@ -291,6 +291,10 @@ function normalizeState(raw){
       id:c.id||uid(), name:c.name||`캘린더 ${i+1}`, color:c.color||'#d9d9d9',
       order:Number(c.order)||i+1, period:c.period||'종일', capacity:Number(c.capacity)||0,
       capacityUnknown:!!c.capacityUnknown,
+      capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>{
+        const src=c.capacityByDay?.[d]??c.capacityByDay?.[String(d)];
+        return [d,{hours:Number(src?.hours ?? c.capacity ?? 0)||0,unknown:src?.unknown!==undefined?!!src.unknown:!!c.capacityUnknown}];
+      })),
       parentId:typeof c.parentId==='string'?c.parentId:''
     }
   )) : d.calendars;
@@ -307,7 +311,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.43',
+    version: '1.44',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -513,6 +517,22 @@ function calendarPath(id){
 }
 function duration(e){ return e?.noDuration ? 0 : (Number(e?.hours)||0); }
 function durationLabel(e){ return e?.noDuration ? '소요시간 미체크' : fmtH(Number(e?.hours)||0); }
+function capacityForDate(c,date){
+  const dow=parse(date).getDay();
+  const src=c?.capacityByDay?.[dow]??c?.capacityByDay?.[String(dow)];
+  if(src) return {hours:Number(src.hours)||0,unknown:!!src.unknown};
+  return {hours:Number(c?.capacity)||0,unknown:!!c?.capacityUnknown};
+}
+function capacityForWeek(c,startDate){
+  let hours=0,unknownDays=0;
+  for(let i=0;i<7;i++){ const info=capacityForDate(c,ds(add(startDate,i))); if(info.unknown) unknownDays++; else hours+=info.hours; }
+  return {hours,unknownDays,unknown:unknownDays>0};
+}
+function capacitySidebarLabel(c){
+  const vals=[0,1,2,3,4,5,6].map(d=>{ const x=c?.capacityByDay?.[d]??c?.capacityByDay?.[String(d)]; return x?`${!!x.unknown?'u':'k'}:${Number(x.hours)||0}`:`${!!c?.capacityUnknown?'u':'k'}:${Number(c?.capacity)||0}`; });
+  if(new Set(vals).size===1){ const [flag,val]=vals[0].split(':'); return flag==='u'?'미정':`${val}h`; }
+  return '요일별';
+}
 function fmtH(h){
   const value = Math.max(0, Number(h) || 0);
   const rounded = Math.round(value * 100) / 100;
@@ -959,10 +979,12 @@ function groupHtml(date, es){
     const rootSum=groupEvents.reduce((sum,e)=>sum+duration(e),0);
     total+=rootSum;
     const activeChildren=members.filter(c=>c.id!==root.id && groupEvents.some(e=>e.calId===c.id));
-    const fallbackCap=activeChildren.filter(c=>!c.capacityUnknown).reduce((sum,c)=>sum+(Number(c.capacity)||0),0);
-    const fallbackUnknown=activeChildren.some(c=>c.capacityUnknown);
-    const rootUnknown=!!root.capacityUnknown || (!(Number(root.capacity)||0) && fallbackUnknown);
-    const effectiveRootCap=rootUnknown?0:((Number(root.capacity)||0) || fallbackCap);
+    const childCaps=activeChildren.map(c=>capacityForDate(c,date));
+    const fallbackCap=childCaps.filter(x=>!x.unknown).reduce((sum,x)=>sum+x.hours,0);
+    const fallbackUnknown=childCaps.some(x=>x.unknown);
+    const rootCapInfo=capacityForDate(root,date);
+    const rootUnknown=rootCapInfo.unknown || (!(Number(rootCapInfo.hours)||0) && fallbackUnknown);
+    const effectiveRootCap=rootUnknown?0:((Number(rootCapInfo.hours)||0) || fallbackCap);
     if(rootUnknown) hasUnknownCapacity=true; else totalCapacity+=effectiveRootCap;
     const rootCollapsed=isDayCalCollapsed(date,root.id);
     html += `<div class="group calendarTreeGroup ${rootCollapsed?'collapsed':''}" style="--group-color:${esc(root.color)}"><div class="groupHead" style="background:${esc(root.color)}55">${dayCalHeadHtml(date,root,rootSum,effectiveRootCap,rootUnknown)}</div><div class="dayCalGroupBody">`;
@@ -971,8 +993,8 @@ function groupHtml(date, es){
     for(const child of members.filter(c=>c.id!==root.id)){
       const xs=groupEvents.filter(e=>e.calId===child.id); if(!xs.length) continue;
       const sum=xs.reduce((n,e)=>n+duration(e),0), depth=Math.max(1,calendarDepth(child.id));
-      const childCollapsed=isDayCalCollapsed(date,child.id);
-      html += `<div class="subCalGroup ${childCollapsed?'collapsed':''}" style="--sub-depth:${depth}"><div class="subCalHead" style="border-left-color:${esc(child.color)};background:color-mix(in srgb, ${esc(child.color)} 14%, white)">${dayCalHeadHtml(date,child,sum,child.capacity,!!child.capacityUnknown,'↳ ')}</div><div class="dayCalGroupBody">${quickLaneHtml(xs,false)}${nonQuickItemsHtml(xs,false)}</div></div>`;
+      const childCollapsed=isDayCalCollapsed(date,child.id), childCapInfo=capacityForDate(child,date);
+      html += `<div class="subCalGroup ${childCollapsed?'collapsed':''}" style="--sub-depth:${depth}"><div class="subCalHead" style="border-left-color:${esc(child.color)};background:color-mix(in srgb, ${esc(child.color)} 14%, white)">${dayCalHeadHtml(date,child,sum,childCapInfo.hours,childCapInfo.unknown,'↳ ')}</div><div class="dayCalGroupBody">${quickLaneHtml(xs,false)}${nonQuickItemsHtml(xs,false)}</div></div>`;
     }
     html += `</div></div>`;
   }
@@ -1011,7 +1033,7 @@ function renderSide(){
   const hidden=new Set(state.settings.hiddenCalendars||[]);
   $('#calList').innerHTML=cals().map(c=>{
     const depth=calendarDepth(c.id), kids=directChildren(c.id).length, focused=calendarFocusId===c.id;
-    const capLabel=c.capacityUnknown?'미정':`${esc(c.capacity)}h`;
+    const capLabel=capacitySidebarLabel(c);
     return `<div class="calRow ${depth?'subCalendarRow':''} ${focused?'calendarFocused':''}" data-cid="${esc(c.id)}" style="--cal-depth:${depth}"><input class="calVisible" type="checkbox" ${isCalendarHidden(c.id)?'':'checked'} title="표시/숨김"><i class="dot" style="background:${esc(c.color)}"></i><button type="button" class="calNameBtn" title="${esc(c.name)}만 현재 달력 화면에서 보기 (다시 누르면 전체 보기)">${depth?'↳ ':''}${esc(c.name)}</button><small>${esc(c.period)} · ${capLabel}${kids?` · 부속 ${kids}`:''}</small><button type="button" class="calEdit" title="캘린더 수정" aria-label="${esc(c.name)} 수정">✎</button></div>`;
   }).join('');
   $$('.calRow').forEach(row=>{
@@ -1316,18 +1338,22 @@ function renderLoad(){
     let rootSum=0;
     for(const day of Object.values(map)) rootSum += day.filter(x=>members.some(c=>c.id===x.calId) && x.kind!=='payment').reduce((a,x)=>a+duration(x),0);
     const children=members.filter(c=>c.id!==root.id);
-    const childCapFallback=children.filter(c=>!c.capacityUnknown).reduce((sum,c)=>sum+(Number(c.capacity)||0),0)*7;
-    const childUnknown=children.some(c=>c.capacityUnknown);
-    const rootUnknown=!!root.capacityUnknown || (!(Number(root.capacity)||0) && childUnknown);
-    const cap=rootUnknown?0:((Number(root.capacity)||0)*7 || childCapFallback);
+    const childWeekInfos=children.map(c=>capacityForWeek(c,s));
+    const childCapFallback=childWeekInfos.reduce((sum,x)=>sum+x.hours,0);
+    const childUnknownDays=childWeekInfos.reduce((sum,x)=>sum+x.unknownDays,0);
+    const rootWeek=capacityForWeek(root,s);
+    const useChildFallback=!rootWeek.hours && rootWeek.unknownDays===0 && (childCapFallback>0 || childUnknownDays>0);
+    const cap=useChildFallback?childCapFallback:rootWeek.hours;
+    const unknownDays=useChildFallback?childUnknownDays:rootWeek.unknownDays;
     const p=cap?rootSum/cap*100:0;
-    rows.push(`<div class="loadLine ${rootUnknown?'unknownCapacity':''}"><b>${esc(root.name)}</b> ${fmtH(rootSum)}${rootUnknown?' / 미정':(cap?` / ${fmtH(cap)}`:'')}<div class="loadBar ${rootUnknown?'unknownLoadBar':''}"><i class="${p>100?'overBar':''}" style="width:${rootUnknown?0:Math.min(100,p)}%"></i></div></div>`);
+    const capText=unknownDays?` / ${cap?`${fmtH(cap)} + `:''}미정 ${unknownDays}일`:(cap?` / ${fmtH(cap)}`:'');
+    rows.push(`<div class="loadLine ${unknownDays?'unknownCapacity':''}"><b>${esc(root.name)}</b> ${fmtH(rootSum)}${capText}<div class="loadBar ${unknownDays?'unknownLoadBar':''}"><i class="${!unknownDays&&p>100?'overBar':''}" style="width:${unknownDays?0:Math.min(100,p)}%"></i></div></div>`);
     for(const child of children){
       let sum=0; for(const day of Object.values(map)) sum += day.filter(x=>x.calId===child.id && x.kind!=='payment').reduce((a,x)=>a+duration(x),0);
-      const unknown=!!child.capacityUnknown;
-      if(!sum && !Number(child.capacity) && !unknown) continue;
-      const ccap=unknown?0:(Number(child.capacity)||0)*7, cp=ccap?sum/ccap*100:0;
-      rows.push(`<div class="loadLine subLoad ${unknown?'unknownCapacity':''}" style="--cal-depth:${Math.max(1,calendarDepth(child.id))}"><b>↳ ${esc(child.name)}</b> ${fmtH(sum)}${unknown?' / 미정':(ccap?` / ${fmtH(ccap)}`:'')}<div class="loadBar ${unknown?'unknownLoadBar':''}"><i class="${cp>100?'overBar':''}" style="width:${unknown?0:Math.min(100,cp)}%"></i></div></div>`);
+      const wi=capacityForWeek(child,s), ccap=wi.hours, unknownDaysChild=wi.unknownDays;
+      if(!sum && !ccap && !unknownDaysChild) continue;
+      const cp=ccap?sum/ccap*100:0, childCapText=unknownDaysChild?` / ${ccap?`${fmtH(ccap)} + `:''}미정 ${unknownDaysChild}일`:(ccap?` / ${fmtH(ccap)}`:'');
+      rows.push(`<div class="loadLine subLoad ${unknownDaysChild?'unknownCapacity':''}" style="--cal-depth:${Math.max(1,calendarDepth(child.id))}"><b>↳ ${esc(child.name)}</b> ${fmtH(sum)}${childCapText}<div class="loadBar ${unknownDaysChild?'unknownLoadBar':''}"><i class="${!unknownDaysChild&&cp>100?'overBar':''}" style="width:${unknownDaysChild?0:Math.min(100,cp)}%"></i></div></div>`);
     }
   }
   $('#weekLoad').innerHTML=rows.join('') || '<div class="empty">표시 중인 캘린더가 없습니다.</div>';
@@ -1558,7 +1584,7 @@ function bindItems(){
       if(payload.type==='fixed'){
         const f=state.fixed.find(z=>z.id===payload.id);
         if(f){
-          state.events.push({id:uid(),title:f.name,calId:f.calId,date:x.dataset.dropdate,endDate:x.dataset.dropdate,allDay:true,start:'',end:'',hours:f.hours,noDuration:!!f.noDuration,kind:'todo',place:'',repeat:'none',repeatRule:null,memo:f.memo||'',fixedId:f.id,important:!!f.important,done:false,doneDates:[],checklist:structuredClone(f.checklist||[]),checklistDoneByDate:{},orderByDate:{}});
+          state.events.push({id:uid(),title:f.name,calId:f.calId,date:x.dataset.dropdate,endDate:x.dataset.dropdate,allDay:true,start:'',end:'',hours:f.hours,noDuration:!!f.noDuration,kind:'event',place:'',repeat:'none',repeatRule:null,memo:f.memo||'',fixedId:f.id,important:!!f.important,done:false,doneDates:[],checklist:structuredClone(f.checklist||[]),checklistDoneByDate:{},orderByDate:{}});
           save();
         }
         return;
@@ -1566,7 +1592,7 @@ function bindItems(){
       if(payload.type==='flexible'){
         const f=(state.flexible||[]).find(z=>z.id===payload.id);
         if(f){
-          state.events.push({id:uid(),title:f.name,calId:f.calId,date:x.dataset.dropdate,endDate:x.dataset.dropdate,allDay:true,start:'',end:'',hours:f.hours,noDuration:!!f.noDuration,kind:'todo',place:'',repeat:'none',repeatRule:null,memo:f.memo||'',flexibleId:f.id,important:!!f.important,done:false,doneDates:[],checklist:structuredClone(f.checklist||[]),checklistDoneByDate:{},orderByDate:{}});
+          state.events.push({id:uid(),title:f.name,calId:f.calId,date:x.dataset.dropdate,endDate:x.dataset.dropdate,allDay:true,start:'',end:'',hours:f.hours,noDuration:!!f.noDuration,kind:'event',place:'',repeat:'none',repeatRule:null,memo:f.memo||'',flexibleId:f.id,important:!!f.important,done:false,doneDates:[],checklist:structuredClone(f.checklist||[]),checklistDoneByDate:{},orderByDate:{}});
           save();
         }
         return;
@@ -1683,11 +1709,19 @@ function renderMultiWeek(weeks=2){
   bindItems();
 }
 function renderMonth(){
-  const y=cursor.getFullYear(),m=cursor.getMonth(),first=new Date(y,m,1),s=startWeek(first),end=add(s,41),map=buildOccurrenceMap(ds(s),ds(end),{calendarIds:focusedCalendarIds()});
+  const y=cursor.getFullYear(),m=cursor.getMonth(),first=new Date(y,m,1),s=startWeek(first);
+  // 현재 달이 실제로 차지하는 주 수(4/5/6주)만 렌더링합니다.
+  // 예: 2026년 10월은 9/28~11/1의 5주만 보여주고, 11/2~11/8은 불필요하므로 만들지 않습니다.
+  const monthDays=new Date(y,m+1,0).getDate();
+  const mondayOffset=(first.getDay()+6)%7;
+  const weekCount=Math.ceil((mondayOffset+monthDays)/7);
+  const totalCells=weekCount*7;
+  const end=add(s,totalCells-1),map=buildOccurrenceMap(ds(s),ds(end),{calendarIds:focusedCalendarIds()});
   $('#range').textContent=`${y}년 ${m+1}월${focusSuffix()}`;
   $('#main').className='month';
+  $('#main').style.setProperty('--month-weeks',String(weekCount));
   const heads=['월','화','수','목','금','토','일'].map((x,i)=>`<div class="weekdayHeader ${i===5?'saturday':i===6?'sunday':''}">${x}</div>`).join('');
-  const cells=[...Array(42)].map((_,i)=>{
+  const cells=[...Array(totalCells)].map((_,i)=>{
     const d=add(s,i),key=ds(d),es=map[key]||[],hasDiary=!!state.diary[key]?.text,h=holidayLabel(key),dow=d.getDay();
     const cellClass=[d.getMonth()!==m?'other':'',holidayClass(key),dow===0?'sunday':'',dow===6?'saturday':''].filter(Boolean).join(' ');
     const holidayText=h?esc(h):'&nbsp;';
@@ -2073,8 +2107,13 @@ function openCal(id){
   $('#cid').value=c?.id||''; $('#cname').value=c?.name||''; $('#ccolor').value=c?.color||'#d9d9d9';
   $('#cparent').innerHTML=`<option value="">없음 (기본 캘린더)</option>${parentOptionsFor(c?.id||'')}`;
   $('#cparent').value=c?.parentId||'';
-  $('#corder').value=c?.order||state.calendars.length+1; $('#cperiod').value=c?.period||'오전'; $('#ccap').value=c?.capacity??8;
-  $('#ccapUnknown').checked=!!c?.capacityUnknown; $('#ccap').disabled=!!c?.capacityUnknown;
+  $('#corder').value=c?.order||state.calendars.length+1; $('#cperiod').value=c?.period||'오전';
+  for(const dow of [1,2,3,4,5,6,0]){
+    const src=c?.capacityByDay?.[dow]??c?.capacityByDay?.[String(dow)]??{hours:c?.capacity??8,unknown:!!c?.capacityUnknown};
+    const inp=document.querySelector(`[data-cap-dow="${dow}"]`), chk=document.querySelector(`[data-cap-unknown="${dow}"]`);
+    if(inp){ inp.value=Number(src.hours)||0; inp.disabled=!!src.unknown; }
+    if(chk) chk.checked=!!src.unknown;
+  }
   updateCalColorHint();
   $('#deleteCal').style.visibility=c?'visible':'hidden'; openDialog($('#calDlg'));
 }
@@ -2084,12 +2123,14 @@ $('#cparent').onchange=()=>{
   if(!$('#cid').value && $('#cparent').value) applySuggestedCalendarColor();
 };
 $('#suggestCalColor').onclick=applySuggestedCalendarColor;
-$('#ccapUnknown').onchange=()=>{ $('#ccap').disabled=$('#ccapUnknown').checked; };
+document.querySelectorAll('[data-cap-unknown]').forEach(chk=>chk.onchange=()=>{ const dow=chk.dataset.capUnknown, inp=document.querySelector(`[data-cap-dow="${dow}"]`); if(inp) inp.disabled=chk.checked; });
 $('#calForm').onsubmit=e=>{
   e.preventDefault();
   const id=$('#cid').value, parentId=$('#cparent').value||'';
   if(id && (parentId===id || descendants(id).some(c=>c.id===parentId))){ alert('자기 자신 또는 자신의 부속캘린더를 상위 캘린더로 지정할 수 없습니다.'); return; }
-  const obj={id:id||uid(),name:$('#cname').value.trim(),color:$('#ccolor').value,order:Number($('#corder').value)||1,period:$('#cperiod').value,capacity:Number($('#ccap').value)||0,capacityUnknown:$('#ccapUnknown').checked,parentId};
+  const capacityByDay=Object.fromEntries([0,1,2,3,4,5,6].map(d=>{ const inp=document.querySelector(`[data-cap-dow="${d}"]`), chk=document.querySelector(`[data-cap-unknown="${d}"]`); return [d,{hours:Number(inp?.value)||0,unknown:!!chk?.checked}]; }));
+  const known=[0,1,2,3,4,5,6].map(d=>capacityByDay[d]).filter(x=>!x.unknown), avg=known.length?known.reduce((a,x)=>a+x.hours,0)/known.length:0;
+  const obj={id:id||uid(),name:$('#cname').value.trim(),color:$('#ccolor').value,order:Number($('#corder').value)||1,period:$('#cperiod').value,capacity:avg,capacityUnknown:known.length===0,capacityByDay,parentId};
   if(id) state.calendars[state.calendars.findIndex(x=>x.id===id)]=obj; else state.calendars.push(obj);
   closeDialog($('#calDlg')); save();
 };
