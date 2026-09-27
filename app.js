@@ -68,7 +68,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.18',
+  version: '1.19',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,parentId:''},
@@ -174,7 +174,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.18',
+    version: '1.19',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -874,14 +874,16 @@ function setRepeatRule(e){
   $('#repeatCount').value=rule.count||10;
   updateRepeatUI();
 }
-function openEvent(date,id){
+function openEvent(date,id,options={}){
   const e=state.events.find(x=>x.id===id);
+  const monthlyPreset=!e && options?.preset==='monthlyRecurring';
   activeEventOccurrence=e?(date||e.date):(date||ds(cursor));
-  $('#eventTitle').textContent=e?'일정 수정':'일정 등록';
+  $('#eventTitle').textContent=e?'일정 수정':(monthlyPreset?'매월 자동반복 업무 추가':'일정 등록');
   $('#eid').value=e?.id||''; $('#title').value=e?.title||''; $('#cal').value=e?.calId||cals()[0]?.id||'';
   $('#date').value=e?.date||date||ds(cursor); $('#endDate').value=e?.endDate||e?.date||date||ds(cursor);
   $('#allDay').checked=e?.allDay??true; $('#start').value=e?.start||''; $('#end').value=e?.end||''; setDurationInputs(e?.hours??1);
-  $('#kind').value=e?.kind||'event'; $('#place').value=e?.place||''; $('#repeat').value=e?.repeat||'none'; $('#memo').value=e?.memo||'';
+  $('#kind').value=e?.kind||(monthlyPreset?'todo':'event'); $('#place').value=e?.place||''; $('#repeat').value=e?.repeat||(monthlyPreset?'monthly':'none'); $('#memo').value=e?.memo||'';
+  $('#repeat').disabled=monthlyPreset;
   $('#deleteEvent').style.visibility=e?'visible':'hidden'; $('#copyEvent').style.visibility=e?'visible':'hidden';
   const occurrenceView=e?{...e,_occurrenceStart:activeEventOccurrence}:null;
   $('#carryEvent').classList.toggle('hidden',!e || e.kind==='anniversary' || (occurrenceView&&isDone(occurrenceView)));
@@ -1019,7 +1021,9 @@ $('#deleteCal').onclick=()=>{
 };
 
 function openFixed(id){
-  const f=state.fixed.find(x=>x.id===id); $('#fid').value=f?.id||''; $('#fname').value=f?.name||''; $('#fcal').value=f?.calId||cals()[0]?.id||'';
+  const f=state.fixed.find(x=>x.id===id);
+  $('#fixedTitle').textContent=f?'날짜 지정 배치 업무 수정':'날짜 지정 배치 업무 추가';
+  $('#fid').value=f?.id||''; $('#fname').value=f?.name||''; $('#fcal').value=f?.calId||cals()[0]?.id||'';
   setDurationInputs(f?.hours??1,'f'); $('#fmemo').value=f?.memo||''; $('#deleteFixed').style.visibility=f?'visible':'hidden'; openDialog($('#fixedDlg'));
 }
 $('#fixedForm').onsubmit=e=>{
@@ -1049,7 +1053,19 @@ function renderSearch(){
 $('#searchBtn').onclick=()=>{ $('#searchInput').value=''; $('#searchResults').innerHTML='<div class="empty">검색어를 입력하세요.</div>'; openDialog($('#searchDlg')); setTimeout(()=>$('#searchInput').focus(),50); };
 $('#searchInput').oninput=renderSearch; $('#closeSearch').onclick=()=>closeDialog($('#searchDlg')); $('#searchForm').onsubmit=e=>e.preventDefault();
 
-$('#addCal').onclick=()=>openCal(); $('#addFixed').onclick=()=>openFixed(); $('#fixedFilter').onchange=e=>{selectedFixedFilter=e.target.value;renderFixed();};
+function setFixedAddMenu(open){
+  const menu=$('#fixedAddMenu'), btn=$('#addFixed'); if(!menu||!btn) return;
+  const show=typeof open==='boolean'?open:menu.classList.contains('hidden');
+  menu.classList.toggle('hidden',!show); btn.setAttribute('aria-expanded',show?'true':'false');
+}
+$('#addCal').onclick=()=>openCal();
+$('#addFixed').onclick=e=>{ e.stopPropagation(); setFixedAddMenu(); };
+$('#addRecurringFixed').onclick=e=>{ e.stopPropagation(); setFixedAddMenu(false); openEvent(ds(cursor),null,{preset:'monthlyRecurring'}); };
+$('#addManualFixed').onclick=e=>{ e.stopPropagation(); setFixedAddMenu(false); openFixed(); };
+$('#fixedAddMenu').onclick=e=>e.stopPropagation();
+document.addEventListener('click',e=>{ if(!e.target.closest('.fixedAddWrap')) setFixedAddMenu(false); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape' && !$('#fixedAddMenu').classList.contains('hidden')) setFixedAddMenu(false); });
+$('#fixedFilter').onchange=e=>{selectedFixedFilter=e.target.value;renderFixed();};
 $('#prev').onclick=()=>{ cursor=view==='month'?new Date(cursor.getFullYear(),cursor.getMonth()-1,1):add(cursor,view==='week'?-7:-1); render(); };
 $('#next').onclick=()=>{ cursor=view==='month'?new Date(cursor.getFullYear(),cursor.getMonth()+1,1):add(cursor,view==='week'?7:1); render(); };
 $('#today').onclick=()=>{cursor=new Date();render();};
