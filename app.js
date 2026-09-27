@@ -23,7 +23,7 @@ const pad = n => String(n).padStart(2, '0');
 const ds = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const parse = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
 const add = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
-const startWeek = d => add(new Date(d.getFullYear(), d.getMonth(), d.getDate()), -d.getDay());
+const startWeek = d => { const x=new Date(d.getFullYear(), d.getMonth(), d.getDate()); return add(x, -((x.getDay()+6)%7)); };
 const uid = () => crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const esc = s => String(s ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
 const DAY = 86400000;
@@ -37,7 +37,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.12',
+  version: '1.13',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3},
@@ -63,12 +63,66 @@ let lastFirebaseSavedAt = null;
 let lastLocalSavedAt = null;
 let localDirty = false;
 let writeInFlight = false;
+let holidayData = {};
+const HOLIDAY_URL = 'https://raw.githubusercontent.com/hyunbinseo/holidays-kr/main/public/basic.json';
+const HOLIDAY_CACHE_KEY = 'myCalendarHolidayKR:v1';
+const HOLIDAY_CACHE_MAX_AGE = 24 * 60 * 60 * 1000;
+const FALLBACK_HOLIDAYS = {
+  '2026-01-01':['1월 1일'],'2026-02-16':['설날 전날'],'2026-02-17':['설날'],'2026-02-18':['설날 다음 날'],'2026-03-01':['3ㆍ1절'],'2026-03-02':['대체공휴일(3ㆍ1절)'],'2026-05-01':['노동절'],'2026-05-05':['어린이날'],'2026-05-24':['부처님 오신 날'],'2026-05-25':['대체공휴일(부처님 오신 날)'],'2026-06-03':['전국동시지방선거'],'2026-06-06':['현충일'],'2026-07-17':['제헌절'],'2026-08-15':['광복절'],'2026-08-17':['대체공휴일(광복절)'],'2026-09-24':['추석 전날'],'2026-09-25':['추석'],'2026-09-26':['추석 다음 날'],'2026-10-03':['개천절'],'2026-10-05':['대체공휴일(개천절)'],'2026-10-09':['한글날'],'2026-12-25':['기독탄신일'],
+  '2027-01-01':['1월 1일'],'2027-02-06':['설날 전날'],'2027-02-07':['설날'],'2027-02-08':['설날 다음 날'],'2027-02-09':['대체공휴일(설날)'],'2027-03-01':['3ㆍ1절'],'2027-05-01':['노동절'],'2027-05-03':['대체공휴일(노동절)'],'2027-05-05':['어린이날'],'2027-05-13':['부처님 오신 날'],'2027-06-06':['현충일'],'2027-07-17':['제헌절'],'2027-07-19':['대체공휴일(제헌절)'],'2027-08-15':['광복절'],'2027-08-16':['대체공휴일(광복절)'],'2027-09-14':['추석 전날'],'2027-09-15':['추석'],'2027-09-16':['추석 다음 날'],'2027-10-03':['개천절'],'2027-10-04':['대체공휴일(개천절)'],'2027-10-09':['한글날'],'2027-10-11':['대체공휴일(한글날)'],'2027-12-25':['기독탄신일'],'2027-12-27':['대체공휴일(기독탄신일)']
+};
+function flattenHolidayData(raw){
+  const out={};
+  if(!raw || typeof raw!=='object') return out;
+  for(const year of Object.values(raw)) if(year && typeof year==='object') for(const [date,names] of Object.entries(year)) out[date]=Array.isArray(names)?names:[String(names)];
+  return out;
+}
+function fixedHolidayFallback(year){
+  const dates={
+    [`${year}-01-01`]:['1월 1일'],
+    [`${year}-03-01`]:['3ㆍ1절'],
+    [`${year}-05-05`]:['어린이날'],
+    [`${year}-06-06`]:['현충일'],
+    [`${year}-08-15`]:['광복절'],
+    [`${year}-10-03`]:['개천절'],
+    [`${year}-10-09`]:['한글날'],
+    [`${year}-12-25`]:['기독탄신일']
+  };
+  return dates;
+}
+function holidaysForDate(date){
+  const exact=holidayData[date] || FALLBACK_HOLIDAYS[date];
+  if(exact) return exact;
+  const year=Number(date.slice(0,4));
+  return fixedHolidayFallback(year)[date] || [];
+}
+function holidayLabel(date){ return holidaysForDate(date).join(' · '); }
+function holidayClass(date){ return holidaysForDate(date).length ? 'holiday' : ''; }
+async function loadHolidayData(){
+  try{
+    const cache=JSON.parse(localStorage.getItem(HOLIDAY_CACHE_KEY)||'null');
+    if(cache?.data){ holidayData=flattenHolidayData(cache.data); }
+    const shouldRefresh=!cache?.savedAt || Date.now()-new Date(cache.savedAt).getTime()>HOLIDAY_CACHE_MAX_AGE;
+    if(shouldRefresh){
+      const res=await fetch(HOLIDAY_URL,{cache:'no-store'});
+      if(!res.ok) throw new Error(`holiday fetch ${res.status}`);
+      const data=await res.json();
+      holidayData=flattenHolidayData(data);
+      localStorage.setItem(HOLIDAY_CACHE_KEY,JSON.stringify({savedAt:new Date().toISOString(),data}));
+      render();
+    }
+  }catch(err){
+    console.warn('공휴일 데이터를 불러오지 못해 내장 공휴일 정보를 사용합니다.',err);
+    if(!Object.keys(holidayData).length) holidayData={...FALLBACK_HOLIDAYS};
+    render();
+  }
+}
 
 function normalizeState(raw){
   const d = defaultState();
   const s = raw && typeof raw === 'object' ? raw : {};
   return {
-    version: '1.12',
+    version: '1.13',
     calendars: Array.isArray(s.calendars) && s.calendars.length ? s.calendars.map((c,i)=>({
       id:c.id||uid(), name:c.name||`캘린더 ${i+1}`, color:c.color||'#d9d9d9',
       order:Number(c.order)||i+1, period:c.period||'종일', capacity:Number(c.capacity)||0
@@ -284,12 +338,12 @@ function generateOccurrenceStarts(e, rangeStart, rangeEnd){
   }
   if(repeat==='weekly'){
     const ws=startWeek(base);
-    const weekdays=[...new Set(rule.weekdays)].sort((a,b)=>a-b);
+    const weekdays=[...new Set(rule.weekdays)].sort((a,b)=>((a+6)%7)-((b+6)%7));
     for(let block=0;guard++<5000;block++){
       const weekStart=add(ws,block*7*rule.interval);
       if(weekStart>add(rEnd,7)) break;
       for(const wd of weekdays){
-        const d=add(weekStart,wd);
+        const d=add(weekStart,(wd+6)%7);
         if(d<base) continue;
         const cont=tryPush(d);
         if(!cont) return out;
@@ -503,8 +557,9 @@ function renderWeek(){
   $('#range').textContent=`${s.getFullYear()}. ${s.getMonth()+1}. ${s.getDate()} - ${days[6].getFullYear()}. ${days[6].getMonth()+1}. ${days[6].getDate()}`;
   $('#main').className='week';
   $('#main').innerHTML=days.map(d=>{
-    const key=ds(d), hasDiary=!!state.diary[key]?.text;
-    return `<div class="dayCol"><div class="dayHead ${key===ds(new Date())?'today':''}"><div class="dayTopLine"><span>${['일','월','화','수','목','금','토'][d.getDay()]}</span><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}" title="다이어리">📝</button></div><div class="dateNum">${d.getDate()}</div></div><div class="dayBody" data-dropdate="${key}" ondblclick="window.__newEvent?.('${key}')">${groupHtml(key,map[key]||[])}</div></div>`;
+    const key=ds(d), hasDiary=!!state.diary[key]?.text, h=holidayLabel(key), dow=d.getDay();
+    const dayClass=[key===ds(new Date())?'today':'', holidayClass(key), dow===0?'sunday':'', dow===6?'saturday':''].filter(Boolean).join(' ');
+    return `<div class="dayCol"><div class="dayHead ${dayClass}"><div class="dayTopLine"><span>${['일','월','화','수','목','금','토'][dow]}</span><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}" title="다이어리">📝</button></div><div class="dateNum">${d.getDate()}</div>${h?`<div class="holidayName">${esc(h)}</div>`:''}</div><div class="dayBody" data-dropdate="${key}" ondblclick="window.__newEvent?.('${key}')">${groupHtml(key,map[key]||[])}</div></div>`;
   }).join('');
   bindItems();
 }
@@ -512,24 +567,25 @@ function renderMonth(){
   const y=cursor.getFullYear(),m=cursor.getMonth(),first=new Date(y,m,1),s=startWeek(first),end=add(s,41),map=buildOccurrenceMap(ds(s),ds(end));
   $('#range').textContent=`${y}년 ${m+1}월`;
   $('#main').className='month';
-  const heads=['일','월','화','수','목','금','토'].map(x=>`<div class="weekdayHeader">${x}</div>`).join('');
+  const heads=['월','화','수','목','금','토','일'].map((x,i)=>`<div class="weekdayHeader ${i===5?'saturday':i===6?'sunday':''}">${x}</div>`).join('');
   const cells=[...Array(42)].map((_,i)=>{
-    const d=add(s,i),key=ds(d),es=map[key]||[],hasDiary=!!state.diary[key]?.text;
-    return `<div class="cell ${d.getMonth()!==m?'other':''}" data-dropdate="${key}" ondblclick="window.__newEvent?.('${key}')"><div class="mhead"><span>${d.getDate()}</span><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}">${hasDiary?'📝':'＋'}</button></div>${es.map(e=>eventItemHtml(e,true)).join('')}</div>`;
+    const d=add(s,i),key=ds(d),es=map[key]||[],hasDiary=!!state.diary[key]?.text,h=holidayLabel(key),dow=d.getDay();
+    const cellClass=[d.getMonth()!==m?'other':'',holidayClass(key),dow===0?'sunday':'',dow===6?'saturday':''].filter(Boolean).join(' ');
+    return `<div class="cell ${cellClass}" data-dropdate="${key}" ondblclick="window.__newEvent?.('${key}')"><div class="mhead"><span>${d.getDate()}</span><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}">${hasDiary?'📝':'＋'}</button></div>${h?`<div class="holidayName">${esc(h)}</div>`:''}${es.map(e=>eventItemHtml(e,true)).join('')}</div>`;
   }).join('');
   $('#main').innerHTML=heads+cells; bindItems();
 }
 function renderDay(){
   const d=ds(cursor),map=buildOccurrenceMap(d,d),hasDiary=!!state.diary[d]?.text;
-  $('#range').textContent=d; $('#main').className='daySingle';
-  $('#main').innerHTML=`<div class="diaryStrip"><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${d}">📝 ${hasDiary?'다이어리 보기':'다이어리 작성'}</button></div><div data-dropdate="${d}" ondblclick="window.__newEvent?.('${d}')">${groupHtml(d,map[d]||[])}</div>`; bindItems();
+  const h=holidayLabel(d); $('#range').textContent=d; $('#main').className='daySingle';
+  $('#main').innerHTML=`${h?`<div class="dayHolidayBanner">${esc(h)}</div>`:''}<div class="diaryStrip"><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${d}">📝 ${hasDiary?'다이어리 보기':'다이어리 작성'}</button></div><div data-dropdate="${d}" ondblclick="window.__newEvent?.('${d}')">${groupHtml(d,map[d]||[])}</div>`; bindItems();
 }
 function renderList(){
   const start=ds(add(new Date(),-30)),end=ds(add(new Date(),365)),map=buildOccurrenceMap(start,end);
   const rows=[]; for(const [date,es] of Object.entries(map)) for(const e of es){ if((e._occurrenceStart||e.date)===date) rows.push({date,e}); }
   $('#range').textContent='일정 목록'; $('#main').className='listView';
   let last='';
-  $('#main').innerHTML=`<div class="listNote">오늘 기준 과거 30일 ~ 앞으로 1년의 일정입니다. 반복 일정도 각 발생일에 표시됩니다.</div>`+(rows.map(({date,e})=>{let h='';if(last!==date){last=date;h=`<div class="listDate">${date}</div>`}return h+eventItemHtml(e);}).join('')||'<div class="empty">등록된 일정이 없습니다.</div>');
+  $('#main').innerHTML=`<div class="listNote">오늘 기준 과거 30일 ~ 앞으로 1년의 일정입니다. 반복 일정도 각 발생일에 표시됩니다.</div>`+(rows.map(({date,e})=>{let h='';if(last!==date){last=date;h=`<div class="listDate ${holidayClass(date)}">${date}${holidayLabel(date)?` · ${esc(holidayLabel(date))}`:''}</div>`}return h+eventItemHtml(e);}).join('')||'<div class="empty">등록된 일정이 없습니다.</div>');
   bindItems();
 }
 function render(){
@@ -807,7 +863,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'1.12',
+    appVersion:'1.13',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
@@ -852,4 +908,5 @@ $('#restoreFile').onchange=e=>restoreBackupFile(e.target.files?.[0]);
   const d=$(`#${id}`); d.addEventListener('cancel',()=>{});
 });
 
+loadHolidayData();
 render();

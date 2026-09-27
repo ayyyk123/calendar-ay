@@ -27,3 +27,12 @@ dialog{border:0;border-radius:12px;box-shadow:0 10px 40px #0003;width:min(560px,
 .dataManage{border:1px solid #e5e5e5;border-radius:8px;padding:10px;background:#fafafa}.dataManage>p{margin:5px 0 8px}.dataButtons{display:flex;gap:7px;flex-wrap:wrap}.dataButtons button{flex:1;min-width:130px}
 .cloudLoading{position:fixed;inset:0;z-index:1000;background:#fffffff2;display:grid;place-items:center}.cloudLoading>div{display:grid;justify-items:center;gap:8px;padding:24px;text-align:center}.cloudLoading small{color:#777}.spinner{width:28px;height:28px;border:3px solid #ddd;border-top-color:#333;border-radius:50%;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
 @media(max-width:760px){.saveBadge{order:1;max-width:150px;padding:4px 7px}#saveBadgeText{overflow:hidden;text-overflow:ellipsis}.brand{order:0}#sidebarToggle{order:1}.views{order:1}.dataButtons{display:grid;grid-template-columns:1fr 1fr}.dataButtons button{min-width:0}}
+
+
+/* v1.13: 월~일 배열 + 대한민국 공휴일 */
+.dayHead.saturday .dayTopLine>span,.dayHead.saturday .dateNum,.month .weekdayHeader.saturday,.month .cell.saturday .mhead>span{color:#356cc8}
+.dayHead.sunday .dayTopLine>span,.dayHead.sunday .dateNum,.dayHead.holiday .dayTopLine>span,.dayHead.holiday .dateNum,.month .weekdayHeader.sunday,.month .cell.sunday .mhead>span,.month .cell.holiday .mhead>span{color:#d33}
+.holidayName{font-size:11px;color:#d33;font-weight:600;line-height:1.25;margin-top:2px;white-space:normal;word-break:keep-all}
+.month .holidayName{margin:0 0 4px;font-size:10px}
+.dayHolidayBanner{margin:0 0 10px;padding:8px 10px;border:1px solid #f1cccc;background:#fff7f7;color:#c33;border-radius:8px;font-weight:700}
+.listDate.holiday{color:#c33}
