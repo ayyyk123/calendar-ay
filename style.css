@@ -74,3 +74,7 @@ dialog{border:0;border-radius:12px;box-shadow:0 10px 40px #0003;width:min(560px,
 /* v1.19: 매월 고정업무 추가 메뉴 분리 */
 .fixedSectionHead{overflow:visible}.fixedAddWrap{position:relative;display:inline-flex}.fixedAddMenu{position:absolute;right:0;top:calc(100% + 6px);z-index:60;width:228px;padding:5px;border:1px solid #dfe3e8;border-radius:9px;background:#fff;box-shadow:0 8px 24px #0002}.fixedAddMenu button{width:100%;display:grid;gap:2px;text-align:left;border:0;background:#fff;padding:9px 10px;border-radius:7px}.fixedAddMenu button:hover{background:#f4f6f8}.fixedAddMenu b{font-size:12px}.fixedAddMenu small{font-size:10px;color:#7b8490;line-height:1.35}.fixedAddWrap>#addFixed[aria-expanded="true"]{background:#f3f4f6}.fixedAddMenu::before{content:"";position:absolute;right:11px;top:-5px;width:9px;height:9px;background:#fff;border-left:1px solid #dfe3e8;border-top:1px solid #dfe3e8;transform:rotate(45deg)}
 @media(max-width:760px){.fixedAddMenu{width:min(240px,72vw);right:0}.fixedAddMenu button{padding:11px 10px}}
+
+
+/* v1.21: 매월 말일 체크박스 + 설정 날짜 엄격 반복 + 기존 v1.20 기능 유지 */
+.durationField{display:grid;gap:6px}.durationSkip{font-size:12px;color:#59636f}.durationField.durationUnchecked .durationInputs{opacity:.42}.durationField.durationUnchecked .durationInputs input{background:#f2f3f5;cursor:not-allowed}.recurringFixed small{line-height:1.45}.recurringFixed b{display:block}.fixed small{word-break:keep-all}
