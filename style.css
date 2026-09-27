@@ -454,3 +454,107 @@ aside{min-height:0}
   #jumpDate{font-size:10px!important;padding:2px!important}
   #range{font-size:10px!important}
 }
+
+/* v1.48: 시각 정돈 + Pretendard 타이포그래피 */
+:root{
+  --ui-font:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic","Segoe UI",sans-serif;
+  --border:#e7eaf0;
+  --text:#24272d;
+  --muted2:#7b8492;
+}
+body{font-family:var(--ui-font);font-size:13px;color:var(--text);letter-spacing:-.012em;font-feature-settings:"tnum" 1,"ss01" 1}
+button,input,select,textarea{font-family:var(--ui-font);letter-spacing:-.01em}
+header{border-bottom-color:#e9ebef;box-shadow:0 1px 0 rgba(15,23,42,.025);gap:14px}
+.brand b{font-weight:760;letter-spacing:-.035em}.brand small{font-weight:520;color:#9097a2}
+button{border-color:#e0e4e9;color:#30343a;background:#fff}
+button:hover{background:#f7f8fa}
+.views .on,.primary{background:#22262d;border-color:#22262d}
+#range{font-weight:650;letter-spacing:-.025em}
+
+/* 날짜/그리드 선은 더 옅게 */
+.dayCol,.month .cell,.month .weekdayHeader,.multiWeek .multiDay{border-color:#edf0f3!important}
+.dayHead{border-bottom-color:#e8ebef;background:#fff}
+.dayHead.today{background:#f6f9fd}
+.weekdayLabel{font-weight:650;color:#5c6470}.dateNum{font-weight:760;letter-spacing:-.03em}
+.dayHead .holidayName{font-weight:600}
+.dayBody{padding:6px}
+
+/* 캘린더 묶음: 헤더-본문 위계를 선명하게, 블록감은 줄임 */
+.group{margin-bottom:8px}
+.calendarTreeGroup>.groupHead{
+  background:color-mix(in srgb,var(--group-color,#d9d9d9) 22%, white)!important;
+  border:1px solid color-mix(in srgb,var(--group-color,#d9d9d9) 34%, #e7eaf0);
+  border-bottom:0;
+  border-radius:6px 6px 0 0!important;
+}
+.dayCalToggle{min-height:24px;padding:4px 6px!important;font-size:10.5px;font-weight:700;letter-spacing:-.02em}
+.dayCalHeadRight{font-weight:650;color:#59616d}
+.subCalHead{background:#fafbfc!important;border-top:1px solid #eef0f3;border-right:1px solid #eef0f3;border-bottom:1px solid #eef0f3}
+.subCalGroup{margin-top:2px;margin-bottom:4px}
+
+/* 일정: 회색 카드 덩어리 대신 얇고 정돈된 한 줄 */
+.item{
+  min-height:24px!important;
+  padding:2px 5px!important;
+  margin:1px 0!important;
+  border:1px solid color-mix(in srgb,var(--item-color,#d9d9d9) 30%, #e8ebef)!important;
+  border-left:3px solid var(--item-color,#d9d9d9)!important;
+  border-radius:4px!important;
+  background:color-mix(in srgb,var(--item-color,#d9d9d9) 11%, white)!important;
+  box-shadow:none!important;
+}
+.item:hover{background:color-mix(in srgb,var(--item-color,#d9d9d9) 17%, white)!important;border-color:color-mix(in srgb,var(--item-color,#d9d9d9) 43%, #e1e5ea)!important}
+.itemRow{min-height:18px!important;gap:3px!important;align-items:center!important}
+.itemTitle{font-size:11.5px!important;line-height:18px!important;font-weight:570;letter-spacing:-.018em;color:#31353c}
+.durationPrefix{font-weight:720;color:#4c535e;margin-right:2px}
+.item.done{opacity:.55!important}.item.done .itemTitle{color:#7d838c!important}
+.item.recurringItem .itemTitle{color:#5f50a1;font-weight:650}
+.item.manualPlacedItem .itemTitle{color:#ad640e;font-weight:650}
+.item.flexiblePlacedItem .itemTitle{color:#157486;font-weight:650}
+.importanceBtn{font-size:11px!important;color:#dc8d00!important}
+.repeatMark,.carryBadge,.checklistToggle{opacity:.72}
+
+/* Quick/예약/납부/기념일은 '테두리 상자'보다 얇은 섹션처럼 */
+.quickLane,.appointmentLane,.paymentLane,.anniversaryLane{border-radius:5px!important;margin-bottom:5px!important;box-shadow:none!important}
+.quickLane{padding:3px!important;border-color:#dce2e8;background:#fafbfc}
+.quickLaneHead,.appointmentLaneHead,.paymentLaneHead,.anniversaryLaneHead{min-height:20px;padding:3px 5px!important;font-size:9.5px!important;letter-spacing:-.015em}
+.appointmentLaneItems,.paymentLaneItems,.anniversaryLaneItems{padding:2px 3px!important}
+.quickLaneItems .item,.paymentLane .paymentItem{background:#fff!important}
+
+/* 합계는 시선 방해를 줄임 */
+.dayTotal{margin-top:3px;padding:4px 3px;border-top:1px dashed #e3e6ea;color:#818895;font-size:9.5px;line-height:1.35}
+.dayTotal .ok,.dayTotal .over{font-weight:650}
+
+/* 월간도 같은 밀도 */
+.month .cell{padding:5px;background:#fff}
+.month .cell.other{background:#fbfcfd}
+.month .mhead{font-size:11px;margin-bottom:3px}
+.month .item{min-height:20px!important;padding:1px 4px!important;font-size:9px!important}
+.month .itemTitle{font-size:9px!important;line-height:16px!important}
+.month .weekdayHeader{font-weight:650;color:#59616d;background:#fbfcfd}
+
+/* 좌측바도 카드보다는 목록형 */
+aside{background:#fbfcfd;border-right-color:#e8ebef}
+.sidebarSection{margin-bottom:20px}.secHead{margin-bottom:7px}.secHead b{font-weight:730;letter-spacing:-.025em}
+.calRow{padding:6px 5px;border-radius:6px}.calRow:hover{background:#f0f3f7}
+.fixed,.flexibleItem,.paymentSidebarItem,.purchaseRow{box-shadow:none}
+
+/* 팝업/다이얼로그 */
+dialog{border:1px solid #eef0f3;box-shadow:0 18px 50px rgba(15,23,42,.18)}
+.eventPopover{border-color:#dfe4ea;box-shadow:0 14px 34px rgba(15,23,42,.16)}
+input,select,textarea{border-color:#d9dee5}.repeatBox,.dataManage,.weekdayCapacityField,.availabilityBlockFields{border-color:#e4e7ec}
+
+@media(max-width:1180px){
+  .itemTitle{font-size:10px!important}.dayCalToggle{font-size:9.5px}.dayBody{padding:4px}
+}
+@media(max-width:760px){
+  body{font-size:12px}
+  .item{min-height:18px!important;padding:1px 2px!important;border-left-width:2px!important;border-radius:3px!important}
+  .itemRow{min-height:15px!important;gap:1px!important}
+  .itemTitle{font-size:7.8px!important;line-height:15px!important;font-weight:570}
+  .durationPrefix{font-size:7px!important}
+  .dayCalToggle{min-height:17px;padding:2px 1px!important;font-size:7px!important}
+  .calendarTreeGroup>.groupHead{border-radius:3px 3px 0 0!important}
+  .quickLaneHead,.appointmentLaneHead,.paymentLaneHead,.anniversaryLaneHead{min-height:13px;padding:1px 2px!important;font-size:6.8px!important}
+  .dayTotal{font-size:6.7px!important;margin-top:1px;padding:2px 1px!important}
+}
