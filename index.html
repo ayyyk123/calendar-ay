@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
-  <title>캘린더 v1.15</title>
+  <title>캘린더 v1.18</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="icon-180.png">
@@ -12,7 +12,7 @@
 </head>
 <body>
 <header>
-  <div class="brand"><b>캘린더</b><small> v1.15</small></div>
+  <div class="brand"><b>캘린더</b><small> v1.18</small></div>
   <div id="saveBadge" class="saveBadge loading" title="Firebase 저장 상태"><span class="saveDot"></span><span id="saveBadgeText">Firebase 확인 중</span></div>
   <button id="manualSaveBtn" class="manualSaveBtn" type="button" title="현재 데이터를 Firebase에 즉시 저장"><span class="manualSaveFull">최신자료 저장</span><span class="manualSaveMobile">저장</span></button>
   <button id="sidebarToggle" class="mobileOnly" type="button" aria-label="메뉴">☰</button>
@@ -127,6 +127,7 @@
     </div>
 
     <label>메모<textarea id="memo" rows="4"></textarea></label>
+    <button type="button" id="carryEvent" class="carryAction hidden">↪ 다음날로 이어하기</button>
     <menu>
       <button type="button" id="deleteEvent" class="danger">삭제</button>
       <button type="button" id="copyEvent">복사</button>
@@ -134,6 +135,20 @@
       <button type="button" id="cancelEvent">취소</button>
       <button type="submit" id="saveEvent" class="primary">저장</button>
     </menu>
+  </form>
+</dialog>
+
+<dialog id="carryDlg" class="smallDlg">
+  <form id="carryForm">
+    <h3>다음날로 이어하기</h3>
+    <input type="hidden" id="carrySourceId">
+    <input type="hidden" id="carryOccurrence">
+    <div class="carryTargetLine"><span>이어질 날짜</span><b id="carryTargetDate">-</b></div>
+    <label>남은 예상 소요시간
+      <div class="durationInputs"><input type="number" id="carryhoursH" min="0" max="24" step="1" value="1"><span>시간</span><input type="number" id="carryhoursM" min="0" max="59" step="5" value="0"><span>분</span></div>
+    </label>
+    <p class="hint">원래 날짜에는 `부분완료 · 이월` 표시가 남고, 다음날 일정에는 `↪ 전날 미완료`가 표시됩니다. 다시 넘기면 2일째, 3일째 이월로 누적 표시됩니다.</p>
+    <menu><span></span><button type="button" id="cancelCarry">취소</button><button type="submit" class="primary">다음날 등록</button></menu>
   </form>
 </dialog>
 
