@@ -68,7 +68,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.26',
+  version: '1.27',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,parentId:''},
@@ -251,7 +251,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.26',
+    version: '1.27',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -606,7 +606,7 @@ function buildOccurrenceMap(rangeStart, rangeEnd, options={}){
   return map;
 }
 function isDone(e){
-  if(!['todo','habit'].includes(e.kind)) return false;
+  if(e.kind==='anniversary') return false;
   if((e.repeat||'none')==='none') return !!e.done;
   return (e.doneDates||[]).includes(e._occurrenceStart||e.date);
 }
@@ -670,7 +670,8 @@ function carryoverInLabel(e){
   return n===1 ? '↪ 전날 미완료' : `↪ ${n}일째 이월`;
 }
 function eventItemHtml(e, compact=false){
-  const c=cal(e.calId), done=isDone(e), checkable=['todo','habit'].includes(e.kind);
+  const c=cal(e.calId), done=isDone(e), checkable=e.kind!=='anniversary';
+  const recurring=(e.repeat||'none')!=='none';
   const meta=[];
   if(!e.allDay && e.start) meta.push(e.start + (e.end?`–${e.end}`:''));
   if(e.noDuration) meta.push('⏱ 소요시간 미체크');
@@ -680,8 +681,9 @@ function eventItemHtml(e, compact=false){
   const inLabel=carryoverInLabel(e), outRecord=carryoverOutRecord(e);
   const badges=`${inLabel?`<span class="carryBadge carryIn">${esc(inLabel)}</span>`:''}${outRecord?`<span class="carryBadge carryOut">부분완료 · 이월</span>`:''}`;
   if(outRecord && !compact) meta.push(`↪ ${esc(outRecord.toDate)}로 이어짐`);
-  return `<div class="item ${done?'done':''} ${inLabel?'carriedIn':''} ${outRecord?'carriedOut':''}" draggable="${drag}" data-eid="${esc(e.id)}" data-occurrence="${esc(e._occurrenceStart||e.date)}" style="border-left-color:${esc(c.color)}">
-    <div class="itemRow">${checkable?`<button type="button" class="todoCheck" data-action="toggle" aria-label="완료 전환">${done?'☑':'☐'}</button>`:''}<div class="itemTitle">${!checkable?kindPrefix(e):''}${esc(e.title)}${repeatShort(e)?` <span class="repeatMark">${repeatShort(e)}</span>`:''}${badges}</div></div>
+  const doneLabel=compact?(done?'☑':'☐'):(done?'☑ 완료':'☐ 완료');
+  return `<div class="item ${done?'done':''} ${recurring?'recurringItem':''} ${inLabel?'carriedIn':''} ${outRecord?'carriedOut':''}" draggable="${drag}" data-eid="${esc(e.id)}" data-occurrence="${esc(e._occurrenceStart||e.date)}" style="border-left-color:${esc(c.color)}">
+    <div class="itemRow">${checkable?`<button type="button" class="todoCheck" data-action="toggle" aria-label="완료 전환" title="${done?'완료 취소':'완료 체크'}">${doneLabel}</button>`:''}<div class="itemTitle">${!checkable?kindPrefix(e):''}${esc(e.title)}${repeatShort(e)?` <span class="repeatMark">${repeatShort(e)}</span>`:''}${badges}</div></div>
     ${compact?'':`<div class="meta">${meta.join(' · ')}</div>`}
   </div>`;
 }
@@ -776,6 +778,30 @@ function renderSide(){
   });
   renderFixed(); renderLoad(); renderDdays();
 }
+function currentMonthRange(){
+  const start=new Date(cursor.getFullYear(),cursor.getMonth(),1);
+  const end=new Date(cursor.getFullYear(),cursor.getMonth()+1,0);
+  return {start,end,startKey:ds(start),endKey:ds(end)};
+}
+function recurringMonthProgress(e){
+  const {startKey,endKey}=currentMonthRange();
+  const starts=generateOccurrenceStarts(e,startKey,endKey).filter(d=>{
+    const k=ds(d); return k>=startKey && k<=endKey;
+  });
+  const total=starts.length;
+  if(!total) return {total:0,done:0,label:'이번 달 해당 없음',complete:false};
+  const doneSet=new Set(e.doneDates||[]);
+  const done=starts.reduce((n,d)=>n+(doneSet.has(ds(d))?1:0),0);
+  if(done===total) return {total,done,label:`✓ 이번 달 완료 ${done}/${total}`,complete:true};
+  return {total,done,label:`이번 달 ${done}/${total} 완료`,complete:false};
+}
+function manualMonthProgress(placed){
+  if(!placed.length) return {label:'이번 달 미배치',complete:false};
+  const done=placed.filter(e=>isDone(e)).length;
+  if(done===placed.length) return {label:`✓ 이번 달 완료${placed.length>1?` ${done}/${placed.length}`:''}`,complete:true};
+  return {label:placed.length>1?`이번 달 ${done}/${placed.length} 완료`:'이번 달 미완료',complete:false};
+}
+
 function renderFixed(){
   const f=selectedFixedFilter||'all';
   const month=`${cursor.getFullYear()}-${pad(cursor.getMonth()+1)}`;
@@ -787,7 +813,8 @@ function renderFixed(){
   const recurringRows=recurring.map(e=>{
     const c=cal(e.calId), rule=repeatRuleLabel(e);
     const kindLabel={event:'일정',todo:'할 일',habit:'습관/루틴',anniversary:'기념일/D-Day'}[e.kind]||'일정';
-    return `<div class="fixed recurringFixed" data-eid="${esc(e.id)}" style="border-left-color:${esc(c.color)}" title="${esc(`${calendarPath(c.id)} · ${rule} · ${durationLabel(e)}`)}"><b>${esc(e.title)}</b><small>${esc(calendarPath(c.id))} · ${esc(kindLabel)} · ${esc(rule)} · ${esc(durationLabel(e))}</small></div>`;
+    const progress=e.kind==='anniversary'?{label:'완료체크 대상 아님',complete:false}:recurringMonthProgress(e);
+    return `<div class="fixed recurringFixed ${progress.complete?'monthComplete':'monthPending'}" data-eid="${esc(e.id)}" style="border-left-color:${esc(c.color)}" title="${esc(`${calendarPath(c.id)} · ${rule} · ${durationLabel(e)} · ${progress.label}`)}"><b>${esc(e.title)}</b><small>${esc(calendarPath(c.id))} · ${esc(kindLabel)} · ${esc(rule)} · ${esc(durationLabel(e))}</small><span class="monthProgress ${progress.complete?'complete':''}">${esc(progress.label)}</span></div>`;
   }).join('') || `<div class="empty compactEmpty">자동반복 일정이 없습니다.</div>`;
 
   const manualRows=manual.map(x=>{
@@ -804,8 +831,9 @@ function renderFixed(){
       if(placed.length>1) placedLabel+=` 외 ${placed.length-1}건`;
     }
     const usedText=used?` · 배치완료 ${placedLabel}`:'';
-    const tip=used?`배치완료: ${placedLabel}에 배치됨. 달력에서 해당 배치 일정을 삭제하면 다시 활성화됩니다.`:'원하는 날짜로 드래그하세요.';
-    return `<div class="fixed manualFixed ${used?'used disabledFixed':''}" draggable="${used?'false':'true'}" aria-disabled="${used?'true':'false'}" data-used="${used?'1':'0'}" data-fid="${esc(x.id)}" style="border-left-color:${esc(c.color)}" title="${esc(tip)}"><b>${used?'✓ 배치완료 · ':''}${esc(x.name)}</b><small>${esc(calendarPath(c.id))} · ${esc(durationLabel(x))}${esc(usedText)}</small></div>`;
+    const progress=manualMonthProgress(placed);
+    const tip=used?`배치완료: ${placedLabel}에 배치됨 · ${progress.label}. 달력에서 해당 배치 일정을 삭제하면 다시 활성화됩니다.`:'원하는 날짜로 드래그하세요.';
+    return `<div class="fixed manualFixed ${used?'used disabledFixed':''} ${progress.complete?'monthComplete':'monthPending'}" draggable="${used?'false':'true'}" aria-disabled="${used?'true':'false'}" data-used="${used?'1':'0'}" data-fid="${esc(x.id)}" style="border-left-color:${esc(c.color)}" title="${esc(tip)}"><b>${used?'✓ 배치완료 · ':''}${esc(x.name)}</b><small>${esc(calendarPath(c.id))} · ${esc(durationLabel(x))}${esc(usedText)}</small><span class="monthProgress ${progress.complete?'complete':''}">${esc(progress.label)}</span></div>`;
   }).join('') || `<div class="empty compactEmpty">날짜 지정 업무를 등록하세요.</div>`;
 
   $('#fixedList').innerHTML=`
@@ -940,7 +968,7 @@ function moveEventToDate(id,newDate){
   e.date=newDate; e.endDate=ds(add(parse(newDate),span)); save();
 }
 function toggleDone(id,occ){
-  const e=state.events.find(x=>x.id===id); if(!e) return;
+  const e=state.events.find(x=>x.id===id); if(!e || e.kind==='anniversary') return;
   if((e.repeat||'none')==='none') e.done=!e.done;
   else {
     e.doneDates=Array.isArray(e.doneDates)?e.doneDates:[];
@@ -1413,7 +1441,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'1.26',
+    appVersion:'1.27',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state

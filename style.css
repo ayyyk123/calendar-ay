@@ -101,3 +101,12 @@ dialog{border:0;border-radius:12px;box-shadow:0 10px 40px #0003;width:min(560px,
 @media(max-width:760px){
   .sidebarResizer{display:none!important}
 }
+
+
+/* v1.27: 완료체크 가시성 + 반복업무 제목색 + 좌측 이번달 완료현황 */
+.todoCheck{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;min-height:22px;padding:2px 6px;border:1px solid #cfd5de;border-radius:6px;background:#fff;color:#4b5563;font-size:10px;font-weight:700;white-space:nowrap}
+.todoCheck:hover{background:#f3f6fa;border-color:#aeb7c4}.item.done .todoCheck{background:#eef8f1;border-color:#b7dfc2;color:#23713b}
+.item.recurringItem .itemTitle{color:#5b4aa3;font-weight:700}.item.recurringItem .repeatMark{color:#7b6bc2;font-weight:800}.item.done.recurringItem .itemTitle{color:#8279a7}
+.month .todoCheck{min-height:18px;padding:0 3px;border-radius:4px;font-size:10px}.month .itemRow{gap:3px}
+.monthProgress{display:block;margin-top:5px;padding-top:4px;border-top:1px dashed #e1e5ea;font-size:10px;font-weight:700;color:#8a5a00}.monthProgress.complete{color:#16803c}
+.fixed.monthComplete{background:#f7fbf8}.fixed.monthPending:not(.disabledFixed) .monthProgress{color:#8a5a00}.manualFixed.disabledFixed .monthProgress.complete{color:#4c7d5b}
