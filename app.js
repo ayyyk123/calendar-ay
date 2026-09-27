@@ -68,7 +68,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.40',
+  version: '1.42',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,parentId:''},
@@ -77,8 +77,9 @@ const defaultState = () => ({
   events: [],
   fixed: [],
   flexible: [],
+  purchases: [],
   diary: {},
-  settings: { hiddenCalendars: [], fixedPanelsCollapsed: { recurring:false, manual:false, flexible:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, manual:{}, flexible:{}, payment:{} } }
+  settings: { hiddenCalendars: [], fixedPanelsCollapsed: { recurring:false, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, manual:{}, flexible:{}, payment:{} } }
 });
 
 let state = defaultState();
@@ -255,7 +256,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.40',
+    version: '1.42',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -286,6 +287,7 @@ function normalizeState(raw){
     })) : [],
     fixed: Array.isArray(s.fixed) ? s.fixed.filter(f=>f && f.id && f.name).map(f=>({...f,hours:Number(f.hours)||0,noDuration:!!f.noDuration,important:!!f.important,checklist:Array.isArray(f.checklist)?f.checklist.filter(x=>x&&String(x.text||'').trim()).map((x,i)=>({id:String(x.id||`fcl-${i}-${uid()}`),text:String(x.text||'').trim()})):[]})) : [],
     flexible: Array.isArray(s.flexible) ? s.flexible.filter(f=>f && f.id && f.name).map(f=>({...f,hours:Number(f.hours)||0,noDuration:!!f.noDuration,important:!!f.important,checklist:Array.isArray(f.checklist)?f.checklist.filter(x=>x&&String(x.text||'').trim()).map((x,i)=>({id:String(x.id||`xcl-${i}-${uid()}`),text:String(x.text||'').trim()})):[]})) : [],
+    purchases: Array.isArray(s.purchases) ? s.purchases.filter(p=>p && p.id && p.name).map(p=>({id:String(p.id),name:String(p.name),qty:Math.max(1,Number(p.qty)||1),memo:String(p.memo||''),done:!!p.done,createdAt:String(p.createdAt||'')})) : [],
     diary: s.diary && typeof s.diary === 'object' ? s.diary : {},
     settings: {
       hiddenCalendars: Array.isArray(s.settings?.hiddenCalendars) ? s.settings.hiddenCalendars : [],
@@ -293,6 +295,7 @@ function normalizeState(raw){
         recurring: !!s.settings?.fixedPanelsCollapsed?.recurring,
         manual: !!s.settings?.fixedPanelsCollapsed?.manual,
         flexible: !!s.settings?.fixedPanelsCollapsed?.flexible,
+        purchase: !!s.settings?.fixedPanelsCollapsed?.purchase,
         payment: !!s.settings?.fixedPanelsCollapsed?.payment
       },
       sidebarCalendarGroupsCollapsed: {
@@ -752,6 +755,7 @@ function repeatRuleLabel(e){
 }
 
 function kindPrefix(e){
+  if(e.kind==='appointment') return '◆ ';
   if(e.kind==='todo') return '☐ ';
   if(e.kind==='habit') return '◇ ';
   if(e.kind==='anniversary') return '♥ ';
@@ -841,16 +845,21 @@ function eventItemHtml(e, compact=false){
   if(outRecord) detail.push(`${outRecord.toDate}로 이월`);
   const tooltip=[e.title,...detail].filter(Boolean).join(' · ');
   const dragHandle=`<span class="dragHandle" title="드래그: 같은 날짜에서는 순서 변경 · 다른 날짜에서는 이동" aria-hidden="true">⋮⋮</span>`;
-  const mainCheck=!checkable?'':`<input type="checkbox" class="todoCheck" data-action="toggle" aria-label="${payment?'납부완료':'완료'} 전환" title="${done?(payment?'납부완료 취소':'완료 취소'):(payment?'납부완료 체크':'완료 체크')}" ${done?'checked':''}>`;
+  const mainCheck='';
   const checklistKey=checklistExpandKey(e), expanded=expandedChecklistKeys.has(checklistKey);
   const checklistButton=checklist.length?`<button type="button" class="checklistToggle ${expanded?'on':''}" data-action="checklist-toggle" title="세부 체크리스트 ${checklistState.done}/${checklistState.total}">☷ ${checklistState.done}/${checklistState.total}</button>`:'';
   const repeatBadge=recurring?`<span class="repeatMark" title="${esc(repeatRuleLabel(e))}">↻</span>`:'';
   const carryBadge=inLabel?`<span class="carryBadge carryIn" title="${esc(inLabel)}">↪</span>`:'';
   const amountInline=payment&&Number(e.paymentAmount)>0?`<span class="inlineMeta">₩${Number(e.paymentAmount).toLocaleString('ko-KR')}</span>`:'';
   return `<div class="item ${done?'done':''} ${recurring?'recurringItem':''} ${payment?'paymentItem':''} ${e.fixedId?'manualPlacedItem':''} ${e.flexibleId?'flexiblePlacedItem':''} ${inLabel?'carriedIn':''} ${outRecord?'carriedOut':''}" draggable="${drag}" data-eid="${esc(e.id)}" data-occurrence="${esc(e._occurrenceStart||e.date)}" data-render-date="${esc(renderDate)}" data-cal-id="${esc(e.calId)}" data-lane="${payment?'payment':'work'}" style="--item-color:${esc(c.color)};border-left-color:${esc(c.color)}">
-    <div class="itemRow">${dragHandle}<button type="button" class="importanceBtn ${e.important?'on':''}" data-action="importance" aria-label="중요도 전환" title="${e.important?'중요 표시 해제':'중요 일정으로 표시'}">${e.important?'★':'☆'}</button>${mainCheck}<div class="itemTitle" title="${esc(tooltip)}">${timePrefix}<span class="durationPrefix">${esc(durationPrefix)}</span>${payment?'₩ ':(!checkable?kindPrefix(e):'')}${esc(e.title)}</div>${amountInline}${repeatBadge}${carryBadge}${checklistButton}</div>
+    <div class="itemRow">${dragHandle}${e.important?`<button type="button" class="importanceBtn on" data-action="importance" aria-label="중요 표시 해제" title="중요 표시 해제">★</button>`:''}${mainCheck}<div class="itemTitle" title="${esc(tooltip)}">${timePrefix}<span class="durationPrefix">${esc(durationPrefix)}</span>${payment?'₩ ':(!checkable?kindPrefix(e):'')}${esc(e.title)}</div>${amountInline}${repeatBadge}${carryBadge}${checklistButton}</div>
     ${expanded?checklistHtml(e,false):''}
   </div>`;
+}
+function appointmentLaneHtml(es, compact=false){
+  const items=(es||[]).filter(e=>e.kind==='appointment');
+  if(!items.length) return '';
+  return `<div class="appointmentLane ${compact?'compactAppointmentLane':''}"><div class="appointmentLaneHead"><span>예약 · 약속</span><small>${items.length}건</small></div><div class="appointmentLaneItems">${items.map(e=>eventItemHtml(e,compact)).join('')}</div></div>`;
 }
 function quickLaneHtml(es, compact=false){
   const quick=(es||[]).filter(e=>e.kind==='todo');
@@ -858,7 +867,7 @@ function quickLaneHtml(es, compact=false){
   return `<div class="quickLane ${compact?'compactQuickLane':''}"><div class="quickLaneHead"><span>Quick</span><small>${quick.length}건</small></div><div class="quickLaneItems">${quick.map(e=>eventItemHtml(e,compact)).join('')}</div></div>`;
 }
 function nonQuickItemsHtml(es, compact=false){
-  return (es||[]).filter(e=>e.kind!=='todo').map(e=>eventItemHtml(e,compact)).join('');
+  return (es||[]).filter(e=>e.kind!=='todo' && e.kind!=='appointment').map(e=>eventItemHtml(e,compact)).join('');
 }
 function paymentLaneHtml(es, compact=false){
   const payments=(es||[]).filter(e=>e.kind==='payment');
@@ -876,11 +885,13 @@ function dayCalHeadHtml(date,c,sum,cap,unknown,label=''){
   return `<button type="button" class="dayCalToggle" data-daycal-toggle="1" data-date="${esc(date)}" data-cal-id="${esc(c.id)}" aria-expanded="${collapsed?'false':'true'}" title="${esc(c.name)} 접기/펴기"><span class="dayCalHeadLabel">${label}${esc(c.name)} · ${esc(c.period)}</span><span class="dayCalHeadRight">${capacityText(sum,cap,unknown)} <b>${collapsed?'▸':'▾'}</b></span></button>`;
 }
 function groupHtml(date, es){
+  const appointmentHtml=appointmentLaneHtml(es,false);
   const paymentHtml=paymentLaneHtml(es,false);
-  const workEvents=(es||[]).filter(e=>e.kind!=='payment');
+  const appointmentEvents=(es||[]).filter(e=>e.kind==='appointment');
+  const workEvents=(es||[]).filter(e=>e.kind!=='payment' && e.kind!=='appointment');
   let html='';
   const visible=visibleCals(), visibleIds=new Set(visible.map(c=>c.id));
-  let total=0, totalCapacity=0, hasUnknownCapacity=false;
+  let total=appointmentEvents.reduce((sum,e)=>sum+duration(e),0), totalCapacity=0, hasUnknownCapacity=false;
   for(const root of topLevelCals()){
     const members=[root,...descendants(root.id)].filter(c=>visibleIds.has(c.id));
     if(!members.length) continue;
@@ -911,7 +922,7 @@ function groupHtml(date, es){
   const capacitySummary=hasUnknownCapacity
     ? `${totalCapacity?` · 확인된 가용 ${fmtH(totalCapacity)}`:''} · 일부 가용시간 미정`
     : (totalCapacity?` / 캘린더 가용 ${fmtH(totalCapacity)}`:'');
-  return paymentHtml + html + `<div class="dayTotal ${overallOver?'overallOver':''}">총 계획 ${fmtH(total)}${capacitySummary}</div>`;
+  return appointmentHtml + paymentHtml + html + `<div class="dayTotal ${overallOver?'overallOver':''}">총 계획 ${fmtH(total)}${capacitySummary}</div>`;
 }
 
 function calendarOptionsHtml(){
@@ -977,7 +988,7 @@ function renderSide(){
     };
     row.querySelector('.calEdit').onclick=e=>{ e.stopPropagation(); openCal(row.dataset.cid); };
   });
-  renderFixed(); renderFlexible(); renderPayments(); renderLoad(); renderDdays();
+  renderFixed(); renderFlexible(); renderPurchases(); renderPayments(); renderLoad(); renderDdays();
 }
 function currentMonthRange(){
   const start=new Date(cursor.getFullYear(),cursor.getMonth(),1);
@@ -1067,7 +1078,7 @@ function renderFixed(){
   const f=selectedFixedFilter||'all';
   const month=`${cursor.getFullYear()}-${pad(cursor.getMonth()+1)}`;
   const allowed=f==='all'?null:new Set([f,...descendants(f).map(c=>c.id)]);
-  const recurring=state.events.filter(e=>(e.repeat||'none')!=='none' && e.kind!=='payment' && (!allowed||allowed.has(e.calId)))
+  const recurring=state.events.filter(e=>(e.repeat||'none')!=='none' && e.kind!=='payment' && e.kind!=='anniversary' && (!allowed||allowed.has(e.calId)))
     .sort((a,b)=>occurrenceSortKey(a).localeCompare(occurrenceSortKey(b)) || String(a.title||'').localeCompare(String(b.title||''),'ko'));
   const manual=state.fixed.filter(x=>!allowed||allowed.has(x.calId))
     .sort((a,b)=>manualPlacementSortKey(a).localeCompare(manualPlacementSortKey(b)) || String(a.name||'').localeCompare(String(b.name||''),'ko'));
@@ -1075,7 +1086,7 @@ function renderFixed(){
 
   const recurringRows=groupedCalendarHtml('recurring',recurring,e=>{
     const c=cal(e.calId), rule=repeatRuleLabel(e);
-    const kindLabel={event:'일정',todo:'Quick',habit:'습관/루틴',anniversary:'기념일/D-Day',payment:'납부일정'}[e.kind]||'일정';
+    const kindLabel={event:'일정',appointment:'예약,약속',todo:'Quick',habit:'습관/루틴',anniversary:'기념일/D-Day',payment:'납부일정'}[e.kind]||'일정';
     const progress=e.kind==='anniversary'?{label:'완료체크 대상 아님',complete:false}:recurringMonthProgress(e);
     return `<div class="fixed recurringFixed ${progress.complete?'monthComplete':'monthPending'}" data-eid="${esc(e.id)}" style="border-left-color:${esc(c.color)}" title="${esc(`${calendarPath(c.id)} · ${rule} · ${durationLabel(e)} · ${progress.label}`)}"><b>${e.important?'★ ':''}${esc(e.title)}</b><small>${esc(kindLabel)} · ${esc(rule)} · ${esc(durationLabel(e))}</small><span class="monthProgress ${progress.complete?'complete':''}">${esc(progress.label)}</span></div>`;
   },'자동반복 일정이 없습니다.');
@@ -1218,6 +1229,24 @@ function renderPayments(){
   bindSidebarCalendarGroupToggles(box);
 }
 
+function renderPurchases(){
+  const box=$('#purchaseList'); if(!box) return;
+  const collapsed=!!state.settings?.fixedPanelsCollapsed?.purchase;
+  const toggle=$('#togglePurchase'); if(toggle){ toggle.textContent=collapsed?'▸':'▾'; toggle.title=collapsed?'구매목록 펼치기':'구매목록 접기'; }
+  if(collapsed){ box.innerHTML=''; return; }
+  const rows=[...(state.purchases||[])].sort((a,b)=>(Number(a.done)-Number(b.done)) || String(a.createdAt||'').localeCompare(String(b.createdAt||'')) || a.name.localeCompare(b.name,'ko'));
+  box.innerHTML=rows.map(p=>`<div class="purchaseRow ${p.done?'done':''}" data-pid="${esc(p.id)}"><button type="button" class="purchaseCheck" title="구매완료 전환">${p.done?'☑':'☐'}</button><button type="button" class="purchaseOpen" title="구매항목 수정"><span>${esc(p.name)}</span>${p.qty>1?`<small>${p.qty}개</small>`:''}</button></div>`).join('') || '<div class="empty">등록된 구매항목이 없습니다.</div>';
+  $$('.purchaseRow').forEach(row=>{
+    row.querySelector('.purchaseCheck')?.addEventListener('click',()=>{ const p=state.purchases.find(x=>x.id===row.dataset.pid); if(!p) return; p.done=!p.done; save(); });
+    row.querySelector('.purchaseOpen')?.addEventListener('click',()=>openPurchase(row.dataset.pid));
+  });
+}
+function openPurchase(id=''){
+  const p=(state.purchases||[]).find(x=>x.id===id);
+  $('#purchaseTitle').textContent=p?'구매항목 수정':'구매항목 추가';
+  $('#purchaseId').value=p?.id||''; $('#purchaseName').value=p?.name||''; $('#purchaseQty').value=p?.qty||1; $('#purchaseMemo').value=p?.memo||''; $('#purchaseDone').checked=!!p?.done;
+  $('#deletePurchase').style.visibility=p?'visible':'hidden'; openDialog($('#purchaseDlg'));
+}
 function renderLoad(){
   const s=startWeek(cursor), e=add(s,6), map=buildOccurrenceMap(ds(s),ds(e)), visibleIds=new Set(visibleCals().map(c=>c.id));
   const rows=[];
@@ -1501,8 +1530,8 @@ function monthCellEventsHtml(date, es){
   const limit=3;
   const visible=(es||[]).slice(0,limit);
   const hidden=Math.max(0,(es||[]).length-visible.length);
-  const payments=visible.filter(e=>e.kind==='payment'), normal=visible.filter(e=>e.kind!=='payment');
-  return `${paymentLaneHtml(payments,true)}${normal.map(e=>eventItemHtml(e,true)).join('')}${hidden?`<button type="button" class="moreEventsBtn" data-more-date="${esc(date)}">+ ${hidden}건</button>`:''}`;
+  const appointments=visible.filter(e=>e.kind==='appointment'), payments=visible.filter(e=>e.kind==='payment'), normal=visible.filter(e=>e.kind!=='payment' && e.kind!=='appointment');
+  return `${appointmentLaneHtml(appointments,true)}${paymentLaneHtml(payments,true)}${normal.map(e=>eventItemHtml(e,true)).join('')}${hidden?`<button type="button" class="moreEventsBtn" data-more-date="${esc(date)}">+ ${hidden}건</button>`:''}`;
 }
 function openDayList(date){
   const map=buildOccurrenceMap(date,date,{calendarIds:focusedCalendarIds()});
@@ -1513,6 +1542,18 @@ function openDayList(date){
 }
 $('#closeDayList').onclick=()=>closeDialog($('#dayListDlg'));
 
+function renderMultiWeek(weeks=2){
+  const s=startWeek(cursor), total=weeks*7, days=[...Array(total)].map((_,i)=>add(s,i)), map=buildOccurrenceMap(ds(s),ds(days[days.length-1]),{calendarIds:focusedCalendarIds()});
+  const last=days[days.length-1];
+  $('#range').textContent=`${s.getFullYear()}. ${s.getMonth()+1}. ${s.getDate()} - ${last.getFullYear()}. ${last.getMonth()+1}. ${last.getDate()}${focusSuffix()}`;
+  $('#main').className=`multiWeek weeks${weeks}`;
+  $('#main').innerHTML=days.map(d=>{
+    const key=ds(d), hasDiary=!!state.diary[key]?.text, h=holidayLabel(key), dow=d.getDay();
+    const dayClass=[key===ds(new Date())?'today':'', holidayClass(key), dow===0?'sunday':'', dow===6?'saturday':''].filter(Boolean).join(' ');
+    return `<div class="multiDay"><div class="dayHead ${dayClass}"><div class="dayTopLine"><span class="weekdayLabel">${['일','월','화','수','목','금','토'][dow]}</span><span class="dateNum">${d.getDate()}</span><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}" title="${hasDiary?'다이어리 보기':'다이어리 작성'}">📝</button></div><div class="holidayName ${h?'':'holidayEmpty'}" title="${h?esc(h):''}">${h?esc(h):'&nbsp;'}</div></div><div class="dayBody" data-dropdate="${key}" ondblclick="window.__newEvent?.('${key}')">${groupHtml(key,map[key]||[])}</div></div>`;
+  }).join('');
+  bindItems();
+}
 function renderMonth(){
   const y=cursor.getFullYear(),m=cursor.getMonth(),first=new Date(y,m,1),s=startWeek(first),end=add(s,41),map=buildOccurrenceMap(ds(s),ds(end),{calendarIds:focusedCalendarIds()});
   $('#range').textContent=`${y}년 ${m+1}월${focusSuffix()}`;
@@ -1544,7 +1585,7 @@ function renderList(){
     const sourceEvents=state.events.filter(e=>allowed.has(e.calId));
     const manualFixed=state.fixed.filter(f=>allowed.has(f.calId));
     const kindCount=type=>sourceEvents.filter(e=>e.kind===type).length;
-    top=`<div class="calendarFocusHeader" style="border-left-color:${esc(focus.color)}"><div><b>${esc(calendarPath(focus.id))}</b><small>${descendants(focus.id).length?'부속 캘린더 포함 · ':''}일정 ${kindCount('event')} · Quick ${kindCount('todo')} · 습관 ${kindCount('habit')} · 기념일 ${kindCount('anniversary')} · 납부 ${kindCount('payment')} · 날짜지정 ${manualFixed.length}</small></div><button id="clearCalendarFocus" type="button">전체 일정 보기</button></div>`;
+    top=`<div class="calendarFocusHeader" style="border-left-color:${esc(focus.color)}"><div><b>${esc(calendarPath(focus.id))}</b><small>${descendants(focus.id).length?'부속 캘린더 포함 · ':''}일정 ${kindCount('event')} · 예약·약속 ${kindCount('appointment')} · Quick ${kindCount('todo')} · 습관 ${kindCount('habit')} · 기념일 ${kindCount('anniversary')} · 납부 ${kindCount('payment')} · 날짜지정 ${manualFixed.length}</small></div><button id="clearCalendarFocus" type="button">전체 일정 보기</button></div>`;
     if(manualFixed.length){
       top+=`<div class="calendarFocusFixed"><b>날짜 지정 배치 업무</b>${manualFixed.map(f=>`<button type="button" class="focusFixedItem" data-fid="${esc(f.id)}" style="border-left-color:${esc(cal(f.calId).color)}"><span>${esc(f.name)}</span><small>${esc(calendarPath(f.calId))} · ${esc(durationLabel(f))}</small></button>`).join('')}</div>`;
     }
@@ -1558,7 +1599,7 @@ function renderList(){
 function render(){
   renderSide();
   $$('.views [data-view]').forEach(b=>b.classList.toggle('on',b.dataset.view===view));
-  ({week:renderWeek,month:renderMonth,day:renderDay,list:renderList}[view])();
+  ({week:renderWeek,'2week':()=>renderMultiWeek(2),'3week':()=>renderMultiWeek(3),month:renderMonth,day:renderDay,list:renderList}[view])();
 }
 
 function timedHoursFromForm(){
@@ -1724,6 +1765,12 @@ function openEvent(date,id,options={}){
   $('#repeat').disabled=false;
   $('#deleteEvent').style.visibility=e?'visible':'hidden'; $('#copyEvent').style.visibility=e?'visible':'hidden';
   const occurrenceView=e?{...e,_occurrenceStart:activeEventOccurrence}:null;
+  const doneWrap=$('#eventDoneWrap'), doneInput=$('#eventDone'), doneText=$('#eventDoneText');
+  if(doneWrap){
+    const canComplete=!!e && e.kind!=='anniversary';
+    doneWrap.classList.toggle('hidden',!canComplete);
+    if(canComplete){ doneInput.checked=!!isDone(occurrenceView); doneText.textContent=e.kind==='payment'?'납부완료':'완료'; }
+  }
   $('#carryEvent').classList.toggle('hidden',!e || e.kind==='anniversary' || e.kind==='payment' || (occurrenceView&&isDone(occurrenceView)));
   updateAllDayUI(); updateKindUI(); setRepeatRule(e||{date:$('#date').value,repeat:$('#repeat').value,repeatRule:null}); updateDurationMode();
   openDialog($('#eventDlg'));
@@ -1763,6 +1810,13 @@ $('#eventForm').onsubmit=e=>{
   activeEventOccurrence=null; closeDialog($('#eventDlg')); save();
 };
 $('#cancelEvent').onclick=()=>{ activeEventOccurrence=null; closeDialog($('#eventDlg')); };
+$('#eventDone').onchange=()=>{
+  const id=$('#eid').value, ev=state.events.find(x=>x.id===id); if(!ev || ev.kind==='anniversary') return;
+  const occ=activeEventOccurrence||ev.date;
+  const want=!!$('#eventDone').checked;
+  const now=isDone({...ev,_occurrenceStart:occ});
+  if(now!==want) toggleDone(id,occ);
+};
 $('#importMemoChecklist').onclick=()=>{
   const lines=$('#memo').value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
   if(!lines.length){ alert('메모에 가져올 줄이 없습니다.'); return; }
@@ -1848,6 +1902,11 @@ $('#carryForm').onsubmit=e=>{
   state.events.push(child);
   closeDialog($('#carryDlg')); closeDialog($('#eventDlg')); activeEventOccurrence=null; save();
 };
+$('#addPurchase').onclick=()=>openPurchase('');
+$('#togglePurchase').onclick=()=>{ state.settings.fixedPanelsCollapsed.purchase=!state.settings.fixedPanelsCollapsed.purchase; save(); };
+$('#purchaseForm').onsubmit=e=>{ e.preventDefault(); const id=$('#purchaseId').value, old=state.purchases.find(x=>x.id===id), obj={id:id||uid(),name:$('#purchaseName').value.trim(),qty:Math.max(1,Number($('#purchaseQty').value)||1),memo:$('#purchaseMemo').value,done:$('#purchaseDone').checked,createdAt:old?.createdAt||new Date().toISOString()}; if(!obj.name) return; if(id) state.purchases[state.purchases.findIndex(x=>x.id===id)]=obj; else state.purchases.push(obj); closeDialog($('#purchaseDlg')); save(); };
+$('#cancelPurchase').onclick=()=>closeDialog($('#purchaseDlg'));
+$('#deletePurchase').onclick=()=>{ const id=$('#purchaseId').value; if(id&&confirm('이 구매항목을 삭제할까요?')){ state.purchases=state.purchases.filter(x=>x.id!==id); closeDialog($('#purchaseDlg')); save(); } };
 $('#allDay').onchange=updateAllDayUI; $('#noDuration').onchange=()=>updateDurationMode(); $('#kind').onchange=updateKindUI; $('#start').onchange=updateDurationMode; $('#end').onchange=updateDurationMode; $('#endDate').onchange=updateDurationMode; $('#repeat').onchange=updateRepeatUI; $('#date').onchange=()=>{
   if(!$('#endDate').value || $('#endDate').value<$('#date').value) $('#endDate').value=$('#date').value;
   const d=parse($('#date').value), lp=lunarPartsFromSolar(d);
@@ -2000,8 +2059,8 @@ $('#addFlexible').onclick=()=>openFlexible();
 $('#toggleFlexible').onclick=()=>{ state.settings.fixedPanelsCollapsed=state.settings.fixedPanelsCollapsed||{}; state.settings.fixedPanelsCollapsed.flexible=!state.settings.fixedPanelsCollapsed.flexible; save(); };
 $('#addPayment').onclick=()=>openEvent(ds(cursor),null,{preset:'payment'});
 $('#togglePayment').onclick=()=>{ state.settings.fixedPanelsCollapsed=state.settings.fixedPanelsCollapsed||{}; state.settings.fixedPanelsCollapsed.payment=!state.settings.fixedPanelsCollapsed.payment; save(); };
-$('#prev').onclick=()=>{ cursor=view==='month'?new Date(cursor.getFullYear(),cursor.getMonth()-1,1):add(cursor,view==='week'?-7:-1); render(); };
-$('#next').onclick=()=>{ cursor=view==='month'?new Date(cursor.getFullYear(),cursor.getMonth()+1,1):add(cursor,view==='week'?7:1); render(); };
+$('#prev').onclick=()=>{ const step=view==='week'?7:view==='2week'?14:view==='3week'?21:1; cursor=view==='month'?new Date(cursor.getFullYear(),cursor.getMonth()-1,1):add(cursor,-step); render(); };
+$('#next').onclick=()=>{ const step=view==='week'?7:view==='2week'?14:view==='3week'?21:1; cursor=view==='month'?new Date(cursor.getFullYear(),cursor.getMonth()+1,1):add(cursor,step); render(); };
 $('#today').onclick=()=>{cursor=new Date();render();};
 $('#jumpDate').onchange=e=>{ if(e.target.value){cursor=parse(e.target.value);render();} };
 $$('.views [data-view]').forEach(b=>b.onclick=()=>{view=b.dataset.view; render();});
