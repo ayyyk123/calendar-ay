@@ -68,7 +68,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.37',
+  version: '1.40',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,parentId:''},
@@ -255,7 +255,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.37',
+    version: '1.40',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -275,6 +275,7 @@ function normalizeState(raw){
       checklist:Array.isArray(e.checklist)?e.checklist.filter(x=>x&&String(x.text||'').trim()).map((x,i)=>({id:String(x.id||`cl-${i}-${uid()}`),text:String(x.text||'').trim()})):[],
       checklistDoneByDate:(e.checklistDoneByDate&&typeof e.checklistDoneByDate==='object')?Object.fromEntries(Object.entries(e.checklistDoneByDate).map(([k,v])=>[k,Array.isArray(v)?v.map(String):[]])):{},
       orderByDate:(e.orderByDate&&typeof e.orderByDate==='object')?Object.fromEntries(Object.entries(e.orderByDate).map(([k,v])=>[k,Number(v)||0])):{},
+      repeatOrder:Number(e.repeatOrder)||0,
       carryoverCount:Math.max(0,Number(e.carryoverCount)||0),
       carryoverFromDate:typeof e.carryoverFromDate==='string'?e.carryoverFromDate:'',
       carryoverRootId:typeof e.carryoverRootId==='string'?e.carryoverRootId:'',
@@ -299,7 +300,8 @@ function normalizeState(raw){
         manual: (s.settings?.sidebarCalendarGroupsCollapsed?.manual && typeof s.settings.sidebarCalendarGroupsCollapsed.manual==='object') ? {...s.settings.sidebarCalendarGroupsCollapsed.manual} : {},
         flexible: (s.settings?.sidebarCalendarGroupsCollapsed?.flexible && typeof s.settings.sidebarCalendarGroupsCollapsed.flexible==='object') ? {...s.settings.sidebarCalendarGroupsCollapsed.flexible} : {},
         payment: (s.settings?.sidebarCalendarGroupsCollapsed?.payment && typeof s.settings.sidebarCalendarGroupsCollapsed.payment==='object') ? {...s.settings.sidebarCalendarGroupsCollapsed.payment} : {}
-      }
+      },
+      dayCalendarGroupsCollapsed: (s.settings?.dayCalendarGroupsCollapsed && typeof s.settings.dayCalendarGroupsCollapsed==='object') ? {...s.settings.dayCalendarGroupsCollapsed} : {}
     }
   };
 }
@@ -499,6 +501,44 @@ function lastWeekday(y,m0,weekday){
 function getNthLabel(n){ return ['첫째','둘째','셋째','넷째','다섯째'][n-1]||`${n}번째`; }
 function weekdayName(n){ return ['일','월','화','수','목','금','토'][n]+'요일'; }
 
+let lunarFormatter=null;
+try{
+  lunarFormatter=new Intl.DateTimeFormat('ko-KR-u-ca-chinese',{calendar:'chinese',year:'numeric',month:'long',day:'numeric'});
+}catch(_e){ lunarFormatter=null; }
+const lunarSolarCache=new Map();
+function lunarPartsFromSolar(date){
+  if(!lunarFormatter || !(date instanceof Date) || Number.isNaN(date.getTime())) return null;
+  try{
+    const parts=lunarFormatter.formatToParts(date);
+    const year=Number(parts.find(p=>p.type==='relatedYear')?.value||'');
+    const monthText=parts.find(p=>p.type==='month')?.value||'';
+    const day=Number(parts.find(p=>p.type==='day')?.value||'');
+    const month=Number((monthText.match(/\d+/)||[])[0]||'');
+    if(!year || !month || !day) return null;
+    return {year,month,day,leap:monthText.includes('윤')};
+  }catch(_e){ return null; }
+}
+function solarDateForLunarYear(lunarYear,month,day,leap=false){
+  lunarYear=Number(lunarYear); month=Number(month); day=Number(day); leap=!!leap;
+  if(!lunarYear || month<1 || month>12 || day<1 || day>30) return null;
+  const key=`${lunarYear}|${month}|${day}|${leap?1:0}`;
+  if(lunarSolarCache.has(key)){
+    const cached=lunarSolarCache.get(key);
+    return cached?parse(cached):null;
+  }
+  // 음력 한 해는 대체로 양력 1~2월에 시작해 다음 해 1~2월까지 이어집니다.
+  const start=new Date(lunarYear,0,15), end=new Date(lunarYear+1,2,10);
+  for(let d=new Date(start); d<=end; d=add(d,1)){
+    const lp=lunarPartsFromSolar(d);
+    if(lp && lp.year===lunarYear && lp.month===month && lp.day===day && lp.leap===leap){
+      const result=ds(d); lunarSolarCache.set(key,result); return new Date(d);
+    }
+  }
+  lunarSolarCache.set(key,'');
+  return null;
+}
+function lunarLabel(month,day,leap=false){ return `음력 ${leap?'윤':''}${Number(month)}월 ${Number(day)}일`; }
+
 function defaultRepeatRule(eDate, repeat){
   const d = parse(eDate||ds(new Date()));
   const nth = Math.floor((d.getDate()-1)/7)+1;
@@ -509,8 +549,12 @@ function defaultRepeatRule(eDate, repeat){
     monthDay:d.getDate(),
     nth,
     weekday:d.getDay(),
+    yearlyCalendar:'solar',
     yearlyMonth:d.getMonth()+1,
     yearlyDay:d.getDate(),
+    lunarMonth:(lunarPartsFromSolar(d)?.month)||1,
+    lunarDay:(lunarPartsFromSolar(d)?.day)||1,
+    lunarLeap:!!lunarPartsFromSolar(d)?.leap,
     endType:'never',
     until:'',
     count:10,
@@ -590,13 +634,26 @@ function generateOccurrenceStarts(e, rangeStart, rangeEnd){
     return out;
   }
   if(repeat==='yearly'){
-    for(let k=0;guard++<1000;k++){
-      const y=base.getFullYear()+k*rule.interval;
-      const d=validLocalDate(y,Number(rule.yearlyMonth)-1,Number(rule.yearlyDay));
-      if(!d) continue;
-      if(d<base) continue;
-      const cont=tryPush(d);
-      if(!cont || d>rEnd) break;
+    if(rule.yearlyCalendar==='lunar'){
+      const baseLunar=lunarPartsFromSolar(base);
+      const startLunarYear=baseLunar?.year || base.getFullYear();
+      for(let k=0;guard++<1200;k++){
+        const ly=startLunarYear+k*rule.interval;
+        if(ly>rEnd.getFullYear()+1) break;
+        const d=solarDateForLunarYear(ly,Number(rule.lunarMonth),Number(rule.lunarDay),!!rule.lunarLeap);
+        if(!d || d<base) continue;
+        const cont=tryPush(d);
+        if(!cont) break;
+      }
+    }else{
+      for(let k=0;guard++<1000;k++){
+        const y=base.getFullYear()+k*rule.interval;
+        const d=validLocalDate(y,Number(rule.yearlyMonth)-1,Number(rule.yearlyDay));
+        if(!d) continue;
+        if(d<base) continue;
+        const cont=tryPush(d);
+        if(!cont || d>rEnd) break;
+      }
     }
   }
   return out;
@@ -632,6 +689,12 @@ function buildOccurrenceMap(rangeStart, rangeEnd, options={}){
       if(ah||bh){
         if(ah&&bh&&ao!==bo) return ao-bo;
         if(ah!==bh) return ah?-1:1;
+      }
+      const ar=Number(a.repeatOrder), br=Number(b.repeatOrder);
+      const arh=Number.isFinite(ar)&&ar!==0, brh=Number.isFinite(br)&&br!==0;
+      if(arh||brh){
+        if(arh&&brh&&ar!==br) return ar-br;
+        if(arh!==brh) return arh?-1:1;
       }
       return ((a.allDay===b.allDay)?0:(a.allDay?-1:1)) || (a.start||'').localeCompare(b.start||'') || a.title.localeCompare(b.title,'ko');
     });
@@ -682,6 +745,7 @@ function repeatRuleLabel(e){
   if(repeat==='monthly') return monthlyRepeatLabel(e);
   if(repeat==='yearly'){
     const lead=r.interval>1?`${r.interval}년마다`:'매년';
+    if(r.yearlyCalendar==='lunar') return `${lead} ${lunarLabel(r.lunarMonth,r.lunarDay,r.lunarLeap)}${repeatEndText(r)}`;
     return `${lead} ${r.yearlyMonth}월 ${r.yearlyDay}일${repeatEndText(r)}`;
   }
   return repeat;
@@ -702,6 +766,18 @@ function carryoverInLabel(e){
   const n=Math.max(0,Number(e.carryoverCount)||0);
   if(!n) return '';
   return n===1 ? '↪ 전날 미완료' : `↪ ${n}일째 이월`;
+}
+
+const expandedChecklistKeys=new Set();
+function checklistExpandKey(e){ return `${e?.id||''}|${e?._occurrenceStart||e?.date||''}`; }
+function dayCalCollapseKey(date,calId){ return `${date}|${calId}`; }
+function isDayCalCollapsed(date,calId){ return !!state.settings?.dayCalendarGroupsCollapsed?.[dayCalCollapseKey(date,calId)]; }
+function toggleDayCalCollapsed(date,calId){
+  state.settings.dayCalendarGroupsCollapsed=(state.settings.dayCalendarGroupsCollapsed&&typeof state.settings.dayCalendarGroupsCollapsed==='object')?state.settings.dayCalendarGroupsCollapsed:{};
+  const key=dayCalCollapseKey(date,calId);
+  if(state.settings.dayCalendarGroupsCollapsed[key]) delete state.settings.dayCalendarGroupsCollapsed[key];
+  else state.settings.dayCalendarGroupsCollapsed[key]=true;
+  save();
 }
 
 function checklistItems(e){ return Array.isArray(e?.checklist)?e.checklist.filter(x=>x&&String(x.text||'').trim()):[]; }
@@ -746,32 +822,34 @@ function eventItemHtml(e, compact=false){
   const recurring=(e.repeat||'none')!=='none';
   const payment=e.kind==='payment';
   const checklist=checklistItems(e), checklistState=checklistProgress(e);
-  const meta=[];
-  if(!e.allDay && e.start) meta.push(e.start + (e.end?`–${e.end}`:''));
-  if(payment){
-    if(Number(e.paymentAmount)>0) meta.push(`₩${Number(e.paymentAmount).toLocaleString('ko-KR')}`);
-    if(e.paymentMethod) meta.push(`💳 ${esc(e.paymentMethod)}`);
-  }else{
-    if(e.noDuration) meta.push('⏱ 소요시간 미체크');
-    else if(duration(e)) meta.push(`⏱ ${fmtH(duration(e))}`);
-  }
-  if(checklist.length && !compact) meta.push(`세부 ${checklistState.done}/${checklistState.total}`);
-  if(e.place) meta.push(`📍 ${esc(e.place)}`);
-  const drag='true';
+  const durationPrefix=(!payment && !e.noDuration && duration(e)>0)?`(${fmtH(duration(e))}) `:'';
+  const timePrefix=(!e.allDay && e.start)?`${e.start}${e.end?`–${e.end}`:''} `:'';
   const inLabel=carryoverInLabel(e), outRecord=carryoverOutRecord(e);
-  const badges=`${inLabel?`<span class="carryBadge carryIn">${esc(inLabel)}</span>`:''}${outRecord?`<span class="carryBadge carryOut">부분완료 · 이월</span>`:''}`;
-  if(outRecord && !compact) meta.push(`↪ ${esc(outRecord.toDate)}로 이어짐`);
-  const doneLabel=done?'☑':'☐';
-  const checkTitle=payment?(done?'납부완료 취소':'납부완료 체크'):(done?'완료 취소':'완료 체크');
-  const dragHandle=drag==='true'?`<span class="dragHandle" title="드래그: 같은 날짜에서는 순서 변경 · 다른 날짜에서는 이동" aria-hidden="true">⋮⋮</span>`:'';
-  const mainCheck=!checkable?'':(checklist.length
-    ? `<span class="todoCheck checklistSummary" aria-label="체크리스트 진행 ${checklistState.done}/${checklistState.total}" title="세부 체크리스트를 모두 완료하면 업무가 자동 완료됩니다.">${doneLabel}</span>`
-    : `<button type="button" class="todoCheck" data-action="toggle" aria-label="${payment?'납부완료':'완료'} 전환" title="${checkTitle}">${doneLabel}</button>`);
   const renderDate=e._renderDate||e._occurrenceStart||e.date;
+  const drag='true';
+  const detail=[];
+  if(!e.allDay && e.start) detail.push(e.start + (e.end?`–${e.end}`:''));
+  if(payment){
+    if(Number(e.paymentAmount)>0) detail.push(`₩${Number(e.paymentAmount).toLocaleString('ko-KR')}`);
+    if(e.paymentMethod) detail.push(e.paymentMethod);
+  }else if(e.noDuration) detail.push('소요시간 미체크');
+  else if(duration(e)) detail.push(fmtH(duration(e)));
+  if(e.place) detail.push(e.place);
+  if(recurring) detail.push(repeatRuleLabel(e));
+  if(checklist.length) detail.push(`체크리스트 ${checklistState.done}/${checklistState.total}`);
+  if(inLabel) detail.push(inLabel);
+  if(outRecord) detail.push(`${outRecord.toDate}로 이월`);
+  const tooltip=[e.title,...detail].filter(Boolean).join(' · ');
+  const dragHandle=`<span class="dragHandle" title="드래그: 같은 날짜에서는 순서 변경 · 다른 날짜에서는 이동" aria-hidden="true">⋮⋮</span>`;
+  const mainCheck=!checkable?'':`<input type="checkbox" class="todoCheck" data-action="toggle" aria-label="${payment?'납부완료':'완료'} 전환" title="${done?(payment?'납부완료 취소':'완료 취소'):(payment?'납부완료 체크':'완료 체크')}" ${done?'checked':''}>`;
+  const checklistKey=checklistExpandKey(e), expanded=expandedChecklistKeys.has(checklistKey);
+  const checklistButton=checklist.length?`<button type="button" class="checklistToggle ${expanded?'on':''}" data-action="checklist-toggle" title="세부 체크리스트 ${checklistState.done}/${checklistState.total}">☷ ${checklistState.done}/${checklistState.total}</button>`:'';
+  const repeatBadge=recurring?`<span class="repeatMark" title="${esc(repeatRuleLabel(e))}">↻</span>`:'';
+  const carryBadge=inLabel?`<span class="carryBadge carryIn" title="${esc(inLabel)}">↪</span>`:'';
+  const amountInline=payment&&Number(e.paymentAmount)>0?`<span class="inlineMeta">₩${Number(e.paymentAmount).toLocaleString('ko-KR')}</span>`:'';
   return `<div class="item ${done?'done':''} ${recurring?'recurringItem':''} ${payment?'paymentItem':''} ${e.fixedId?'manualPlacedItem':''} ${e.flexibleId?'flexiblePlacedItem':''} ${inLabel?'carriedIn':''} ${outRecord?'carriedOut':''}" draggable="${drag}" data-eid="${esc(e.id)}" data-occurrence="${esc(e._occurrenceStart||e.date)}" data-render-date="${esc(renderDate)}" data-cal-id="${esc(e.calId)}" data-lane="${payment?'payment':'work'}" style="--item-color:${esc(c.color)};border-left-color:${esc(c.color)}">
-    <div class="itemRow">${dragHandle}<button type="button" class="importanceBtn ${e.important?'on':''}" data-action="importance" aria-label="중요도 전환" title="${e.important?'중요 표시 해제':'중요 일정으로 표시'}">${e.important?'★':'☆'}</button>${mainCheck}<div class="itemTitle" title="${esc(e.title)}">${payment?'₩ ':(!checkable?kindPrefix(e):'')}${esc(e.title)}${repeatShort(e)?` <span class="repeatMark">${repeatShort(e)}</span>`:''}${badges}</div></div>
-    ${compact?'':`<div class="meta">${meta.join(' · ')}</div>${checklistHtml(e,false)}`}
-    ${compact?checklistHtml(e,true):''}
+    <div class="itemRow">${dragHandle}<button type="button" class="importanceBtn ${e.important?'on':''}" data-action="importance" aria-label="중요도 전환" title="${e.important?'중요 표시 해제':'중요 일정으로 표시'}">${e.important?'★':'☆'}</button>${mainCheck}<div class="itemTitle" title="${esc(tooltip)}">${timePrefix}<span class="durationPrefix">${esc(durationPrefix)}</span>${payment?'₩ ':(!checkable?kindPrefix(e):'')}${esc(e.title)}</div>${amountInline}${repeatBadge}${carryBadge}${checklistButton}</div>
+    ${expanded?checklistHtml(e,false):''}
   </div>`;
 }
 function quickLaneHtml(es, compact=false){
@@ -793,6 +871,10 @@ function capacityText(sum, cap, unknown=false){
   if(!n) return `<span>${fmtH(sum)}</span>`;
   return `<span class="${sum>n?'over':'ok'}">${fmtH(sum)} / ${fmtH(n)}</span>`;
 }
+function dayCalHeadHtml(date,c,sum,cap,unknown,label=''){
+  const collapsed=isDayCalCollapsed(date,c.id);
+  return `<button type="button" class="dayCalToggle" data-daycal-toggle="1" data-date="${esc(date)}" data-cal-id="${esc(c.id)}" aria-expanded="${collapsed?'false':'true'}" title="${esc(c.name)} 접기/펴기"><span class="dayCalHeadLabel">${label}${esc(c.name)} · ${esc(c.period)}</span><span class="dayCalHeadRight">${capacityText(sum,cap,unknown)} <b>${collapsed?'▸':'▾'}</b></span></button>`;
+}
 function groupHtml(date, es){
   const paymentHtml=paymentLaneHtml(es,false);
   const workEvents=(es||[]).filter(e=>e.kind!=='payment');
@@ -813,15 +895,17 @@ function groupHtml(date, es){
     const rootUnknown=!!root.capacityUnknown || (!(Number(root.capacity)||0) && fallbackUnknown);
     const effectiveRootCap=rootUnknown?0:((Number(root.capacity)||0) || fallbackCap);
     if(rootUnknown) hasUnknownCapacity=true; else totalCapacity+=effectiveRootCap;
-    html += `<div class="group calendarTreeGroup"><div class="groupHead" style="background:${esc(root.color)}55"><span>${esc(root.name)} · ${esc(root.period)}</span>${capacityText(rootSum,effectiveRootCap,rootUnknown)}</div>`;
+    const rootCollapsed=isDayCalCollapsed(date,root.id);
+    html += `<div class="group calendarTreeGroup ${rootCollapsed?'collapsed':''}" style="--group-color:${esc(root.color)}"><div class="groupHead" style="background:${esc(root.color)}55">${dayCalHeadHtml(date,root,rootSum,effectiveRootCap,rootUnknown)}</div><div class="dayCalGroupBody">`;
     const direct=groupEvents.filter(e=>e.calId===root.id);
     if(direct.length) html += quickLaneHtml(direct,false)+nonQuickItemsHtml(direct,false);
     for(const child of members.filter(c=>c.id!==root.id)){
       const xs=groupEvents.filter(e=>e.calId===child.id); if(!xs.length) continue;
       const sum=xs.reduce((n,e)=>n+duration(e),0), depth=Math.max(1,calendarDepth(child.id));
-      html += `<div class="subCalGroup" style="--sub-depth:${depth}"><div class="subCalHead" style="border-left-color:${esc(child.color)};background:color-mix(in srgb, ${esc(child.color)} 14%, white)"><span>↳ ${esc(child.name)} · ${esc(child.period)}</span>${capacityText(sum,child.capacity,!!child.capacityUnknown)}</div>${quickLaneHtml(xs,false)}${nonQuickItemsHtml(xs,false)}</div>`;
+      const childCollapsed=isDayCalCollapsed(date,child.id);
+      html += `<div class="subCalGroup ${childCollapsed?'collapsed':''}" style="--sub-depth:${depth}"><div class="subCalHead" style="border-left-color:${esc(child.color)};background:color-mix(in srgb, ${esc(child.color)} 14%, white)">${dayCalHeadHtml(date,child,sum,child.capacity,!!child.capacityUnknown,'↳ ')}</div><div class="dayCalGroupBody">${quickLaneHtml(xs,false)}${nonQuickItemsHtml(xs,false)}</div></div>`;
     }
-    html += `</div>`;
+    html += `</div></div>`;
   }
   const overallOver=!hasUnknownCapacity && totalCapacity>0 && total>totalCapacity;
   const capacitySummary=hasUnknownCapacity
@@ -1194,15 +1278,16 @@ function readDragPayload(dt){
   return null;
 }
 function occurrenceKey(e){ return `${e.id}|${e._occurrenceStart||e.date}`; }
-function reorderOccurrenceInDay(payload,targetItem,before=true){
-  if(!payload?.id || !payload.day) return false;
+let pendingRepeatOrder=null;
+function buildReorderContext(payload,targetItem,before=true){
+  if(!payload?.id || !payload.day) return null;
   const day=targetItem.dataset.renderDate||'';
-  if(!day || day!==payload.day) return false;
+  if(!day || day!==payload.day) return null;
   const src=state.events.find(x=>x.id===payload.id), target=state.events.find(x=>x.id===targetItem.dataset.eid);
-  if(!src||!target||src.id===target.id&&String(payload.occurrence||'')===String(targetItem.dataset.occurrence||'')) return false;
+  if(!src||!target||src.id===target.id&&String(payload.occurrence||'')===String(targetItem.dataset.occurrence||'')) return null;
   const targetLane=targetItem.dataset.lane||'work';
   const sourceLane=payload.lane||((src.kind==='payment')?'payment':'work');
-  if(src.calId!==target.calId || sourceLane!==targetLane) return false;
+  if(src.calId!==target.calId || sourceLane!==targetLane) return null;
   const map=buildOccurrenceMap(day,day,{includeHidden:true});
   const list=[]; const seen=new Set();
   for(const e of (map[day]||[])){
@@ -1212,20 +1297,45 @@ function reorderOccurrenceInDay(payload,targetItem,before=true){
   const sourceKey=`${payload.id}|${payload.occurrence||src.date}`;
   const targetKey=`${targetItem.dataset.eid}|${targetItem.dataset.occurrence||target.date}`;
   const from=list.findIndex(e=>occurrenceKey(e)===sourceKey), to=list.findIndex(e=>occurrenceKey(e)===targetKey);
-  if(from<0||to<0) return false;
+  if(from<0||to<0) return null;
   const [moved]=list.splice(from,1);
   let insertAt=list.findIndex(e=>occurrenceKey(e)===targetKey);
   if(insertAt<0) insertAt=list.length;
   if(!before) insertAt++;
   list.splice(Math.min(insertAt,list.length),0,moved);
-  list.forEach((occ,i)=>{
+  return {day,src,target,sourceLane,list};
+}
+function applyReorderContext(ctx,scope='day'){
+  if(!ctx) return false;
+  ctx.list.forEach((occ,i)=>{
     const base=state.events.find(x=>x.id===occ.id); if(!base) return;
     base.orderByDate=(base.orderByDate&&typeof base.orderByDate==='object')?base.orderByDate:{};
-    base.orderByDate[day]=(i+1)*10;
+    base.orderByDate[ctx.day]=(i+1)*10;
+    if(scope==='series') base.repeatOrder=(i+1)*10;
   });
   save();
   return true;
 }
+function reorderOccurrenceInDay(payload,targetItem,before=true){
+  const ctx=buildReorderContext(payload,targetItem,before);
+  if(!ctx) return false;
+  if((ctx.src.repeat||'none')!=='none'){
+    pendingRepeatOrder=ctx;
+    $('#repeatOrderInfo').textContent=`${ctx.day} 순서 변경을 이 날짜에만 적용할지, 다른 반복 날짜에도 적용할지 선택하세요.`;
+    openDialog($('#repeatOrderDlg'));
+    return true;
+  }
+  return applyReorderContext(ctx,'day');
+}
+$('#orderOccurrenceOnly').onclick=()=>{
+  if(pendingRepeatOrder) applyReorderContext(pendingRepeatOrder,'day');
+  pendingRepeatOrder=null; closeDialog($('#repeatOrderDlg'));
+};
+$('#orderSeries').onclick=()=>{
+  if(pendingRepeatOrder) applyReorderContext(pendingRepeatOrder,'series');
+  pendingRepeatOrder=null; closeDialog($('#repeatOrderDlg'));
+};
+$('#cancelRepeatOrder').onclick=()=>{ pendingRepeatOrder=null; closeDialog($('#repeatOrderDlg')); render(); };
 
 function bindItems(){
   $$('.item').forEach(item=>{
@@ -1235,6 +1345,14 @@ function bindItems(){
       if(sub){ e.stopPropagation(); toggleSubtask(id,occ,sub.dataset.subtaskId); return; }
       if(e.target.closest('[data-action="importance"]')){ e.stopPropagation(); toggleImportant(id); return; }
       if(e.target.closest('[data-action="toggle"]')){ e.stopPropagation(); if($('#dayListDlg')?.open) closeDialog($('#dayListDlg')); toggleDone(id,occ); return; }
+      if(e.target.closest('[data-action="checklist-toggle"]')){
+        e.stopPropagation();
+        const base=state.events.find(x=>x.id===id); if(!base) return;
+        const key=`${id}|${occ||base.date}`;
+        expandedChecklistKeys.has(key)?expandedChecklistKeys.delete(key):expandedChecklistKeys.add(key);
+        render();
+        return;
+      }
       e.stopPropagation(); if($('#dayListDlg')?.open) closeDialog($('#dayListDlg')); openEvent(occ,id);
     };
     if(item.draggable){
@@ -1301,6 +1419,10 @@ function bindItems(){
       if(payload.type==='event' && payload.id) moveEventToDate(payload.id,x.dataset.dropdate,payload.occurrence||'',payload.day||'');
     };
   });
+  $$('[data-daycal-toggle]').forEach(b=>b.onclick=e=>{
+    e.preventDefault(); e.stopPropagation();
+    toggleDayCalCollapsed(b.dataset.date,b.dataset.calId);
+  });
   $$('[data-more-date]').forEach(b=>b.onclick=e=>{e.stopPropagation();openDayList(b.dataset.moreDate);});
   $$('.diaryBtn').forEach(b=>b.onclick=e=>{e.stopPropagation();openDiary(b.dataset.diarydate);});
 }
@@ -1320,7 +1442,7 @@ function moveEventToDate(id,newDate,occurrence='',sourceDay=''){
   if(!e.excludedDates.includes(occ)) e.excludedDates.push(occ);
   const wasDone=(e.doneDates||[]).includes(occ);
   const movedChecklistDone=Array.isArray(e.checklistDoneByDate?.[occ])?[...e.checklistDoneByDate[occ]]:[];
-  const detached={...structuredClone(e),id:uid(),date:newDate,endDate:ds(add(parse(newDate),span)),repeat:'none',repeatRule:null,excludedDates:[],done:wasDone,doneDates:[],checklistDoneByDate:movedChecklistDone.length?{[newDate]:movedChecklistDone}:{},orderByDate:{},fixedId:null,detachedFromRepeatId:e.id,detachedOccurrence:occ};
+  const detached={...structuredClone(e),id:uid(),date:newDate,endDate:ds(add(parse(newDate),span)),repeat:'none',repeatRule:null,excludedDates:[],done:wasDone,doneDates:[],checklistDoneByDate:movedChecklistDone.length?{[newDate]:movedChecklistDone}:{},orderByDate:{},repeatOrder:0,fixedId:null,detachedFromRepeatId:e.id,detachedOccurrence:occ};
   if(e.checklistDoneByDate?.[occ]) delete e.checklistDoneByDate[occ];
   detached.carryoverHistory=[];
   state.events.push(detached); save();
@@ -1343,8 +1465,14 @@ function toggleSubtask(id,occ,subtaskId){
 }
 function toggleDone(id,occ){
   const e=state.events.find(x=>x.id===id); if(!e || e.kind==='anniversary') return;
-  if(e.kind!=='payment' && checklistItems(e).length){
-    alert('세부 체크리스트를 모두 완료하면 업무가 자동으로 완료됩니다.');
+  const list=checklistItems(e);
+  if(e.kind!=='payment' && list.length){
+    const key=occ||e.date, currentlyDone=isDone({...e,_occurrenceStart:key});
+    e.checklistDoneByDate=(e.checklistDoneByDate&&typeof e.checklistDoneByDate==='object')?e.checklistDoneByDate:{};
+    if(currentlyDone) delete e.checklistDoneByDate[key];
+    else e.checklistDoneByDate[key]=list.map(x=>String(x.id));
+    setOccurrenceDoneState(e,key,!currentlyDone);
+    save();
     return;
   }
   if((e.repeat||'none')==='none') e.done=!e.done;
@@ -1482,6 +1610,26 @@ function updateMonthlyRepeatUI(){
     $('#monthlyHint').textContent=`매월 ${d.getDate()}일에 반복됩니다.${d.getDate()>=29?' 해당 날짜가 없는 달은 건너뜁니다.':''}`;
   }
 }
+function updateLunarYearlyHint(){
+  const hint=$('#lunarYearlyHint'); if(!hint) return;
+  if(!lunarFormatter){ hint.textContent='이 브라우저에서는 음력 변환을 지원하지 않습니다.'; return; }
+  const base=parse($('#date').value||ds(new Date()));
+  const baseParts=lunarPartsFromSolar(base);
+  const lunarYear=baseParts?.year || base.getFullYear();
+  const month=clamp(Number($('#lunarMonth').value)||baseParts?.month||1,1,12);
+  const day=clamp(Number($('#lunarDay').value)||baseParts?.day||1,1,30);
+  const leap=!!$('#lunarLeap').checked;
+  const solar=solarDateForLunarYear(lunarYear,month,day,leap);
+  hint.textContent=solar
+    ? `${lunarLabel(month,day,leap)} → ${ds(solar)} · 이후 매년 음력 기준으로 반복됩니다.${leap?' 윤달이 없는 해에는 표시되지 않습니다.':''}`
+    : `${lunarLabel(month,day,leap)}은 음력 ${lunarYear}년에 존재하지 않습니다.${leap?' 윤달이 있는 해에만 표시됩니다.':''}`;
+}
+function updateYearlyCalendarUI(){
+  const isLunar=$('#yearlyCalendar').value==='lunar';
+  $('#solarYearlyOptions').classList.toggle('hidden',isLunar);
+  $('#lunarYearlyOptions').classList.toggle('hidden',!isLunar);
+  if(isLunar) updateLunarYearlyHint();
+}
 function updateRepeatUI(){
   const type=$('#repeat').value, date=$('#date').value||ds(new Date()), d=parse(date);
   $('#repeatDetails').classList.toggle('hidden',type==='none');
@@ -1492,6 +1640,10 @@ function updateRepeatUI(){
   if(type==='monthly') updateMonthlyRepeatUI();
   if(!$('#yearlyMonth').value) $('#yearlyMonth').value=d.getMonth()+1;
   if(!$('#yearlyDay').value) $('#yearlyDay').value=d.getDate();
+  const lp=lunarPartsFromSolar(d);
+  if(!$('#lunarMonth').value) $('#lunarMonth').value=lp?.month||1;
+  if(!$('#lunarDay').value) $('#lunarDay').value=lp?.day||1;
+  if(type==='yearly') updateYearlyCalendarUI();
   updateRepeatEndUI();
 }
 function updateRepeatEndUI(){
@@ -1509,8 +1661,12 @@ function getRepeatRule(){
     monthDay:d.getDate(),
     nth,
     weekday:d.getDay(),
+    yearlyCalendar:$('#yearlyCalendar').value==='lunar'?'lunar':'solar',
     yearlyMonth:clamp(Number($('#yearlyMonth').value)||d.getMonth()+1,1,12),
     yearlyDay:clamp(Number($('#yearlyDay').value)||d.getDate(),1,31),
+    lunarMonth:clamp(Number($('#lunarMonth').value)||lunarPartsFromSolar(d)?.month||1,1,12),
+    lunarDay:clamp(Number($('#lunarDay').value)||lunarPartsFromSolar(d)?.day||1,1,30),
+    lunarLeap:!!$('#lunarLeap').checked,
     endType:$('#repeatEndType').value,
     until:$('#repeatEndDate').value,
     count:Math.max(1,Number($('#repeatCount').value)||10)
@@ -1522,8 +1678,12 @@ function setRepeatRule(e){
   $$('#weeklyOptions input[type=checkbox]').forEach(x=>x.checked=rule.weekdays.includes(Number(x.value)));
   $('#monthlyMode').value=rule.monthlyMode==='monthEnd'?'date':(rule.monthlyMode||'date');
   $('#monthlyMonthEnd').checked=rule.monthlyMode==='monthEnd';
+  $('#yearlyCalendar').value=rule.yearlyCalendar==='lunar'?'lunar':'solar';
   $('#yearlyMonth').value=rule.yearlyMonth;
   $('#yearlyDay').value=rule.yearlyDay;
+  $('#lunarMonth').value=rule.lunarMonth||1;
+  $('#lunarDay').value=rule.lunarDay||1;
+  $('#lunarLeap').checked=!!rule.lunarLeap;
   $('#repeatEndType').value=rule.endType||'never';
   $('#repeatEndDate').value=rule.until||'';
   $('#repeatCount').value=rule.count||10;
@@ -1579,6 +1739,7 @@ $('#eventForm').onsubmit=e=>{
   if(!$('#allDay').checked && $('#start').value && $('#end').value && $('#end').value<=$('#start').value && $('#date').value===$('#endDate').value){ alert('종료 시간은 시작 시간보다 늦어야 합니다.'); return; }
   if($('#repeat').value!=='none' && $('#repeatEndType').value==='date' && !$('#repeatEndDate').value){ alert('반복 종료 날짜를 선택하세요.'); return; }
   if($('#repeat').value!=='none' && $('#repeatEndType').value==='date' && $('#repeatEndDate').value<$('#date').value){ alert('반복 종료 날짜는 시작 날짜보다 빠를 수 없습니다.'); return; }
+  if($('#repeat').value==='yearly' && $('#yearlyCalendar').value==='lunar' && !lunarFormatter){ alert('현재 브라우저에서는 음력 날짜 변환을 지원하지 않습니다.'); return; }
   const repeat=$('#repeat').value;
   const checklist=checklistFromText($('#checklistText').value,checklistItems(old||{}));
   const checklistDoneByDate=cleanedChecklistDoneMap(old?.checklistDoneByDate||{},checklist);
@@ -1647,7 +1808,7 @@ $('#cancelRepeatDelete').onclick=()=>{ pendingRepeatDeleteId=''; closeDialog($('
 
 $('#copyEvent').onclick=()=>{
   const id=$('#eid').value, src=state.events.find(x=>x.id===id); if(!src) return;
-  const copy={...structuredClone(src),id:uid(),title:`${src.title} 복사`,done:false,doneDates:[],checklistDoneByDate:{},orderByDate:{},fixedId:null,flexibleId:null,carryoverCount:0,carryoverFromDate:'',carryoverRootId:'',carryoverParentId:'',carryoverHistory:[]};
+  const copy={...structuredClone(src),id:uid(),title:`${src.title} 복사`,done:false,doneDates:[],checklistDoneByDate:{},orderByDate:{},repeatOrder:0,fixedId:null,flexibleId:null,carryoverCount:0,carryoverFromDate:'',carryoverRootId:'',carryoverParentId:'',carryoverHistory:[]};
   state.events.push(copy); activeEventOccurrence=null; closeDialog($('#eventDlg')); save();
 };
 
@@ -1689,8 +1850,19 @@ $('#carryForm').onsubmit=e=>{
 };
 $('#allDay').onchange=updateAllDayUI; $('#noDuration').onchange=()=>updateDurationMode(); $('#kind').onchange=updateKindUI; $('#start').onchange=updateDurationMode; $('#end').onchange=updateDurationMode; $('#endDate').onchange=updateDurationMode; $('#repeat').onchange=updateRepeatUI; $('#date').onchange=()=>{
   if(!$('#endDate').value || $('#endDate').value<$('#date').value) $('#endDate').value=$('#date').value;
-  $('#yearlyMonth').value=parse($('#date').value).getMonth()+1; $('#yearlyDay').value=parse($('#date').value).getDate(); updateRepeatUI(); updateDurationMode();
+  const d=parse($('#date').value), lp=lunarPartsFromSolar(d);
+  $('#yearlyMonth').value=d.getMonth()+1; $('#yearlyDay').value=d.getDate();
+  if($('#yearlyCalendar').value==='lunar' && lp){ $('#lunarMonth').value=lp.month; $('#lunarDay').value=lp.day; $('#lunarLeap').checked=!!lp.leap; }
+  updateRepeatUI(); updateDurationMode();
 }; $('#monthlyMode').onchange=updateMonthlyRepeatUI; $('#monthlyMonthEnd').onchange=updateMonthlyRepeatUI; $('#repeatEndType').onchange=updateRepeatEndUI;
+$('#yearlyCalendar').onchange=()=>{
+  if($('#yearlyCalendar').value==='lunar'){
+    const lp=lunarPartsFromSolar(parse($('#date').value||ds(new Date())));
+    if(lp){ $('#lunarMonth').value=lp.month; $('#lunarDay').value=lp.day; $('#lunarLeap').checked=!!lp.leap; }
+  }
+  updateYearlyCalendarUI();
+};
+$('#lunarMonth').oninput=updateLunarYearlyHint; $('#lunarDay').oninput=updateLunarYearlyHint; $('#lunarLeap').onchange=updateLunarYearlyHint;
 
 function parentOptionsFor(editId=''){
   const blocked=new Set(editId?[editId,...descendants(editId).map(c=>c.id)]:[]);

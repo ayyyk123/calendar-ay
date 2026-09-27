@@ -4,15 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
-  <title>캘린더 v1.37</title>
-  <link rel="manifest" href="manifest.json?v=1.36">
+  <title>캘린더 v1.40</title>
+  <link rel="manifest" href="manifest.json?v=1.40">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="icon-180.png">
-  <link rel="stylesheet" href="style.css?v=1.36">
+  <link rel="stylesheet" href="style.css?v=1.40">
 </head>
 <body>
 <header>
-  <div class="brand"><b>캘린더</b><small> v1.37</small></div>
+  <div class="brand"><b>캘린더</b><small> v1.40</small></div>
   <div id="saveBadge" class="saveBadge loading" title="Firebase 저장 상태"><span class="saveDot"></span><span id="saveBadgeText">Firebase 확인 중</span></div>
   <button id="manualSaveBtn" class="manualSaveBtn" type="button" title="현재 데이터를 Firebase에 즉시 저장"><span class="manualSaveFull">최신자료 저장</span><span class="manualSaveMobile">저장</span></button>
   <button id="sidebarToggle" class="mobileOnly" type="button" aria-label="메뉴">☰</button>
@@ -139,9 +139,18 @@
         <p id="monthlyHint" class="hint"></p>
       </div>
       <div id="yearlyOptions" class="hidden">
-        <div class="row">
+        <label>매년 반복 기준<select id="yearlyCalendar"><option value="solar">양력</option><option value="lunar">음력</option></select></label>
+        <div id="solarYearlyOptions" class="row">
           <label>월<input type="number" id="yearlyMonth" min="1" max="12"></label>
           <label>일<input type="number" id="yearlyDay" min="1" max="31"></label>
+        </div>
+        <div id="lunarYearlyOptions" class="lunarYearlyOptions hidden">
+          <div class="row">
+            <label>음력 월<input type="number" id="lunarMonth" min="1" max="12"></label>
+            <label>음력 일<input type="number" id="lunarDay" min="1" max="30"></label>
+          </div>
+          <label class="check"><input type="checkbox" id="lunarLeap"> 윤달</label>
+          <p id="lunarYearlyHint" class="hint"></p>
         </div>
       </div>
       <div class="row">
@@ -179,6 +188,18 @@
       <button type="button" id="deleteSeries"><b>전체 반복 일정 삭제</b><small>반복 시리즈 전체를 삭제합니다.</small></button>
     </div>
     <menu><span></span><button type="button" id="cancelRepeatDelete">취소</button></menu>
+  </form>
+</dialog>
+
+<dialog id="repeatOrderDlg" class="smallDlg">
+  <form method="dialog">
+    <h3>반복 일정 순서</h3>
+    <p id="repeatOrderInfo" class="hint">이 순서 변경을 다른 반복 날짜에도 적용할지 선택하세요.</p>
+    <div class="scopeActions">
+      <button type="button" id="orderOccurrenceOnly"><b>이 날짜만 적용</b><small>선택한 날짜에서만 순서를 바꿉니다.</small></button>
+      <button type="button" id="orderSeries"><b>반복 일정 전체에 적용</b><small>같은 캘린더의 다른 반복 날짜에도 이 순서를 기본으로 적용합니다.</small></button>
+    </div>
+    <menu><span></span><button type="button" id="cancelRepeatOrder">취소</button></menu>
   </form>
 </dialog>
 
@@ -334,6 +355,6 @@
   <div><span class="spinner"></span><b>Firebase 최신 데이터 불러오는 중…</b><small>저장된 최신 일정을 확인하고 있어요.</small></div>
 </div>
 
-<script type="module" src="app.js?v=1.36"></script>
+<script type="module" src="app.js?v=1.40"></script>
 </body>
 </html>

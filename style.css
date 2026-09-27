@@ -242,3 +242,63 @@ dialog{border:0;border-radius:12px;box-shadow:0 10px 40px #0003;width:min(560px,
 .month .quickLane{padding:2px;margin:1px 0 3px}
 .month .quickLaneHead{font-size:8px;margin-bottom:1px}
 .month .quickLaneItems .item{padding:3px 4px}
+
+/* v1.39: 네이버형 한 줄 일정 + 날짜별 캘린더 접기/펴기 */
+.item{padding:3px 5px!important;margin:1px 0!important;min-height:26px}
+.itemRow{align-items:center!important;gap:4px!important;min-height:20px;min-width:0}
+.itemTitle{line-height:20px!important;font-size:12px!important;font-weight:500;min-width:0}
+.durationPrefix{font-weight:700;color:#515151;margin-right:1px}
+.todoCheck{
+  appearance:none;-webkit-appearance:none;flex:0 0 14px;width:14px;height:14px;min-width:14px;min-height:14px;
+  margin:0;padding:0!important;border:1px solid #aeb4bd!important;border-radius:2px;background:#fff!important;position:relative;cursor:pointer
+}
+.todoCheck:checked{border-color:#8a929d!important;background:#fff!important}
+.todoCheck:checked::after{content:'✓';position:absolute;left:1px;top:-3px;font-size:14px;line-height:16px;color:#5c6673;font-weight:800}
+.item.done .todoCheck{opacity:1}
+.item.done .itemTitle{text-decoration:none!important;color:#888!important}
+.item.done{opacity:.72!important}
+.inlineMeta{flex:0 0 auto;font-size:10px;color:#6f747b;white-space:nowrap}
+.repeatMark,.carryBadge{flex:0 0 auto;margin:0!important;font-size:10px}
+.checklistToggle{flex:0 0 auto;border:0;background:transparent!important;padding:1px 2px!important;font-size:9px;color:#657080;white-space:nowrap}
+.checklistToggle.on{color:#25364b;font-weight:700}
+.subtaskList{margin:3px 0 1px 42px;padding:4px 5px;border-top:1px dashed color-mix(in srgb,var(--item-color,#d9d9d9) 55%, #ddd);display:grid;gap:2px}
+.subtaskRow{display:flex;align-items:center;gap:4px;font-size:10px;min-width:0}
+.subtaskRow span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.subtaskCheck{border:0;background:transparent!important;padding:0!important;font-size:11px;line-height:1}
+.item .meta,.checklistCompact{display:none!important}
+
+.groupHead,.subCalHead{padding:0!important;overflow:hidden}
+.dayCalToggle{width:100%;border:0!important;border-radius:0!important;background:transparent!important;padding:4px 5px!important;display:flex;align-items:center;justify-content:space-between;gap:5px;text-align:left;font-weight:700;color:inherit;min-width:0}
+.dayCalToggle:hover{background:rgba(255,255,255,.28)!important}
+.dayCalHeadLabel{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dayCalHeadRight{display:flex;align-items:center;gap:3px;flex:0 0 auto;white-space:nowrap}
+.calendarTreeGroup.collapsed>.dayCalGroupBody,.subCalGroup.collapsed>.dayCalGroupBody{display:none}
+.calendarTreeGroup.collapsed{margin-bottom:5px}
+.subCalGroup{margin-top:3px}
+.subCalHead{display:block}
+.dayCalGroupBody{min-width:0}
+
+@media(max-width:1180px){
+  .item{padding:2px 3px!important;min-height:23px}.itemRow{min-height:18px;gap:2px!important}.itemTitle{font-size:10px!important;line-height:18px!important}
+  .todoCheck{width:12px;height:12px;min-width:12px;min-height:12px}.todoCheck:checked::after{font-size:12px;left:0;top:-3px}
+  .importanceBtn{font-size:11px}.checklistToggle{font-size:8px}.inlineMeta{font-size:8px}
+  .dayCalToggle{padding:3px 3px!important;font-size:9px}.subtaskList{margin-left:30px}
+}
+@media(max-width:760px){
+  .item{padding:2px 2px!important;min-height:20px}.itemRow{min-height:16px;gap:1px!important}.itemTitle{font-size:8px!important;line-height:16px!important}
+  .todoCheck{width:10px;height:10px;min-width:10px;min-height:10px}.todoCheck:checked::after{font-size:10px;line-height:12px;top:-3px}
+  .importanceBtn{font-size:9px}.checklistToggle{font-size:7px;padding:0 1px!important}.inlineMeta{display:none}.repeatMark,.carryBadge{font-size:7px}
+  .dayCalToggle{padding:2px!important;font-size:7px}.dayCalHeadRight>span{display:none}.subtaskList{margin-left:18px;padding:2px 3px}.subtaskRow{font-size:8px}
+}
+
+/* v1.39: 항목이 많을 때 달력 영역 세로 스크롤 보장 */
+.layout{min-height:0}
+main{min-height:0!important;overflow-x:auto;overflow-y:auto!important;overscroll-behavior:contain}
+aside{min-height:0}
+.week{height:auto!important;min-height:100%}
+.dayCol{overflow:visible!important;min-height:0}
+.dayBody{overflow:visible}
+
+/* v1.40 lunar yearly repeat */
+.lunarYearlyOptions{margin-top:8px;padding:10px;border:1px solid #e3e5e8;border-radius:8px;background:#fafbfc}
+.lunarYearlyOptions .hint{margin:6px 0 0;line-height:1.45}
