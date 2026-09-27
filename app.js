@@ -68,7 +68,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.46',
+  version: '1.47',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -311,7 +311,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.46',
+    version: '1.47',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -510,6 +510,15 @@ function focusedCalendarIds(){
 function focusSuffix(){
   const focus=calendarFocusId?state.calendars.find(c=>c.id===calendarFocusId):null;
   return focus?` · ${calendarPath(focus.id)}만 보기`:'';
+}
+function compactFocusSuffix(){
+  const focus=calendarFocusId?state.calendars.find(c=>c.id===calendarFocusId):null;
+  return focus?` · ${focus.name}`:'';
+}
+function setRangeLabel(fullText, compactText=fullText){
+  const el=$('#range'); if(!el) return;
+  el.textContent=window.matchMedia('(max-width: 760px)').matches?compactText:fullText;
+  el.title=fullText;
 }
 function calendarPath(id){
   let cur=state.calendars.find(c=>c.id===id); if(!cur) return '미지정';
@@ -1540,6 +1549,8 @@ document.addEventListener('pointerdown',e=>{
   closeEventPopover();
 });
 window.addEventListener('resize',closeEventPopover);
+const mobileBreakpoint=window.matchMedia('(max-width: 760px)');
+mobileBreakpoint.addEventListener?.('change',()=>render());
 document.addEventListener('scroll',e=>{ if(!$('#eventPopover')?.classList.contains('hidden') && !$('#eventPopover')?.contains(e.target)) closeEventPopover(); },true);
 
 function bindItems(){
@@ -1801,7 +1812,7 @@ function toggleDone(id,occ){
 
 function renderWeek(){
   const s=startWeek(cursor), days=[0,1,2,3,4,5,6].map(i=>add(s,i)), map=buildOccurrenceMap(ds(s),ds(days[6]),{calendarIds:focusedCalendarIds()});
-  $('#range').textContent=`${s.getFullYear()}. ${s.getMonth()+1}. ${s.getDate()} - ${days[6].getFullYear()}. ${days[6].getMonth()+1}. ${days[6].getDate()}${focusSuffix()}`;
+  setRangeLabel(`${s.getFullYear()}. ${s.getMonth()+1}. ${s.getDate()} - ${days[6].getFullYear()}. ${days[6].getMonth()+1}. ${days[6].getDate()}${focusSuffix()}`,`${s.getMonth()+1}/${s.getDate()}–${days[6].getMonth()+1}/${days[6].getDate()}${compactFocusSuffix()}`);
   $('#main').className='week';
   $('#main').innerHTML=days.map(d=>{
     const key=ds(d), hasDiary=!!state.diary[key]?.text, h=holidayLabel(key), dow=d.getDay();
@@ -1832,7 +1843,7 @@ $('#closeDayList').onclick=()=>closeDialog($('#dayListDlg'));
 function renderMultiWeek(weeks=2){
   const s=startWeek(cursor), total=weeks*7, days=[...Array(total)].map((_,i)=>add(s,i)), map=buildOccurrenceMap(ds(s),ds(days[days.length-1]),{calendarIds:focusedCalendarIds()});
   const last=days[days.length-1];
-  $('#range').textContent=`${s.getFullYear()}. ${s.getMonth()+1}. ${s.getDate()} - ${last.getFullYear()}. ${last.getMonth()+1}. ${last.getDate()}${focusSuffix()}`;
+  setRangeLabel(`${s.getFullYear()}. ${s.getMonth()+1}. ${s.getDate()} - ${last.getFullYear()}. ${last.getMonth()+1}. ${last.getDate()}${focusSuffix()}`,`${s.getMonth()+1}/${s.getDate()}–${last.getMonth()+1}/${last.getDate()}${compactFocusSuffix()}`);
   $('#main').className=`multiWeek weeks${weeks}`;
   $('#main').innerHTML=days.map(d=>{
     const key=ds(d), hasDiary=!!state.diary[key]?.text, h=holidayLabel(key), dow=d.getDay();
@@ -1850,7 +1861,7 @@ function renderMonth(){
   const weekCount=Math.ceil((mondayOffset+monthDays)/7);
   const totalCells=weekCount*7;
   const end=add(s,totalCells-1),map=buildOccurrenceMap(ds(s),ds(end),{calendarIds:focusedCalendarIds()});
-  $('#range').textContent=`${y}년 ${m+1}월${focusSuffix()}`;
+  setRangeLabel(`${y}년 ${m+1}월${focusSuffix()}`,`${y}.${m+1}${compactFocusSuffix()}`);
   $('#main').className='month';
   $('#main').style.setProperty('--month-weeks',String(weekCount));
   const heads=['월','화','수','목','금','토','일'].map((x,i)=>`<div class="weekdayHeader ${i===5?'saturday':i===6?'sunday':''}">${x}</div>`).join('');
@@ -1864,7 +1875,7 @@ function renderMonth(){
 }
 function renderDay(){
   const d=ds(cursor),map=buildOccurrenceMap(d,d,{calendarIds:focusedCalendarIds()}),hasDiary=!!state.diary[d]?.text;
-  const h=holidayLabel(d); $('#range').textContent=`${d}${focusSuffix()}`; $('#main').className='daySingle';
+  const h=holidayLabel(d); setRangeLabel(`${d}${focusSuffix()}`,`${d.slice(5).replace('-', '/')}${compactFocusSuffix()}`); $('#main').className='daySingle';
   $('#main').innerHTML=`${h?`<div class="dayHolidayBanner">${esc(h)}</div>`:''}<div class="diaryStrip"><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${d}">📝 ${hasDiary?'다이어리 보기':'다이어리 작성'}</button></div><div data-dropdate="${d}" ondblclick="window.__newEvent?.('${d}')">${groupHtml(d,map[d]||[])}</div>`; bindItems();
 }
 function renderList(){
@@ -1873,7 +1884,7 @@ function renderList(){
   const allowed=focus?new Set([focus.id,...descendants(focus.id).map(c=>c.id)]):null;
   const map=buildOccurrenceMap(start,end,{calendarIds:allowed});
   const rows=[]; for(const [date,es] of Object.entries(map)) for(const e of es){ if((e._occurrenceStart||e.date)===date) rows.push({date,e}); }
-  $('#range').textContent=focus?`${focus.name} 관련 일정`:'일정 목록'; $('#main').className='listView';
+  setRangeLabel(focus?`${focus.name} 관련 일정`:'일정 목록',focus?`${focus.name} 목록`:'목록'); $('#main').className='listView';
   let last='';
   let top='';
   if(focus){

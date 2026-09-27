@@ -358,3 +358,99 @@ aside{min-height:0}
 .weekdayCapacityField.sharedFromParent{background:#f7f8fa}
 .weekdayCapacityField.sharedFromParent .weekdayCapacityGrid{opacity:.42}
 .sharedCapacityText{font-size:10px;color:#7a7f87;font-weight:500}
+
+
+/* v1.47: 모바일 전용 레이아웃 정리
+   - 헤더를 3행(상태 / 보기 / 날짜이동)으로 고정해 겹침 방지
+   - 주간 7요일은 한 화면에 유지하면서 카드/헤더를 압축
+   - iPhone Safari의 date input/버튼 줄바꿈 방지 */
+@media(max-width:760px){
+  :root{--header-h:146px}
+  html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+  body{font-size:13px}
+  header{
+    height:var(--header-h)!important;
+    min-height:var(--header-h)!important;
+    display:grid!important;
+    grid-template-columns:auto minmax(0,1fr) auto auto;
+    grid-template-rows:36px 38px 38px;
+    grid-template-areas:
+      "brand badge save menu"
+      "views views views views"
+      "nav nav nav nav";
+    align-items:center;
+    gap:5px 6px!important;
+    padding:8px!important;
+    overflow:hidden;
+  }
+  header .brand{grid-area:brand;order:initial!important;font-size:16px;line-height:1;align-self:center}
+  header .brand small{font-size:11px}
+  #saveBadge{grid-area:badge;order:initial!important;max-width:none!important;min-width:0!important;width:100%;padding:4px 7px;font-size:10px;height:30px}
+  #saveBadgeText{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #manualSaveBtn{grid-area:save;order:initial!important;height:32px;min-width:44px;padding:4px 8px!important;font-size:11px!important;white-space:nowrap}
+  #sidebarToggle{grid-area:menu;order:initial!important;display:inline-flex!important;align-items:center;justify-content:center;width:38px;height:34px;padding:0!important;font-size:18px;white-space:nowrap}
+  .views{
+    grid-area:views;order:initial!important;margin:0!important;width:100%;min-width:0;
+    display:grid!important;grid-template-columns:repeat(8,minmax(0,1fr));gap:4px!important;
+  }
+  .views button{min-width:0!important;width:100%;height:34px;padding:4px 0!important;font-size:12px!important;white-space:nowrap;overflow:hidden;text-overflow:clip;border-radius:8px}
+  nav{
+    grid-area:nav;order:initial!important;width:100%!important;min-width:0;overflow:visible!important;
+    display:grid!important;grid-template-columns:30px 44px 30px 100px minmax(0,1fr);gap:4px!important;align-items:center;
+  }
+  nav button{min-width:0;height:34px;padding:3px 0!important;font-size:12px;white-space:nowrap;overflow:hidden}
+  #jumpDate{
+    width:100%!important;min-width:0!important;max-width:none!important;height:34px;padding:3px 4px!important;
+    font-size:11px!important;border-radius:7px;color:#30343a;background:#fff;
+  }
+  #jumpDate::-webkit-date-and-time-value{text-align:center;margin:0}
+  #range{
+    margin:0!important;min-width:0;max-width:100%;font-size:11px!important;line-height:1.15;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;display:block;
+  }
+  .layout{height:calc(100dvh - var(--header-h))!important;min-height:0}
+  .layout aside{top:var(--header-h)!important}
+  main{height:100%;min-height:0;overflow-x:hidden!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch}
+
+  /* 7요일은 그대로 보이되, 모바일에서는 내부 여백을 최소화 */
+  .week,.month,.multiWeek{width:100%!important;min-width:0!important;max-width:100%!important}
+  .dayCol,.multiWeek .multiDay,.month .cell,.month .weekdayHeader{min-width:0!important}
+  .dayHead{height:42px!important;padding:3px 1px!important}
+  .dayTopLine{height:18px!important;min-height:18px!important;gap:1px!important}
+  .weekdayLabel{font-size:8px!important}
+  .dayTopLine .dateNum{font-size:12px!important}
+  .dayHead .diaryBtn{font-size:8px!important;padding:0!important;max-width:12px;overflow:hidden}
+  .dayHead .holidayName{height:10px!important;min-height:10px!important;line-height:10px!important;font-size:6.5px!important;margin-top:1px!important}
+  .dayBody{padding:1px!important;min-height:calc(100dvh - var(--header-h) - 42px)!important}
+  .group{margin-bottom:3px!important}
+  .dayCalToggle{padding:2px 1px!important;font-size:7px!important;min-height:18px}
+  .dayCalHeadLabel{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .item{padding:1px 2px!important;min-height:19px!important;margin:1px 0!important;border-left-width:2px!important}
+  .itemRow{min-height:16px!important;gap:1px!important}
+  .itemTitle{font-size:8px!important;line-height:16px!important}
+  .durationPrefix{font-size:7px!important}
+  .repeatMark,.carryBadge,.checklistToggle{font-size:7px!important}
+  .appointmentLane,.anniversaryLane,.paymentLane,.quickLane{margin-bottom:3px!important;border-radius:3px}
+  .appointmentLaneHead,.anniversaryLaneHead,.paymentLaneHead,.quickLaneHead{padding:2px!important;font-size:7px!important;min-height:14px}
+  .appointmentLaneItems,.anniversaryLaneItems,.paymentLaneItems,.quickLane{padding:1px!important}
+  .dayTotal{font-size:7px!important;padding:2px 1px!important;line-height:1.25}
+  .month .weekdayHeader{height:26px;padding:5px 0!important;font-size:9px!important}
+  .month .cell{padding:2px!important}
+  .month .mhead{height:17px!important;min-height:17px!important;font-size:9px!important}
+  .month .holidayName{height:10px!important;min-height:10px!important;line-height:10px!important;font-size:6.5px!important}
+  .month .item{padding:1px 2px!important;min-height:16px!important;font-size:7px!important}
+  .month .moreEventsBtn{font-size:7px!important;padding:1px 2px!important}
+}
+@media(max-width:390px){
+  :root{--header-h:142px}
+  header{grid-template-rows:34px 36px 36px;padding:7px 6px!important;gap:4px!important}
+  header .brand{font-size:15px}.brand small{font-size:10px}
+  #saveBadge{font-size:9px;height:28px;padding:3px 6px}
+  #manualSaveBtn{height:30px;min-width:40px;padding:3px 6px!important;font-size:10px!important}
+  #sidebarToggle{width:34px;height:31px;font-size:17px}
+  .views{gap:3px!important}.views button{height:32px;font-size:11px!important}
+  nav{grid-template-columns:28px 42px 28px 94px minmax(0,1fr);gap:3px!important}
+  nav button,#jumpDate{height:32px!important}
+  #jumpDate{font-size:10px!important;padding:2px!important}
+  #range{font-size:10px!important}
+}
