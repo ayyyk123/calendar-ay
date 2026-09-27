@@ -315,3 +315,25 @@ aside{min-height:0}
 .multiWeek{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-auto-rows:minmax(230px,auto);min-width:0;width:100%;align-content:start}.multiWeek .multiDay{min-width:0;border-right:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;display:flex;flex-direction:column}.multiWeek .dayBody{flex:1;min-height:180px;padding:5px;overflow:visible}.multiWeek .dayHead{border-bottom:1px solid #e5e7eb}
 .purchaseRow{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:4px;margin:4px 0;padding:4px 5px;border:1px solid #e2e8f0;border-radius:6px;background:#fff}.purchaseRow.done{opacity:.62;background:#f6f7f8}.purchaseRow.done .purchaseOpen span{text-decoration:line-through}.purchaseCheck{border:0;background:transparent;padding:2px;font-size:13px;cursor:pointer}.purchaseOpen{border:0;background:transparent;padding:1px 2px;min-width:0;display:flex;justify-content:space-between;gap:6px;text-align:left}.purchaseOpen span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.purchaseOpen small{white-space:nowrap;color:#6b7280}
 @media(max-width:760px){.multiWeek{grid-auto-rows:minmax(180px,auto)}.multiWeek .dayBody{min-height:130px;padding:2px}.appointmentLaneHead{font-size:8px;padding:2px 3px}.eventDoneWrap{right:10px;top:10px;padding:4px 6px;font-size:11px}}
+
+/* v1.43: 네이버식 일정 빠른 팝오버 + D-Day 상단 영역 + 좌측 메뉴 순서 드래그 */
+.eventPopover{
+  position:fixed;z-index:4000;width:min(300px,calc(100vw - 16px));
+  padding:10px;border:1px solid #cfd5de;border-radius:9px;background:#fff;
+  box-shadow:0 10px 30px rgba(15,23,42,.18);font-size:12px;
+}
+.eventPopover.hidden{display:none!important}
+.eventPopoverHead{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:7px}
+.eventPopoverHead>div{min-width:0;display:grid;gap:2px}.eventPopoverHead b{font-size:13px;line-height:1.3;white-space:normal;word-break:keep-all}.eventPopoverHead small{font-size:10px;color:#667085}
+#eventPopoverClose{border:0;background:transparent!important;padding:0 3px;font-size:18px;line-height:1;color:#7b8490}
+.eventPopoverMeta{padding:6px 7px;border-radius:6px;background:#f7f8fa;color:#596273;font-size:10px;line-height:1.45;word-break:keep-all}
+.eventPopoverDone{display:flex;align-items:center;gap:6px;margin:9px 2px 4px;font-weight:700;cursor:pointer}.eventPopoverDone input{width:15px;height:15px;accent-color:#44546a}.eventPopoverDone.hidden{display:none!important}
+.eventPopoverActions{display:flex;justify-content:flex-end;margin-top:7px}.eventPopoverActions button{padding:5px 9px;font-size:11px}
+
+.anniversaryLane{margin:0 0 7px;border:1px solid #f0d5e5;border-radius:6px;background:#fff8fc;overflow:hidden}
+.anniversaryLaneHead{display:flex;align-items:center;justify-content:space-between;padding:4px 6px;background:#fbeaf4;color:#9b3c74;font-size:10px;font-weight:800}
+.anniversaryLaneHead small{font-size:9px;color:#b16a94}.anniversaryLaneItems{padding:3px}.anniversaryLane .item{margin:2px 0!important}.anniversaryLane .itemTitle{font-weight:700;color:#873762}
+.compactAnniversaryLane{margin-bottom:4px}.compactAnniversaryLane .anniversaryLaneHead{padding:2px 3px;font-size:8px}.compactAnniversaryLane .anniversaryLaneHead small{font-size:7px}.compactAnniversaryLane .anniversaryLaneItems{padding:1px 2px}
+
+.secTitleWithGrip{display:flex;align-items:center;gap:5px;min-width:0}.sidebarSectionGrip{display:inline-flex;align-items:center;justify-content:center;width:14px;color:#9aa3ae;letter-spacing:-3px;cursor:grab;user-select:none;font-size:12px}.sidebarSectionGrip:active{cursor:grabbing}.sidebarSectionDragging{opacity:.48}.sidebarSectionDrop{outline:1px dashed #9db4d5;outline-offset:2px}.sidebarSection{transition:opacity .12s ease}
+@media(max-width:760px){.sidebarSectionGrip{display:none}.eventPopover{width:min(300px,calc(100vw - 12px));padding:9px}}
