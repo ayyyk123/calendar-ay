@@ -68,7 +68,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.24',
+  version: '1.25',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,parentId:''},
@@ -251,7 +251,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.24',
+    version: '1.25',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -721,19 +721,25 @@ function renderSide(){
   $$('.calRow').forEach(row=>{
     row.querySelector('.calVisible').onclick=e=>{
       e.stopPropagation();
-      const id=row.dataset.cid, set=new Set(state.settings.hiddenCalendars||[]), ids=[id,...descendants(id).map(c=>c.id)];
-      if(e.target.checked) ids.forEach(x=>set.delete(x)); else ids.forEach(x=>set.add(x));
-      state.settings.hiddenCalendars=[...set]; save();
+      const id=row.dataset.cid, set=new Set(state.settings.hiddenCalendars||[]);
+      // 표시 체크는 각 캘린더별로 독립 동작합니다.
+      // 상위 캘린더를 꺼도 부속캘린더 체크박스는 개별적으로 다시 켤 수 있습니다.
+      if(e.target.checked) set.delete(id); else set.add(id);
+      state.settings.hiddenCalendars=[...set];
+      save();
     };
     row.querySelector('.calNameBtn').onclick=e=>{
       e.stopPropagation();
       const id=row.dataset.cid;
+      // 캘린더 이름 클릭은 현재 주/월/일/목록 보기 방식을 절대 바꾸지 않고
+      // 현재 화면에서 선택한 캘린더 내용만 필터링합니다.
       if(calendarFocusId===id){
         calendarFocusId=null;
         render();
       }else{
         calendarFocusId=id;
-        // 이름을 눌러 '이 캘린더만 보기'를 선택하면 해당 캘린더(및 하위)는 바로 보이도록 체크 상태도 복구합니다.
+        // 선택한 캘린더가 숨김 상태라면 선택 즉시 보이도록 복구합니다.
+        // 상위 캘린더는 그 하위까지 함께 필터링하므로 하위도 표시 상태로 돌립니다.
         const showIds=[id,...descendants(id).map(c=>c.id)];
         const set=new Set(state.settings.hiddenCalendars||[]);
         const before=set.size;
@@ -1385,7 +1391,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'1.24',
+    appVersion:'1.25',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
