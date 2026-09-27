@@ -68,7 +68,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.27',
+  version: '1.29',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,parentId:''},
@@ -251,7 +251,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.27',
+    version: '1.29',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -437,9 +437,10 @@ function calendarPath(id){
 function duration(e){ return e?.noDuration ? 0 : (Number(e?.hours)||0); }
 function durationLabel(e){ return e?.noDuration ? '소요시간 미체크' : fmtH(Number(e?.hours)||0); }
 function fmtH(h){
-  const m = Math.round((Number(h)||0)*60);
-  if(m<=0) return '0시간';
-  return m%60 ? `${Math.floor(m/60)}시간 ${m%60}분` : `${m/60}시간`;
+  const value = Math.max(0, Number(h) || 0);
+  const rounded = Math.round(value * 100) / 100;
+  const text = Number.isInteger(rounded) ? String(rounded) : String(rounded).replace(/0+$/,'').replace(/\.$/,'');
+  return `${text}h`;
 }
 function getDurationInputs(prefix=''){
   const h = Number($(`#${prefix}hoursH`)?.value)||0;
@@ -681,7 +682,7 @@ function eventItemHtml(e, compact=false){
   const inLabel=carryoverInLabel(e), outRecord=carryoverOutRecord(e);
   const badges=`${inLabel?`<span class="carryBadge carryIn">${esc(inLabel)}</span>`:''}${outRecord?`<span class="carryBadge carryOut">부분완료 · 이월</span>`:''}`;
   if(outRecord && !compact) meta.push(`↪ ${esc(outRecord.toDate)}로 이어짐`);
-  const doneLabel=compact?(done?'☑':'☐'):(done?'☑ 완료':'☐ 완료');
+  const doneLabel=done?'☑':'☐';
   return `<div class="item ${done?'done':''} ${recurring?'recurringItem':''} ${inLabel?'carriedIn':''} ${outRecord?'carriedOut':''}" draggable="${drag}" data-eid="${esc(e.id)}" data-occurrence="${esc(e._occurrenceStart||e.date)}" style="border-left-color:${esc(c.color)}">
     <div class="itemRow">${checkable?`<button type="button" class="todoCheck" data-action="toggle" aria-label="완료 전환" title="${done?'완료 취소':'완료 체크'}">${doneLabel}</button>`:''}<div class="itemTitle">${!checkable?kindPrefix(e):''}${esc(e.title)}${repeatShort(e)?` <span class="repeatMark">${repeatShort(e)}</span>`:''}${badges}</div></div>
     ${compact?'':`<div class="meta">${meta.join(' · ')}</div>`}

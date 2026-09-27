@@ -4,15 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
-  <title>캘린더 v1.27</title>
-  <link rel="manifest" href="manifest.json?v=1.27">
+  <title>캘린더 v1.29</title>
+  <link rel="manifest" href="manifest.json?v=1.29">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="icon-180.png">
-  <link rel="stylesheet" href="style.css?v=1.27">
+  <link rel="stylesheet" href="style.css?v=1.29">
 </head>
 <body>
 <header>
-  <div class="brand"><b>캘린더</b><small> v1.27</small></div>
+  <div class="brand"><b>캘린더</b><small> v1.29</small></div>
   <div id="saveBadge" class="saveBadge loading" title="Firebase 저장 상태"><span class="saveDot"></span><span id="saveBadgeText">Firebase 확인 중</span></div>
   <button id="manualSaveBtn" class="manualSaveBtn" type="button" title="현재 데이터를 Firebase에 즉시 저장"><span class="manualSaveFull">최신자료 저장</span><span class="manualSaveMobile">저장</span></button>
   <button id="sidebarToggle" class="mobileOnly" type="button" aria-label="메뉴">☰</button>
@@ -94,7 +94,7 @@
     <div class="row">
       <div class="durationField">
         <label>예상 소요시간
-          <div class="durationInputs"><input type="number" id="hoursH" min="0" max="24" step="1" value="1"><span>시간</span><input type="number" id="hoursM" min="0" max="59" step="5" value="0"><span>분</span></div>
+          <div class="durationInputs"><input type="number" id="hoursH" min="0" max="24" step="1" value="1"><span>h</span><input type="number" id="hoursM" min="0" max="59" step="5" value="0"><span>분</span></div>
         </label>
         <label class="check durationSkip"><input type="checkbox" id="noDuration"> 소요시간 미체크</label>
       </div>
@@ -152,7 +152,7 @@
     <input type="hidden" id="carryOccurrence">
     <div class="carryTargetLine"><span>이어질 날짜</span><b id="carryTargetDate">-</b></div>
     <label id="carryDurationBlock">남은 예상 소요시간
-      <div class="durationInputs"><input type="number" id="carryhoursH" min="0" max="24" step="1" value="1"><span>시간</span><input type="number" id="carryhoursM" min="0" max="59" step="5" value="0"><span>분</span></div>
+      <div class="durationInputs"><input type="number" id="carryhoursH" min="0" max="24" step="1" value="1"><span>h</span><input type="number" id="carryhoursM" min="0" max="59" step="5" value="0"><span>분</span></div>
     </label>
     <p id="carryNoDurationNote" class="hint hidden">이 업무는 소요시간 미체크로 등록되어 있어 시간 입력 없이 다음날로 이어집니다.</p>
     <p class="hint">원래 날짜에는 `부분완료 · 이월` 표시가 남고, 다음날 일정에는 `↪ 전날 미완료`가 표시됩니다. 다시 넘기면 2일째, 3일째 이월로 누적 표시됩니다.</p>
@@ -193,7 +193,7 @@
     <label>캘린더<select id="fcal"></select></label>
     <div class="durationField">
       <label>예상 소요시간
-        <div class="durationInputs"><input type="number" id="fhoursH" min="0" max="24" step="1" value="1"><span>시간</span><input type="number" id="fhoursM" min="0" max="59" step="5" value="0"><span>분</span></div>
+        <div class="durationInputs"><input type="number" id="fhoursH" min="0" max="24" step="1" value="1"><span>h</span><input type="number" id="fhoursM" min="0" max="59" step="5" value="0"><span>분</span></div>
       </label>
       <label class="check durationSkip"><input type="checkbox" id="fnoDuration"> 소요시간 미체크</label>
     </div>
@@ -259,6 +259,6 @@
   <div><span class="spinner"></span><b>Firebase 최신 데이터 불러오는 중…</b><small>저장된 최신 일정을 확인하고 있어요.</small></div>
 </div>
 
-<script type="module" src="app.js?v=1.27"></script>
+<script type="module" src="app.js?v=1.29"></script>
 </body>
 </html>
