@@ -5,7 +5,7 @@ import {
   sendPasswordResetEmail
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import {
-  getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp
+  getFirestore, doc, getDoc, getDocFromServer, setDoc, onSnapshot, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 const FIREBASE_CONFIG = {
@@ -37,7 +37,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.11',
+  version: '1.12',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3},
@@ -59,12 +59,16 @@ let syncReady = false;
 let applyingRemote = false;
 let saveTimer = null;
 let selectedFixedFilter = 'all';
+let lastFirebaseSavedAt = null;
+let lastLocalSavedAt = null;
+let localDirty = false;
+let writeInFlight = false;
 
 function normalizeState(raw){
   const d = defaultState();
   const s = raw && typeof raw === 'object' ? raw : {};
   return {
-    version: '1.11',
+    version: '1.12',
     calendars: Array.isArray(s.calendars) && s.calendars.length ? s.calendars.map((c,i)=>({
       id:c.id||uid(), name:c.name||`캘린더 ${i+1}`, color:c.color||'#d9d9d9',
       order:Number(c.order)||i+1, period:c.period||'종일', capacity:Number(c.capacity)||0
@@ -88,26 +92,92 @@ function normalizeState(raw){
   };
 }
 
-function storageKey(){ return currentUser ? `myCalendarV11:${currentUser.uid}` : 'myCalendarV11:guest'; }
-function saveLocal(){ if(currentUser) localStorage.setItem(storageKey(), JSON.stringify(state)); }
+function storageKey(){ return currentUser ? `myCalendarV12:${currentUser.uid}` : 'myCalendarV12:guest'; }
+function metaKey(){ return currentUser ? `myCalendarV12Meta:${currentUser.uid}` : 'myCalendarV12Meta:guest'; }
+function legacyStorageKey(){ return currentUser ? `myCalendarV11:${currentUser.uid}` : 'myCalendarV11:guest'; }
+function fmtDateTime(value){
+  if(!value) return '-';
+  const d = value instanceof Date ? value : new Date(value);
+  if(Number.isNaN(d.getTime())) return '-';
+  return `${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+function updateSaveIndicators(){
+  const fb = fmtDateTime(lastFirebaseSavedAt);
+  const local = fmtDateTime(lastLocalSavedAt);
+  const fbEl=$('#lastFirebaseSave'), localEl=$('#lastLocalSave');
+  if(fbEl) fbEl.textContent=fb;
+  if(localEl) localEl.textContent=local;
+  const badge=$('#saveBadge'), txt=$('#saveBadgeText');
+  if(badge && txt && !badge.dataset.busy){
+    txt.textContent = lastFirebaseSavedAt ? `Firebase 저장완료 · ${fmtDateTime(lastFirebaseSavedAt).split(' ')[1]}` : 'Firebase 확인 중';
+    badge.className='saveBadge saved';
+  }
+}
+function setSyncStatus(text, type='normal'){
+  const stateEl=$('#syncState'); if(stateEl) stateEl.textContent=text;
+  const badge=$('#saveBadge'), txt=$('#saveBadgeText');
+  if(badge && txt){
+    txt.textContent=text;
+    badge.className=`saveBadge ${type}`;
+    badge.dataset.busy = ['saving','error','loading','offline'].includes(type) ? '1' : '';
+  }
+}
+function saveLocal(){
+  if(!currentUser) return;
+  localStorage.setItem(storageKey(), JSON.stringify(state));
+  lastLocalSavedAt=new Date();
+  localStorage.setItem(metaKey(), JSON.stringify({lastLocalSavedAt:lastLocalSavedAt.toISOString()}));
+  updateSaveIndicators();
+}
 function loadLocal(){
   if(!currentUser) return defaultState();
-  try { return normalizeState(JSON.parse(localStorage.getItem(storageKey()) || 'null')); }
+  try {
+    const meta=JSON.parse(localStorage.getItem(metaKey())||'null');
+    lastLocalSavedAt=meta?.lastLocalSavedAt?new Date(meta.lastLocalSavedAt):null;
+    const current=localStorage.getItem(storageKey());
+    const legacy=localStorage.getItem(legacyStorageKey());
+    const raw=current || legacy;
+    const loaded=normalizeState(JSON.parse(raw || 'null'));
+    if(!current && legacy){
+      localStorage.setItem(storageKey(),JSON.stringify(loaded));
+      lastLocalSavedAt=lastLocalSavedAt||new Date();
+      localStorage.setItem(metaKey(),JSON.stringify({lastLocalSavedAt:lastLocalSavedAt.toISOString()}));
+    }
+    return loaded;
+  }
   catch { return defaultState(); }
+}
+function timestampToDate(ts){
+  if(!ts) return null;
+  if(typeof ts.toDate==='function') return ts.toDate();
+  if(ts.seconds) return new Date(ts.seconds*1000);
+  return null;
+}
+async function writeRemoteNow(reason='save'){
+  if(!syncReady || !remoteRef || applyingRemote) return false;
+  clearTimeout(saveTimer); saveTimer=null;
+  localDirty=true; writeInFlight=true;
+  setSyncStatus(reason==='restore'?'백업 복원 저장 중…':'저장 중…','saving');
+  try{
+    await setDoc(remoteRef,{state,updatedAt:serverTimestamp()},{merge:false});
+    localDirty=false; writeInFlight=false;
+    lastFirebaseSavedAt=new Date();
+    updateSaveIndicators();
+    setSyncStatus(`✓ Firebase 저장완료 · ${fmtDateTime(lastFirebaseSavedAt).split(' ')[1]}`,'saved');
+    return true;
+  }catch(e){
+    writeInFlight=false;
+    console.error(e);
+    setSyncStatus('⚠ Firebase 저장 실패','error');
+    return false;
+  }
 }
 function queueRemoteSave(){
   if(!syncReady || !remoteRef || applyingRemote) return;
+  localDirty=true;
+  setSyncStatus('저장 대기…','saving');
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(async()=>{
-    try {
-      $('#syncState').textContent = '저장 중…';
-      await setDoc(remoteRef, {state, updatedAt:serverTimestamp()}, {merge:false});
-      $('#syncState').textContent = '연결됨';
-    } catch (e) {
-      console.error(e);
-      $('#syncState').textContent = '동기화 오류';
-    }
-  }, 250);
+  saveTimer = setTimeout(()=>writeRemoteNow('save'), 300);
 }
 function save({rerender=true}={}){
   saveLocal();
@@ -628,7 +698,7 @@ $$('.views [data-view]').forEach(b=>b.onclick=()=>{view=b.dataset.view;render();
 $('#sidebarToggle').onclick=()=>$('#sidebar').classList.toggle('open');
 $('#main').addEventListener('click',()=>$('#sidebar').classList.remove('open'));
 
-$('#settingsBtn').onclick=()=>{ $('#accountEmail').textContent=currentUser?.email||'-'; $('#syncState').textContent=syncReady?'연결됨':'연결 확인 중'; openDialog($('#settingsDlg')); };
+$('#settingsBtn').onclick=()=>{ $('#accountEmail').textContent=currentUser?.email||'-'; updateSaveIndicators(); if(!syncReady) $('#syncState').textContent='연결 확인 중'; openDialog($('#settingsDlg')); };
 $('#closeSettings').onclick=()=>closeDialog($('#settingsDlg'));
 $('#logoutBtn').onclick=async()=>{closeDialog($('#settingsDlg')); await signOut(auth);};
 
@@ -661,37 +731,121 @@ $('#resetPasswordBtn').onclick=async()=>{
 $('#authDlg').addEventListener('cancel',e=>e.preventDefault());
 
 async function bindUser(user){
-  currentUser=user; syncReady=false; applyingRemote=false;
-  clearTimeout(saveTimer); if(unsubscribeDoc){unsubscribeDoc();unsubscribeDoc=null;}
+  currentUser=user; syncReady=false; applyingRemote=false; localDirty=false; writeInFlight=false;
+  lastFirebaseSavedAt=null;
+  clearTimeout(saveTimer); saveTimer=null;
+  if(unsubscribeDoc){unsubscribeDoc();unsubscribeDoc=null;}
   state=loadLocal(); render();
   $('#accountEmail').textContent=user.email||'';
   remoteRef=doc(db,'users',user.uid,'calendar','main');
+  setSyncStatus('Firebase 최신 데이터 불러오는 중…','loading');
   try{
-    const snap=await getDoc(remoteRef);
-    if(snap.exists()){
-      applyingRemote=true; state=normalizeState(snap.data().state); saveLocal(); applyingRemote=false; render();
-    }else{
-      await setDoc(remoteRef,{state,updatedAt:serverTimestamp()},{merge:false});
+    let snap, serverFresh=true;
+    try{
+      snap=await getDocFromServer(remoteRef);
+    }catch(serverErr){
+      serverFresh=false;
+      console.warn('Firebase server read failed, falling back to available cache/local state.',serverErr);
+      try{ snap=await getDoc(remoteRef); }catch{ snap=null; }
     }
-    syncReady=true; $('#syncState').textContent='연결됨';
-    unsubscribeDoc=onSnapshot(remoteRef,snap2=>{
+    if(snap?.exists()){
+      applyingRemote=true;
+      state=normalizeState(snap.data().state);
+      lastFirebaseSavedAt=timestampToDate(snap.data().updatedAt) || null;
+      saveLocal();
+      applyingRemote=false;
+      render();
+      syncReady=serverFresh;
+      if(serverFresh){
+        setSyncStatus(`✓ Firebase 최신본 · ${lastFirebaseSavedAt?fmtDateTime(lastFirebaseSavedAt).split(' ')[1]:'확인됨'}`,'saved');
+      }else{
+        setSyncStatus('오프라인 · Firebase 캐시본 표시 중','offline');
+      }
+    }else if(snap && !snap.exists() && serverFresh){
+      syncReady=true;
+      await writeRemoteNow('save');
+    }else{
+      syncReady=false;
+      setSyncStatus('오프라인 · 기기 저장본 표시 중','offline');
+    }
+
+    unsubscribeDoc=onSnapshot(remoteRef,{includeMetadataChanges:true},snap2=>{
       if(!snap2.exists()) return;
-      const incoming=normalizeState(snap2.data().state);
-      applyingRemote=true; state=incoming; saveLocal(); render(); applyingRemote=false;
-      $('#syncState').textContent='연결됨';
-    },err=>{console.error(err);$('#syncState').textContent='동기화 오류';});
+      if(snap2.metadata.hasPendingWrites){
+        setSyncStatus('저장 중…','saving');
+        return;
+      }
+      const remoteTime=timestampToDate(snap2.data().updatedAt) || new Date();
+      lastFirebaseSavedAt=remoteTime;
+      syncReady=true;
+      if(!localDirty && !writeInFlight){
+        const incoming=normalizeState(snap2.data().state);
+        applyingRemote=true; state=incoming; saveLocal(); render(); applyingRemote=false;
+      }
+      setSyncStatus(`✓ Firebase 저장완료 · ${fmtDateTime(lastFirebaseSavedAt).split(' ')[1]}`,'saved');
+      updateSaveIndicators();
+    },err=>{console.error(err);syncReady=false;setSyncStatus('⚠ Firebase 동기화 오류','error');});
   }catch(err){
-    console.error(err); syncReady=false; $('#syncState').textContent='연결 실패';
+    console.error(err); syncReady=false; setSyncStatus('⚠ Firebase 연결 실패','error');
   }
 }
 onAuthStateChanged(auth,async user=>{
   if(user){
-    closeDialog($('#authDlg')); $('#authPassword').value=''; await bindUser(user);
+    closeDialog($('#authDlg')); $('#authPassword').value='';
+    $('#cloudLoading').classList.remove('hidden');
+    try{ await bindUser(user); } finally { $('#cloudLoading').classList.add('hidden'); }
   }else{
-    currentUser=null;syncReady=false;remoteRef=null;if(unsubscribeDoc){unsubscribeDoc();unsubscribeDoc=null;}
-    state=defaultState();render();authMessage('');openDialog($('#authDlg'));
+    currentUser=null;syncReady=false;remoteRef=null;lastFirebaseSavedAt=null;lastLocalSavedAt=null;localDirty=false;writeInFlight=false;
+    if(unsubscribeDoc){unsubscribeDoc();unsubscribeDoc=null;}
+    state=defaultState();render();authMessage('');setSyncStatus('로그인 필요','offline');openDialog($('#authDlg'));
   }
 });
+
+
+function downloadBackup(){
+  if(!currentUser) return;
+  const now=new Date();
+  const payload={
+    type:'my-calendar-backup',
+    appVersion:'1.12',
+    exportedAt:now.toISOString(),
+    accountEmail:currentUser.email||'',
+    state
+  };
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=`나만의캘린더_백업_${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+async function restoreBackupFile(file){
+  if(!file) return;
+  try{
+    const raw=JSON.parse(await file.text());
+    const candidate=raw?.state ?? raw?.data ?? raw;
+    if(!candidate || typeof candidate!=='object' || !Array.isArray(candidate.calendars) || !Array.isArray(candidate.events)) throw new Error('invalid backup');
+    const restored=normalizeState(candidate);
+    if(!confirm('이 백업으로 현재 캘린더 데이터를 덮어쓸까요? 현재 Firebase 데이터도 같은 내용으로 변경됩니다.')) return;
+    applyingRemote=true; state=restored; saveLocal(); render(); applyingRemote=false;
+    if(syncReady && remoteRef){
+      const ok=await writeRemoteNow('restore');
+      if(ok) alert('백업을 복원하고 Firebase에 저장했습니다.');
+      else alert('기기에는 복원했지만 Firebase 저장에 실패했습니다. 인터넷 연결을 확인하세요.');
+    }else{
+      localDirty=true;
+      alert('기기에는 복원했습니다. Firebase가 다시 연결되면 저장 상태를 확인하세요.');
+    }
+  }catch(err){
+    console.error(err); alert('올바른 나만의 캘린더 백업 파일이 아닙니다.');
+  }finally{
+    $('#restoreFile').value='';
+  }
+}
+$('#downloadBackupBtn').onclick=downloadBackup;
+$('#restoreBackupBtn').onclick=()=>$('#restoreFile').click();
+$('#restoreFile').onchange=e=>restoreBackupFile(e.target.files?.[0]);
 
 // Native dialog cancel/ESC never saves. Explicit cancel buttons above only close dialogs.
 ['eventDlg','calDlg','fixedDlg','diaryDlg','searchDlg','settingsDlg'].forEach(id=>{

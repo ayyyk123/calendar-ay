@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
-  <title>나만의 캘린더 v1.11</title>
+  <title>나만의 캘린더 v1.12</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="icon-180.png">
@@ -12,7 +12,8 @@
 </head>
 <body>
 <header>
-  <div class="brand"><b>나만의 캘린더</b><small> v1.11</small></div>
+  <div class="brand"><b>나만의 캘린더</b><small> v1.12</small></div>
+  <div id="saveBadge" class="saveBadge loading" title="Firebase 저장 상태"><span class="saveDot"></span><span id="saveBadgeText">Firebase 확인 중</span></div>
   <button id="sidebarToggle" class="mobileOnly" type="button" aria-label="메뉴">☰</button>
   <nav>
     <button id="prev" type="button">‹</button>
@@ -199,8 +200,19 @@
   <form id="settingsForm">
     <h3>설정</h3>
     <div class="settingsLine"><span>로그인</span><b id="accountEmail">-</b></div>
-    <div class="settingsLine"><span>Firebase</span><b id="syncState">연결 확인 중</b></div>
-    <p class="hint">Firebase 설정은 앱에 연결되어 있으며, 로그인한 계정별로 데이터를 분리해 저장합니다.</p>
+    <div class="settingsLine"><span>Firebase 상태</span><b id="syncState">연결 확인 중</b></div>
+    <div class="settingsLine"><span>최근 Firebase 저장</span><b id="lastFirebaseSave">-</b></div>
+    <div class="settingsLine"><span>최근 기기 저장</span><b id="lastLocalSave">-</b></div>
+    <p class="hint">온라인 상태에서는 로그인 직후 Firebase의 최신 저장본을 먼저 불러오고, 이후 변경사항을 자동 저장합니다.</p>
+    <div class="dataManage">
+      <b>데이터 백업</b>
+      <p class="hint">백업 파일에는 일정 데이터만 들어가며 비밀번호는 포함되지 않습니다.</p>
+      <div class="dataButtons">
+        <button type="button" id="downloadBackupBtn">백업 다운로드</button>
+        <button type="button" id="restoreBackupBtn">백업 불러오기</button>
+        <input id="restoreFile" type="file" accept="application/json,.json" hidden>
+      </div>
+    </div>
     <menu>
       <button type="button" id="logoutBtn" class="danger">로그아웃</button>
       <span></span>
@@ -208,6 +220,10 @@
     </menu>
   </form>
 </dialog>
+
+<div id="cloudLoading" class="cloudLoading hidden" aria-live="polite">
+  <div><span class="spinner"></span><b>Firebase 최신 데이터 불러오는 중…</b><small>저장된 최신 일정을 확인하고 있어요.</small></div>
+</div>
 
 <script type="module" src="app.js"></script>
 </body>
