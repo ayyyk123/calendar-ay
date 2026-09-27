@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
-  <title>캘린더 v1.22</title>
+  <title>캘린더 v1.23</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="icon-180.png">
@@ -12,7 +12,7 @@
 </head>
 <body>
 <header>
-  <div class="brand"><b>캘린더</b><small> v1.22</small></div>
+  <div class="brand"><b>캘린더</b><small> v1.23</small></div>
   <div id="saveBadge" class="saveBadge loading" title="Firebase 저장 상태"><span class="saveDot"></span><span id="saveBadgeText">Firebase 확인 중</span></div>
   <button id="manualSaveBtn" class="manualSaveBtn" type="button" title="현재 데이터를 Firebase에 즉시 저장"><span class="manualSaveFull">최신자료 저장</span><span class="manualSaveMobile">저장</span></button>
   <button id="sidebarToggle" class="mobileOnly" type="button" aria-label="메뉴">☰</button>
@@ -54,6 +54,9 @@
       <div id="ddayList"></div>
     </section>
   </aside>
+  <div id="sidebarResizer" class="sidebarResizer" title="드래그해서 좌측바 너비 조절 · 더블클릭하면 기본 너비">
+    <button id="sidebarCollapseBtn" type="button" aria-label="좌측바 접기" title="좌측바 접기">‹</button>
+  </div>
   <main id="main"></main>
 </div>
 

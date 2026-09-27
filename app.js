@@ -68,7 +68,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.22',
+  version: '1.23',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,parentId:''},
@@ -101,6 +101,82 @@ let holidayData = {};
 const HOLIDAY_URL = 'https://raw.githubusercontent.com/hyunbinseo/holidays-kr/main/public/basic.json';
 const HOLIDAY_CACHE_KEY = 'myCalendarHolidayKR:v1';
 const HOLIDAY_CACHE_MAX_AGE = 24 * 60 * 60 * 1000;
+const SIDEBAR_UI_KEY = 'calendarSidebarUI:v1';
+const SIDEBAR_DEFAULT_WIDTH = 260;
+const SIDEBAR_MIN_WIDTH = 210;
+const SIDEBAR_MAX_WIDTH = 520;
+let sidebarUI = { width: SIDEBAR_DEFAULT_WIDTH, collapsed: false };
+
+function loadSidebarUI(){
+  try{
+    const raw=JSON.parse(localStorage.getItem(SIDEBAR_UI_KEY)||'null');
+    if(raw && typeof raw==='object'){
+      sidebarUI.width=clamp(Number(raw.width)||SIDEBAR_DEFAULT_WIDTH,SIDEBAR_MIN_WIDTH,SIDEBAR_MAX_WIDTH);
+      sidebarUI.collapsed=!!raw.collapsed;
+    }
+  }catch{}
+}
+function saveSidebarUI(){
+  try{ localStorage.setItem(SIDEBAR_UI_KEY,JSON.stringify(sidebarUI)); }catch{}
+}
+function isMobileSidebar(){ return window.matchMedia('(max-width: 760px)').matches; }
+function applySidebarUI(){
+  const layout=$('.layout'), btn=$('#sidebarCollapseBtn');
+  if(!layout) return;
+  document.documentElement.style.setProperty('--sidebar-w',`${sidebarUI.width}px`);
+  const desktopCollapsed=!isMobileSidebar() && sidebarUI.collapsed;
+  layout.classList.toggle('sidebarCollapsed',desktopCollapsed);
+  if(btn){
+    btn.textContent=desktopCollapsed?'›':'‹';
+    btn.setAttribute('aria-label',desktopCollapsed?'좌측바 펴기':'좌측바 접기');
+    btn.title=desktopCollapsed?'좌측바 펴기':'좌측바 접기';
+  }
+}
+function setSidebarCollapsed(collapsed){
+  sidebarUI.collapsed=!!collapsed;
+  saveSidebarUI();
+  applySidebarUI();
+}
+function initSidebarResizer(){
+  loadSidebarUI();
+  applySidebarUI();
+  const resizer=$('#sidebarResizer'), collapseBtn=$('#sidebarCollapseBtn');
+  if(!resizer || !collapseBtn) return;
+  collapseBtn.addEventListener('click',e=>{
+    e.stopPropagation();
+    if(isMobileSidebar()) return;
+    setSidebarCollapsed(!sidebarUI.collapsed);
+  });
+  resizer.addEventListener('dblclick',e=>{
+    if(isMobileSidebar() || e.target.closest('button')) return;
+    sidebarUI.width=SIDEBAR_DEFAULT_WIDTH;
+    sidebarUI.collapsed=false;
+    saveSidebarUI(); applySidebarUI();
+  });
+  resizer.addEventListener('pointerdown',e=>{
+    if(isMobileSidebar() || e.button!==0 || e.target.closest('button') || sidebarUI.collapsed) return;
+    e.preventDefault();
+    const max=Math.min(SIDEBAR_MAX_WIDTH,Math.max(SIDEBAR_MIN_WIDTH,window.innerWidth*0.55));
+    document.body.classList.add('resizingSidebar');
+    resizer.setPointerCapture?.(e.pointerId);
+    const move=ev=>{
+      sidebarUI.width=clamp(ev.clientX,SIDEBAR_MIN_WIDTH,max);
+      document.documentElement.style.setProperty('--sidebar-w',`${sidebarUI.width}px`);
+    };
+    const up=ev=>{
+      resizer.removeEventListener('pointermove',move);
+      resizer.removeEventListener('pointerup',up);
+      resizer.removeEventListener('pointercancel',up);
+      document.body.classList.remove('resizingSidebar');
+      saveSidebarUI();
+      try{resizer.releasePointerCapture?.(ev.pointerId)}catch{}
+    };
+    resizer.addEventListener('pointermove',move);
+    resizer.addEventListener('pointerup',up);
+    resizer.addEventListener('pointercancel',up);
+  });
+  window.addEventListener('resize',applySidebarUI);
+}
 const FALLBACK_HOLIDAYS = {
   '2026-01-01':['1월 1일'],'2026-02-16':['설날 전날'],'2026-02-17':['설날'],'2026-02-18':['설날 다음 날'],'2026-03-01':['3ㆍ1절'],'2026-03-02':['대체공휴일(3ㆍ1절)'],'2026-05-01':['노동절'],'2026-05-05':['어린이날'],'2026-05-24':['부처님 오신 날'],'2026-05-25':['대체공휴일(부처님 오신 날)'],'2026-06-03':['전국동시지방선거'],'2026-06-06':['현충일'],'2026-07-17':['제헌절'],'2026-08-15':['광복절'],'2026-08-17':['대체공휴일(광복절)'],'2026-09-24':['추석 전날'],'2026-09-25':['추석'],'2026-09-26':['추석 다음 날'],'2026-10-03':['개천절'],'2026-10-05':['대체공휴일(개천절)'],'2026-10-09':['한글날'],'2026-12-25':['기독탄신일'],
   '2027-01-01':['1월 1일'],'2027-02-06':['설날 전날'],'2027-02-07':['설날'],'2027-02-08':['설날 다음 날'],'2027-02-09':['대체공휴일(설날)'],'2027-03-01':['3ㆍ1절'],'2027-05-01':['노동절'],'2027-05-03':['대체공휴일(노동절)'],'2027-05-05':['어린이날'],'2027-05-13':['부처님 오신 날'],'2027-06-06':['현충일'],'2027-07-17':['제헌절'],'2027-07-19':['대체공휴일(제헌절)'],'2027-08-15':['광복절'],'2027-08-16':['대체공휴일(광복절)'],'2027-09-14':['추석 전날'],'2027-09-15':['추석'],'2027-09-16':['추석 다음 날'],'2027-10-03':['개천절'],'2027-10-04':['대체공휴일(개천절)'],'2027-10-09':['한글날'],'2027-10-11':['대체공휴일(한글날)'],'2027-12-25':['기독탄신일'],'2027-12-27':['대체공휴일(기독탄신일)']
@@ -175,7 +251,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.22',
+    version: '1.23',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -1160,7 +1236,8 @@ $('#today').onclick=()=>{cursor=new Date();render();};
 $('#jumpDate').onchange=e=>{ if(e.target.value){cursor=parse(e.target.value);render();} };
 $$('.views [data-view]').forEach(b=>b.onclick=()=>{view=b.dataset.view; if(view==='list') calendarFocusId=null; render();});
 $('#sidebarToggle').onclick=()=>$('#sidebar').classList.toggle('open');
-$('#main').addEventListener('click',()=>$('#sidebar').classList.remove('open'));
+$('#main').addEventListener('click',()=>{ if(isMobileSidebar()) $('#sidebar').classList.remove('open'); });
+initSidebarResizer();
 
 $('#settingsBtn').onclick=()=>{ $('#accountEmail').textContent=currentUser?.email||'-'; updateSaveIndicators(); if(!syncReady) $('#syncState').textContent='연결 확인 중'; openDialog($('#settingsDlg')); };
 $('#closeSettings').onclick=()=>closeDialog($('#settingsDlg'));
@@ -1291,7 +1368,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'1.21',
+    appVersion:'1.23',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
