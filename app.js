@@ -68,7 +68,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.25',
+  version: '1.26',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,parentId:''},
@@ -251,7 +251,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.25',
+    version: '1.26',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -632,6 +632,28 @@ function monthlyRepeatLabel(e){
   }
   return `${lead} ${body}${repeatEndText(r)}`;
 }
+function repeatRuleLabel(e){
+  const repeat=e.repeat||'none';
+  const r=normalizedRule(e);
+  if(repeat==='none') return '반복 없음';
+  if(repeat==='daily'){
+    const lead=r.interval>1?`${r.interval}일마다`:'매일';
+    return `${lead}${repeatEndText(r)}`;
+  }
+  if(repeat==='weekly'){
+    const lead=r.interval>1?`${r.interval}주마다`:'매주';
+    const order=[1,2,3,4,5,6,0];
+    const days=order.filter(d=>(r.weekdays||[]).includes(d)).map(d=>weekdayName(d).replace('요일','')).join('·') || weekdayName(parse(e.date).getDay()).replace('요일','');
+    return `${lead} ${days}요일${repeatEndText(r)}`;
+  }
+  if(repeat==='monthly') return monthlyRepeatLabel(e);
+  if(repeat==='yearly'){
+    const lead=r.interval>1?`${r.interval}년마다`:'매년';
+    return `${lead} ${r.yearlyMonth}월 ${r.yearlyDay}일${repeatEndText(r)}`;
+  }
+  return repeat;
+}
+
 function kindPrefix(e){
   if(e.kind==='todo') return '☐ ';
   if(e.kind==='habit') return '◇ ';
@@ -758,15 +780,15 @@ function renderFixed(){
   const f=selectedFixedFilter||'all';
   const month=`${cursor.getFullYear()}-${pad(cursor.getMonth()+1)}`;
   const allowed=f==='all'?null:new Set([f,...descendants(f).map(c=>c.id)]);
-  const recurring=state.events.filter(e=>e.repeat==='monthly' && (!allowed||allowed.has(e.calId)));
+  const recurring=state.events.filter(e=>(e.repeat||'none')!=='none' && (!allowed||allowed.has(e.calId)));
   const manual=state.fixed.filter(x=>!allowed||allowed.has(x.calId));
   const collapsed=state.settings.fixedPanelsCollapsed||{recurring:false,manual:false};
 
   const recurringRows=recurring.map(e=>{
-    const c=cal(e.calId), rule=monthlyRepeatLabel(e);
+    const c=cal(e.calId), rule=repeatRuleLabel(e);
     const kindLabel={event:'일정',todo:'할 일',habit:'습관/루틴',anniversary:'기념일/D-Day'}[e.kind]||'일정';
     return `<div class="fixed recurringFixed" data-eid="${esc(e.id)}" style="border-left-color:${esc(c.color)}" title="${esc(`${calendarPath(c.id)} · ${rule} · ${durationLabel(e)}`)}"><b>${esc(e.title)}</b><small>${esc(calendarPath(c.id))} · ${esc(kindLabel)} · ${esc(rule)} · ${esc(durationLabel(e))}</small></div>`;
-  }).join('') || `<div class="empty compactEmpty">매월 자동반복 일정이 없습니다.</div>`;
+  }).join('') || `<div class="empty compactEmpty">자동반복 일정이 없습니다.</div>`;
 
   const manualRows=manual.map(x=>{
     const c=cal(x.calId);
@@ -788,7 +810,7 @@ function renderFixed(){
 
   $('#fixedList').innerHTML=`
     <div class="fixedGroup">
-      <button type="button" class="fixedGroupHead" data-fixed-toggle="recurring" aria-expanded="${collapsed.recurring?'false':'true'}"><span>매월 자동반복 <em>달력에 이미 배치</em></span><span class="fixedGroupMeta">${recurring.length}건 ${collapsed.recurring?'▸':'▾'}</span></button>
+      <button type="button" class="fixedGroupHead" data-fixed-toggle="recurring" aria-expanded="${collapsed.recurring?'false':'true'}"><span>자동반복 <em>달력에 자동 배치</em></span><span class="fixedGroupMeta">${recurring.length}건 ${collapsed.recurring?'▸':'▾'}</span></button>
       <div class="fixedGroupBody ${collapsed.recurring?'collapsed':''}" data-fixed-panel="recurring">${recurringRows}</div>
     </div>
     <div class="fixedGroup">
@@ -1056,14 +1078,14 @@ function setRepeatRule(e){
 }
 function openEvent(date,id,options={}){
   const e=state.events.find(x=>x.id===id);
-  const monthlyPreset=!e && options?.preset==='monthlyRecurring';
+  const recurringPreset=!e && options?.preset==='autoRecurring';
   activeEventOccurrence=e?(date||e.date):(date||ds(cursor));
-  $('#eventTitle').textContent=e?'일정 수정':(monthlyPreset?'매월 자동반복 업무 추가':'일정 등록');
+  $('#eventTitle').textContent=e?'일정 수정':(recurringPreset?'자동반복 업무 추가':'일정 등록');
   $('#eid').value=e?.id||''; $('#title').value=e?.title||''; $('#cal').value=e?.calId||cals()[0]?.id||'';
   $('#date').value=e?.date||date||ds(cursor); $('#endDate').value=e?.endDate||e?.date||date||ds(cursor);
   $('#allDay').checked=e?.allDay??true; $('#start').value=e?.start||''; $('#end').value=e?.end||''; setDurationInputs(e?.hours??1); $('#noDuration').checked=!!e?.noDuration; updateDurationUI();
-  $('#kind').value=e?.kind||(monthlyPreset?'todo':'event'); $('#place').value=e?.place||''; $('#repeat').value=e?.repeat||(monthlyPreset?'monthly':'none'); $('#memo').value=e?.memo||'';
-  $('#repeat').disabled=monthlyPreset;
+  $('#kind').value=e?.kind||(recurringPreset?'todo':'event'); $('#place').value=e?.place||''; $('#repeat').value=e?.repeat||(recurringPreset?'weekly':'none'); $('#memo').value=e?.memo||'';
+  $('#repeat').disabled=false;
   $('#deleteEvent').style.visibility=e?'visible':'hidden'; $('#copyEvent').style.visibility=e?'visible':'hidden';
   const occurrenceView=e?{...e,_occurrenceStart:activeEventOccurrence}:null;
   $('#carryEvent').classList.toggle('hidden',!e || e.kind==='anniversary' || (occurrenceView&&isDone(occurrenceView)));
@@ -1247,7 +1269,7 @@ $('#checkAllCals').onclick=()=>{ state.settings.hiddenCalendars=[]; save(); };
 $('#uncheckAllCals').onclick=()=>{ state.settings.hiddenCalendars=state.calendars.map(c=>c.id); save(); };
 $('#addCal').onclick=()=>openCal();
 $('#addFixed').onclick=e=>{ e.stopPropagation(); setFixedAddMenu(); };
-$('#addRecurringFixed').onclick=e=>{ e.stopPropagation(); setFixedAddMenu(false); openEvent(ds(cursor),null,{preset:'monthlyRecurring'}); };
+$('#addRecurringFixed').onclick=e=>{ e.stopPropagation(); setFixedAddMenu(false); openEvent(ds(cursor),null,{preset:'autoRecurring'}); };
 $('#addManualFixed').onclick=e=>{ e.stopPropagation(); setFixedAddMenu(false); openFixed(); };
 $('#fixedAddMenu').onclick=e=>e.stopPropagation();
 document.addEventListener('click',e=>{ if(!e.target.closest('.fixedAddWrap')) setFixedAddMenu(false); });
@@ -1391,7 +1413,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'1.25',
+    appVersion:'1.26',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
