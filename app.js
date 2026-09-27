@@ -68,7 +68,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.30',
+  version: '1.34',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,parentId:''},
@@ -76,8 +76,9 @@ const defaultState = () => ({
   ],
   events: [],
   fixed: [],
+  flexible: [],
   diary: {},
-  settings: { hiddenCalendars: [], fixedPanelsCollapsed: { recurring:false, manual:false, payment:false } }
+  settings: { hiddenCalendars: [], fixedPanelsCollapsed: { recurring:false, manual:false, flexible:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, manual:{}, flexible:{}, payment:{} } }
 });
 
 let state = defaultState();
@@ -90,6 +91,8 @@ let syncReady = false;
 let applyingRemote = false;
 let saveTimer = null;
 let selectedFixedFilter = 'all';
+let selectedFlexibleFilter = 'all';
+let selectedPaymentFilter = 'all';
 let calendarFocusId = null;
 let activeDrag = null;
 let activeEventOccurrence = null;
@@ -251,7 +254,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.30',
+    version: '1.34',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -276,13 +279,21 @@ function normalizeState(raw){
       })):[]
     })) : [],
     fixed: Array.isArray(s.fixed) ? s.fixed.filter(f=>f && f.id && f.name).map(f=>({...f,hours:Number(f.hours)||0,noDuration:!!f.noDuration})) : [],
+    flexible: Array.isArray(s.flexible) ? s.flexible.filter(f=>f && f.id && f.name).map(f=>({...f,hours:Number(f.hours)||0,noDuration:!!f.noDuration})) : [],
     diary: s.diary && typeof s.diary === 'object' ? s.diary : {},
     settings: {
       hiddenCalendars: Array.isArray(s.settings?.hiddenCalendars) ? s.settings.hiddenCalendars : [],
       fixedPanelsCollapsed: {
         recurring: !!s.settings?.fixedPanelsCollapsed?.recurring,
         manual: !!s.settings?.fixedPanelsCollapsed?.manual,
+        flexible: !!s.settings?.fixedPanelsCollapsed?.flexible,
         payment: !!s.settings?.fixedPanelsCollapsed?.payment
+      },
+      sidebarCalendarGroupsCollapsed: {
+        recurring: (s.settings?.sidebarCalendarGroupsCollapsed?.recurring && typeof s.settings.sidebarCalendarGroupsCollapsed.recurring==='object') ? {...s.settings.sidebarCalendarGroupsCollapsed.recurring} : {},
+        manual: (s.settings?.sidebarCalendarGroupsCollapsed?.manual && typeof s.settings.sidebarCalendarGroupsCollapsed.manual==='object') ? {...s.settings.sidebarCalendarGroupsCollapsed.manual} : {},
+        flexible: (s.settings?.sidebarCalendarGroupsCollapsed?.flexible && typeof s.settings.sidebarCalendarGroupsCollapsed.flexible==='object') ? {...s.settings.sidebarCalendarGroupsCollapsed.flexible} : {},
+        payment: (s.settings?.sidebarCalendarGroupsCollapsed?.payment && typeof s.settings.sidebarCalendarGroupsCollapsed.payment==='object') ? {...s.settings.sidebarCalendarGroupsCollapsed.payment} : {}
       }
     }
   };
@@ -697,10 +708,15 @@ function eventItemHtml(e, compact=false){
   const doneLabel=done?'☑':'☐';
   const checkTitle=payment?(done?'납부완료 취소':'납부완료 체크'):(done?'완료 취소':'완료 체크');
   const dragHandle=drag==='true'?`<span class="dragHandle" title="드래그해서 날짜 이동" aria-hidden="true">⋮⋮</span>`:'';
-  return `<div class="item ${done?'done':''} ${recurring?'recurringItem':''} ${payment?'paymentItem':''} ${inLabel?'carriedIn':''} ${outRecord?'carriedOut':''}" draggable="${drag}" data-eid="${esc(e.id)}" data-occurrence="${esc(e._occurrenceStart||e.date)}" style="border-left-color:${esc(c.color)}">
+  return `<div class="item ${done?'done':''} ${recurring?'recurringItem':''} ${payment?'paymentItem':''} ${e.fixedId?'manualPlacedItem':''} ${e.flexibleId?'flexiblePlacedItem':''} ${inLabel?'carriedIn':''} ${outRecord?'carriedOut':''}" draggable="${drag}" data-eid="${esc(e.id)}" data-occurrence="${esc(e._occurrenceStart||e.date)}" style="border-left-color:${esc(c.color)}">
     <div class="itemRow">${dragHandle}${checkable?`<button type="button" class="todoCheck" data-action="toggle" aria-label="${payment?'납부완료':'완료'} 전환" title="${checkTitle}">${doneLabel}</button>`:''}<div class="itemTitle">${payment?'₩ ':(!checkable?kindPrefix(e):'')}${esc(e.title)}${repeatShort(e)?` <span class="repeatMark">${repeatShort(e)}</span>`:''}${badges}</div></div>
     ${compact?'':`<div class="meta">${meta.join(' · ')}</div>`}
   </div>`;
+}
+function paymentLaneHtml(es, compact=false){
+  const payments=(es||[]).filter(e=>e.kind==='payment');
+  if(!payments.length) return '';
+  return `<div class="paymentLane ${compact?'compactPaymentLane':''}"><div class="paymentLaneHead"><span>₩ 납부</span><small>${payments.length}건</small></div><div class="paymentLaneItems">${payments.map(e=>eventItemHtml(e,compact)).join('')}</div></div>`;
 }
 function capacityText(sum, cap){
   const n=Number(cap)||0;
@@ -708,6 +724,8 @@ function capacityText(sum, cap){
   return `<span class="${sum>n?'over':'ok'}">${fmtH(sum)} / ${fmtH(n)}</span>`;
 }
 function groupHtml(date, es){
+  const paymentHtml=paymentLaneHtml(es,false);
+  const workEvents=(es||[]).filter(e=>e.kind!=='payment');
   let html='';
   const visible=visibleCals(), visibleIds=new Set(visible.map(c=>c.id));
   let total=0, totalCapacity=0;
@@ -715,7 +733,7 @@ function groupHtml(date, es){
     const members=[root,...descendants(root.id)].filter(c=>visibleIds.has(c.id));
     if(!members.length) continue;
     const memberIds=new Set(members.map(c=>c.id));
-    const groupEvents=es.filter(e=>memberIds.has(e.calId));
+    const groupEvents=workEvents.filter(e=>memberIds.has(e.calId));
     if(!groupEvents.length) continue;
     const rootSum=groupEvents.reduce((sum,e)=>sum+duration(e),0);
     total+=rootSum;
@@ -733,7 +751,7 @@ function groupHtml(date, es){
     html += `</div>`;
   }
   const overallOver=totalCapacity>0 && total>totalCapacity;
-  return html + `<div class="dayTotal ${overallOver?'overallOver':''}">총 계획 ${fmtH(total)}${totalCapacity?` / 캘린더 가용 ${fmtH(totalCapacity)}`:''}</div>`;
+  return paymentHtml + html + `<div class="dayTotal ${overallOver?'overallOver':''}">총 계획 ${fmtH(total)}${totalCapacity?` / 캘린더 가용 ${fmtH(totalCapacity)}`:''}</div>`;
 }
 
 function calendarOptionsHtml(){
@@ -743,12 +761,19 @@ function calendarOptionsHtml(){
   }).join('');
 }
 function syncSelects(){
-  const fixedPrev = selectedFixedFilter;
+  const fixedPrev = selectedFixedFilter, flexiblePrev=selectedFlexibleFilter, paymentPrev=selectedPaymentFilter;
   const opts=calendarOptionsHtml();
   $('#cal').innerHTML=opts; $('#fcal').innerHTML=opts;
+  if($('#flexcal')) $('#flexcal').innerHTML=opts;
   $('#fixedFilter').innerHTML=`<option value="all">전체 캘린더</option>${opts}`;
+  $('#flexibleFilter').innerHTML=`<option value="all">전체 캘린더</option>${opts}`;
+  $('#paymentFilter').innerHTML=`<option value="all">전체 캘린더</option>${opts}`;
   if([...$('#fixedFilter').options].some(o=>o.value===fixedPrev)) $('#fixedFilter').value=fixedPrev;
   else { selectedFixedFilter='all'; $('#fixedFilter').value='all'; }
+  if([...$('#flexibleFilter').options].some(o=>o.value===flexiblePrev)) $('#flexibleFilter').value=flexiblePrev;
+  else { selectedFlexibleFilter='all'; $('#flexibleFilter').value='all'; }
+  if([...$('#paymentFilter').options].some(o=>o.value===paymentPrev)) $('#paymentFilter').value=paymentPrev;
+  else { selectedPaymentFilter='all'; $('#paymentFilter').value='all'; }
 }
 function renderSide(){
   syncSelects();
@@ -791,7 +816,7 @@ function renderSide(){
     };
     row.querySelector('.calEdit').onclick=e=>{ e.stopPropagation(); openCal(row.dataset.cid); };
   });
-  renderFixed(); renderPayments(); renderLoad(); renderDdays();
+  renderFixed(); renderFlexible(); renderPayments(); renderLoad(); renderDdays();
 }
 function currentMonthRange(){
   const start=new Date(cursor.getFullYear(),cursor.getMonth(),1);
@@ -817,6 +842,52 @@ function manualMonthProgress(placed){
   return {label:placed.length>1?`이번 달 ${done}/${placed.length} 완료`:'이번 달 미완료',complete:false};
 }
 
+function sidebarCalendarCollapseMap(section){
+  state.settings.sidebarCalendarGroupsCollapsed=state.settings.sidebarCalendarGroupsCollapsed||{recurring:{},manual:{},flexible:{},payment:{}};
+  state.settings.sidebarCalendarGroupsCollapsed[section]=state.settings.sidebarCalendarGroupsCollapsed[section]||{};
+  return state.settings.sidebarCalendarGroupsCollapsed[section];
+}
+function sidebarCalendarGroupHtml(section,c,bodyHtml,count){
+  const collapsed=!!sidebarCalendarCollapseMap(section)[c.id];
+  const path=calendarPath(c.id);
+  return `<div class="sidebarCalGroup ${collapsed?'collapsed':''}" style="--group-color:${esc(c.color)}">
+    <button type="button" class="sidebarCalGroupHead" data-sidebar-cal-toggle="${esc(section)}" data-cal-id="${esc(c.id)}" aria-expanded="${collapsed?'false':'true'}" title="${esc(path)} 접기/펴기">
+      <span class="sidebarCalGroupTitle"><i class="dot" style="background:${esc(c.color)}"></i><span>${esc(path)}</span></span>
+      <span class="sidebarCalGroupMeta">${count}건 ${collapsed?'▸':'▾'}</span>
+    </button>
+    <div class="sidebarCalGroupBody">${bodyHtml}</div>
+  </div>`;
+}
+function bindSidebarCalendarGroupToggles(scope=document){
+  scope.querySelectorAll('[data-sidebar-cal-toggle]').forEach(btn=>btn.onclick=()=>{
+    const section=btn.dataset.sidebarCalToggle, calId=btn.dataset.calId;
+    const map=sidebarCalendarCollapseMap(section);
+    map[calId]=!map[calId];
+    save();
+  });
+}
+function groupedCalendarHtml(section,items,rowBuilder,emptyText){
+  if(!items.length) return `<div class="empty compactEmpty">${esc(emptyText)}</div>`;
+  const byCal=new Map();
+  for(const item of items){
+    const id=item.calId||'';
+    if(!byCal.has(id)) byCal.set(id,[]);
+    byCal.get(id).push(item);
+  }
+  const groups=[];
+  for(const c of cals()){
+    const xs=byCal.get(c.id); if(!xs?.length) continue;
+    groups.push(sidebarCalendarGroupHtml(section,c,xs.map(rowBuilder).join(''),xs.length));
+    byCal.delete(c.id);
+  }
+  // 삭제된 캘린더를 가리키는 오래된 데이터가 있어도 목록에서 유실되지 않도록 처리합니다.
+  for(const [id,xs] of byCal){
+    const c=cal(id);
+    groups.push(sidebarCalendarGroupHtml(section,c,xs.map(rowBuilder).join(''),xs.length));
+  }
+  return groups.join('');
+}
+
 function renderFixed(){
   const f=selectedFixedFilter||'all';
   const month=`${cursor.getFullYear()}-${pad(cursor.getMonth()+1)}`;
@@ -825,14 +896,14 @@ function renderFixed(){
   const manual=state.fixed.filter(x=>!allowed||allowed.has(x.calId));
   const collapsed=state.settings.fixedPanelsCollapsed||{recurring:false,manual:false};
 
-  const recurringRows=recurring.map(e=>{
+  const recurringRows=groupedCalendarHtml('recurring',recurring,e=>{
     const c=cal(e.calId), rule=repeatRuleLabel(e);
     const kindLabel={event:'일정',todo:'할 일',habit:'습관/루틴',anniversary:'기념일/D-Day',payment:'납부일정'}[e.kind]||'일정';
     const progress=e.kind==='anniversary'?{label:'완료체크 대상 아님',complete:false}:recurringMonthProgress(e);
-    return `<div class="fixed recurringFixed ${progress.complete?'monthComplete':'monthPending'}" data-eid="${esc(e.id)}" style="border-left-color:${esc(c.color)}" title="${esc(`${calendarPath(c.id)} · ${rule} · ${durationLabel(e)} · ${progress.label}`)}"><b>${esc(e.title)}</b><small>${esc(calendarPath(c.id))} · ${esc(kindLabel)} · ${esc(rule)} · ${esc(durationLabel(e))}</small><span class="monthProgress ${progress.complete?'complete':''}">${esc(progress.label)}</span></div>`;
-  }).join('') || `<div class="empty compactEmpty">자동반복 일정이 없습니다.</div>`;
+    return `<div class="fixed recurringFixed ${progress.complete?'monthComplete':'monthPending'}" data-eid="${esc(e.id)}" style="border-left-color:${esc(c.color)}" title="${esc(`${calendarPath(c.id)} · ${rule} · ${durationLabel(e)} · ${progress.label}`)}"><b>${esc(e.title)}</b><small>${esc(kindLabel)} · ${esc(rule)} · ${esc(durationLabel(e))}</small><span class="monthProgress ${progress.complete?'complete':''}">${esc(progress.label)}</span></div>`;
+  },'자동반복 일정이 없습니다.');
 
-  const manualRows=manual.map(x=>{
+  const manualRows=groupedCalendarHtml('manual',manual,x=>{
     const c=cal(x.calId);
     const placed=state.events
       .filter(e=>e.fixedId===x.id && (e.date||'').startsWith(month))
@@ -848,8 +919,8 @@ function renderFixed(){
     const usedText=used?` · 배치완료 ${placedLabel}`:'';
     const progress=manualMonthProgress(placed);
     const tip=used?`배치완료: ${placedLabel}에 배치됨 · ${progress.label}. 달력에서 해당 배치 일정을 삭제하면 다시 활성화됩니다.`:'원하는 날짜로 드래그하세요.';
-    return `<div class="fixed manualFixed ${used?'used disabledFixed':''} ${progress.complete?'monthComplete':'monthPending'}" draggable="${used?'false':'true'}" aria-disabled="${used?'true':'false'}" data-used="${used?'1':'0'}" data-fid="${esc(x.id)}" style="border-left-color:${esc(c.color)}" title="${esc(tip)}"><b>${used?'✓ 배치완료 · ':''}${esc(x.name)}</b><small>${esc(calendarPath(c.id))} · ${esc(durationLabel(x))}${esc(usedText)}</small><span class="monthProgress ${progress.complete?'complete':''}">${esc(progress.label)}</span></div>`;
-  }).join('') || `<div class="empty compactEmpty">날짜 지정 업무를 등록하세요.</div>`;
+    return `<div class="fixed manualFixed ${used?'used disabledFixed':''} ${progress.complete?'monthComplete':'monthPending'}" draggable="${used?'false':'true'}" aria-disabled="${used?'true':'false'}" data-used="${used?'1':'0'}" data-fid="${esc(x.id)}" style="border-left-color:${esc(c.color)}" title="${esc(tip)}"><b>${used?'✓ 배치완료 · ':''}${esc(x.name)}</b><small>${esc(durationLabel(x))}${esc(usedText)}</small><span class="monthProgress ${progress.complete?'complete':''}">${esc(progress.label)}</span></div>`;
+  },'날짜 지정 업무를 등록하세요.');
 
   $('#fixedList').innerHTML=`
     <div class="fixedGroup">
@@ -881,14 +952,56 @@ function renderFixed(){
     state.settings.fixedPanelsCollapsed[key]=!state.settings.fixedPanelsCollapsed[key];
     save();
   });
+  bindSidebarCalendarGroupToggles($('#fixedList'));
+}
+
+function flexHistoryDates(item){
+  return [...new Set(state.events
+    .filter(e=>e.flexibleId===item.id && isDone(e))
+    .map(e=>e.date)
+    .filter(Boolean))]
+    .sort();
+}
+function shortDateKo(date){
+  const d=parse(date), names=['일','월','화','수','목','금','토'];
+  return `${d.getMonth()+1}/${d.getDate()}(${names[d.getDay()]})`;
+}
+function renderFlexible(){
+  const box=$('#flexibleList'); if(!box) return;
+  const f=selectedFlexibleFilter||'all';
+  const allowed=f==='all'?null:new Set([f,...descendants(f).map(c=>c.id)]);
+  const items=(state.flexible||[]).filter(x=>!allowed||allowed.has(x.calId));
+  const collapsed=!!state.settings?.fixedPanelsCollapsed?.flexible;
+  const rows=groupedCalendarHtml('flexible',items,x=>{
+    const c=cal(x.calId), dates=flexHistoryDates(x);
+    const history=dates.length?dates.map(shortDateKo).join(' · '):'아직 완료기록 없음';
+    const tip=dates.length?`완료기록: ${dates.join(', ')}`:'원하는 날짜로 드래그하세요. 완료 체크한 날짜가 여기에 누적됩니다.';
+    return `<div class="fixed flexibleFixed" draggable="true" data-flexid="${esc(x.id)}" style="border-left-color:${esc(c.color)}" title="${esc(tip)}"><b>${esc(x.name)}</b><small>${esc(durationLabel(x))}</small><span class="flexHistory">${dates.length?`완료기록 ${esc(history)}`:esc(history)}</span></div>`;
+  },'시간날때 할 업무를 등록하세요.');
+  box.innerHTML=`<div class="flexiblePanel ${collapsed?'collapsed':''}">${rows}</div>`;
+  box.classList.toggle('collapsed',collapsed);
+  const toggle=$('#toggleFlexible'); if(toggle){ toggle.textContent=collapsed?'▸':'▾'; toggle.title=collapsed?'시간날때 업무 펴기':'시간날때 업무 접기'; }
+  $$('.flexibleFixed').forEach(x=>{
+    x.ondragstart=e=>{
+      activeDrag={type:'flexible',id:x.dataset.flexid}; x.classList.add('dragging'); e.dataTransfer.effectAllowed='copy';
+      try{e.dataTransfer.setData('application/x-calendar-flexible',x.dataset.flexid)}catch(_e){}
+      e.dataTransfer.setData('text/plain',`calendar-flexible:${x.dataset.flexid}`);
+    };
+    x.ondragend=()=>{ activeDrag=null; x.classList.remove('dragging'); $$('.dropReady').forEach(el=>el.classList.remove('dropReady')); };
+    x.ondblclick=()=>openFlexible(x.dataset.flexid);
+  });
+  bindSidebarCalendarGroupToggles(box);
 }
 
 function renderPayments(){
   const box=$('#paymentList'); if(!box) return;
   const {startKey,endKey}=currentMonthRange();
-  const payments=state.events.filter(e=>e.kind==='payment').sort((a,b)=>String(a.title).localeCompare(String(b.title),'ko'));
+  const pf=selectedPaymentFilter||'all';
+  const allowed=pf==='all'?null:new Set([pf,...descendants(pf).map(c=>c.id)]);
+  const payments=state.events.filter(e=>e.kind==='payment' && (!allowed||allowed.has(e.calId))).sort((a,b)=>String(a.title).localeCompare(String(b.title),'ko'));
   const collapsed=!!state.settings?.fixedPanelsCollapsed?.payment;
-  const rows=[];
+  const byCal=new Map();
+  const push=(calId,html)=>{ if(!byCal.has(calId)) byCal.set(calId,[]); byCal.get(calId).push(html); };
   for(const e of payments){
     const starts=generateOccurrenceStarts(e,startKey,endKey)
       .map(ds)
@@ -900,21 +1013,30 @@ function renderPayments(){
         const c=cal(e.calId);
         const amount=Number(e.paymentAmount)>0?`₩${Number(e.paymentAmount).toLocaleString('ko-KR')}`:'금액 미입력';
         const method=e.paymentMethod?` · ${esc(e.paymentMethod)}`:'';
-        rows.push(`<div class="paymentRow ${done?'paid':''}" data-eid="${esc(e.id)}" data-occ="${esc(occ)}" style="border-left-color:${esc(c.color)}"><button type="button" class="paymentCheck" title="${done?'납부완료 취소':'납부완료 체크'}">${done?'☑':'☐'}</button><button type="button" class="paymentOpen"><b>${esc(e.title)}</b><small>${esc(occ)} · ${amount}${method}${(e.repeat||'none')!=='none'?` · ${esc(repeatRuleLabel(e))}`:''}</small></button></div>`);
+        push(e.calId,`<div class="paymentRow ${done?'paid':''}" data-eid="${esc(e.id)}" data-occ="${esc(occ)}" style="border-left-color:${esc(c.color)}"><button type="button" class="paymentCheck" title="${done?'납부완료 취소':'납부완료 체크'}">${done?'☑':'☐'}</button><button type="button" class="paymentOpen"><b>${esc(e.title)}</b><small>${esc(occ)} · ${amount}${method}${(e.repeat||'none')!=='none'?` · ${esc(repeatRuleLabel(e))}`:''}</small></button></div>`);
       }
     }else{
       const next=nextOccurrenceFor(e,ds(new Date()),740);
       const c=cal(e.calId);
-      rows.push(`<div class="paymentRow paymentNoMonth" data-eid="${esc(e.id)}" data-occ="${esc(next||e.date)}" style="border-left-color:${esc(c.color)}"><span class="paymentCheck muted">·</span><button type="button" class="paymentOpen"><b>${esc(e.title)}</b><small>이번 달 해당 없음${next?` · 다음 ${esc(next)}`:''} · ${esc(repeatRuleLabel(e))}</small></button></div>`);
+      push(e.calId,`<div class="paymentRow paymentNoMonth" data-eid="${esc(e.id)}" data-occ="${esc(next||e.date)}" style="border-left-color:${esc(c.color)}"><span class="paymentCheck muted">·</span><button type="button" class="paymentOpen"><b>${esc(e.title)}</b><small>이번 달 해당 없음${next?` · 다음 ${esc(next)}`:''} · ${esc(repeatRuleLabel(e))}</small></button></div>`);
     }
   }
-  box.innerHTML=`<div class="paymentPanel ${collapsed?'collapsed':''}">${rows.join('')||'<div class="empty compactEmpty">등록된 납부일정이 없습니다.</div>'}</div>`;
+  const groups=[];
+  for(const c of cals()){
+    const rows=byCal.get(c.id); if(!rows?.length) continue;
+    groups.push(sidebarCalendarGroupHtml('payment',c,rows.join(''),rows.length));
+    byCal.delete(c.id);
+  }
+  for(const [id,rows] of byCal){ groups.push(sidebarCalendarGroupHtml('payment',cal(id),rows.join(''),rows.length)); }
+  const html=groups.join('')||'<div class="empty compactEmpty">등록된 납부일정이 없습니다.</div>';
+  box.innerHTML=`<div class="paymentPanel ${collapsed?'collapsed':''}">${html}</div>`;
   box.classList.toggle('collapsed',collapsed);
   const toggle=$('#togglePayment'); if(toggle){ toggle.textContent=collapsed?'▸':'▾'; toggle.title=collapsed?'납부일정 펼치기':'납부일정 접기'; }
   $$('.paymentRow').forEach(row=>{
     row.querySelector('.paymentCheck')?.addEventListener('click',ev=>{ ev.stopPropagation(); if(row.classList.contains('paymentNoMonth')) return; toggleDone(row.dataset.eid,row.dataset.occ); });
     row.querySelector('.paymentOpen')?.addEventListener('click',()=>openEvent(row.dataset.occ,row.dataset.eid));
   });
+  bindSidebarCalendarGroupToggles(box);
 }
 
 function renderLoad(){
@@ -959,9 +1081,11 @@ function readDragPayload(dt){
   if(activeDrag) return activeDrag;
   try{
     const fixed=dt.getData('application/x-calendar-fixed'); if(fixed) return {type:'fixed',id:fixed};
+    const flexible=dt.getData('application/x-calendar-flexible'); if(flexible) return {type:'flexible',id:flexible};
     const event=dt.getData('application/x-calendar-event'); if(event){ try{ const p=JSON.parse(event); if(p?.id) return {type:'event',id:p.id,occurrence:p.occurrence||''}; }catch(_e){ return {type:'event',id:event}; } }
     const plain=dt.getData('text/plain')||'';
     if(plain.startsWith('calendar-fixed:')) return {type:'fixed',id:plain.slice('calendar-fixed:'.length)};
+    if(plain.startsWith('calendar-flexible:')) return {type:'flexible',id:plain.slice('calendar-flexible:'.length)};
     if(plain.startsWith('calendar-event:')){ const rest=plain.slice('calendar-event:'.length); const idx=rest.indexOf(':'); return idx>=0?{type:'event',id:rest.slice(0,idx),occurrence:rest.slice(idx+1)}:{type:'event',id:rest}; }
   }catch(_e){}
   return null;
@@ -970,8 +1094,8 @@ function bindItems(){
   $$('.item').forEach(item=>{
     item.onclick=e=>{
       const id=item.dataset.eid, occ=item.dataset.occurrence;
-      if(e.target.closest('[data-action="toggle"]')){ e.stopPropagation(); toggleDone(id,occ); return; }
-      e.stopPropagation(); openEvent(occ,id);
+      if(e.target.closest('[data-action="toggle"]')){ e.stopPropagation(); if($('#dayListDlg')?.open) closeDialog($('#dayListDlg')); toggleDone(id,occ); return; }
+      e.stopPropagation(); if($('#dayListDlg')?.open) closeDialog($('#dayListDlg')); openEvent(occ,id);
     };
     if(item.draggable){
       item.ondragstart=e=>{
@@ -989,7 +1113,7 @@ function bindItems(){
     x.ondragover=e=>{
       e.preventDefault();
       const payload=activeDrag||readDragPayload(e.dataTransfer);
-      e.dataTransfer.dropEffect=payload?.type==='fixed'?'copy':'move';
+      e.dataTransfer.dropEffect=(payload?.type==='fixed'||payload?.type==='flexible')?'copy':'move';
       x.classList.add('dropReady');
     };
     x.ondragleave=e=>{ if(!x.contains(e.relatedTarget)) x.classList.remove('dropReady'); };
@@ -1005,9 +1129,18 @@ function bindItems(){
         }
         return;
       }
+      if(payload.type==='flexible'){
+        const f=(state.flexible||[]).find(z=>z.id===payload.id);
+        if(f){
+          state.events.push({id:uid(),title:f.name,calId:f.calId,date:x.dataset.dropdate,endDate:x.dataset.dropdate,allDay:true,start:'',end:'',hours:f.hours,noDuration:!!f.noDuration,kind:'todo',place:'',repeat:'none',repeatRule:null,memo:f.memo||'',flexibleId:f.id,done:false,doneDates:[]});
+          save();
+        }
+        return;
+      }
       if(payload.type==='event' && payload.id) moveEventToDate(payload.id,x.dataset.dropdate,payload.occurrence||'');
     };
   });
+  $$('[data-more-date]').forEach(b=>b.onclick=e=>{e.stopPropagation();openDayList(b.dataset.moreDate);});
   $$('.diaryBtn').forEach(b=>b.onclick=e=>{e.stopPropagation();openDiary(b.dataset.diarydate);});
 }
 
@@ -1045,10 +1178,27 @@ function renderWeek(){
   $('#main').innerHTML=days.map(d=>{
     const key=ds(d), hasDiary=!!state.diary[key]?.text, h=holidayLabel(key), dow=d.getDay();
     const dayClass=[key===ds(new Date())?'today':'', holidayClass(key), dow===0?'sunday':'', dow===6?'saturday':''].filter(Boolean).join(' ');
-    return `<div class="dayCol"><div class="dayHead ${dayClass}"><div class="dayTopLine"><span>${['일','월','화','수','목','금','토'][dow]}</span><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}" title="다이어리">📝</button></div><div class="dateNum">${d.getDate()}</div>${h?`<div class="holidayName">${esc(h)}</div>`:''}</div><div class="dayBody" data-dropdate="${key}" ondblclick="window.__newEvent?.('${key}')">${groupHtml(key,map[key]||[])}</div></div>`;
+    const holidayText=h?esc(h):'&nbsp;';
+    return `<div class="dayCol"><div class="dayHead ${dayClass}"><div class="dayTopLine"><span class="weekdayLabel">${['일','월','화','수','목','금','토'][dow]}</span><span class="dateNum">${d.getDate()}</span><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}" title="${hasDiary?'다이어리 보기':'다이어리 작성'}">📝</button></div><div class="holidayName ${h?'':'holidayEmpty'}" title="${h?esc(h):''}">${holidayText}</div></div><div class="dayBody" data-dropdate="${key}" ondblclick="window.__newEvent?.('${key}')">${groupHtml(key,map[key]||[])}</div></div>`;
   }).join('');
   bindItems();
 }
+function monthCellEventsHtml(date, es){
+  const limit=3;
+  const visible=(es||[]).slice(0,limit);
+  const hidden=Math.max(0,(es||[]).length-visible.length);
+  const payments=visible.filter(e=>e.kind==='payment'), normal=visible.filter(e=>e.kind!=='payment');
+  return `${paymentLaneHtml(payments,true)}${normal.map(e=>eventItemHtml(e,true)).join('')}${hidden?`<button type="button" class="moreEventsBtn" data-more-date="${esc(date)}">+ ${hidden}건</button>`:''}`;
+}
+function openDayList(date){
+  const map=buildOccurrenceMap(date,date,{calendarIds:focusedCalendarIds()});
+  const h=holidayLabel(date);
+  $('#dayListTitle').textContent=`${date}${h?` · ${h}`:''}`;
+  $('#dayListBody').innerHTML=groupHtml(date,map[date]||[]);
+  openDialog($('#dayListDlg')); bindItems();
+}
+$('#closeDayList').onclick=()=>closeDialog($('#dayListDlg'));
+
 function renderMonth(){
   const y=cursor.getFullYear(),m=cursor.getMonth(),first=new Date(y,m,1),s=startWeek(first),end=add(s,41),map=buildOccurrenceMap(ds(s),ds(end),{calendarIds:focusedCalendarIds()});
   $('#range').textContent=`${y}년 ${m+1}월${focusSuffix()}`;
@@ -1057,7 +1207,8 @@ function renderMonth(){
   const cells=[...Array(42)].map((_,i)=>{
     const d=add(s,i),key=ds(d),es=map[key]||[],hasDiary=!!state.diary[key]?.text,h=holidayLabel(key),dow=d.getDay();
     const cellClass=[d.getMonth()!==m?'other':'',holidayClass(key),dow===0?'sunday':'',dow===6?'saturday':''].filter(Boolean).join(' ');
-    return `<div class="cell ${cellClass}" data-dropdate="${key}" ondblclick="window.__newEvent?.('${key}')"><div class="mhead"><span>${d.getDate()}</span><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}">${hasDiary?'📝':'＋'}</button></div>${h?`<div class="holidayName">${esc(h)}</div>`:''}${es.map(e=>eventItemHtml(e,true)).join('')}</div>`;
+    const holidayText=h?esc(h):'&nbsp;';
+    return `<div class="cell ${cellClass}" data-dropdate="${key}" ondblclick="window.__newEvent?.('${key}')"><div class="mhead"><span>${d.getDate()}</span><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}" title="${hasDiary?'다이어리 보기':'다이어리 작성'}">📝</button></div><div class="holidayName ${h?'':'holidayEmpty'}" title="${h?esc(h):''}">${holidayText}</div>${monthCellEventsHtml(key,es)}</div>`;
   }).join('');
   $('#main').innerHTML=heads+cells; bindItems();
 }
@@ -1275,7 +1426,7 @@ $('#cancelRepeatDelete').onclick=()=>{ pendingRepeatDeleteId=''; closeDialog($('
 
 $('#copyEvent').onclick=()=>{
   const id=$('#eid').value, src=state.events.find(x=>x.id===id); if(!src) return;
-  const copy={...structuredClone(src),id:uid(),title:`${src.title} 복사`,done:false,doneDates:[],fixedId:null,carryoverCount:0,carryoverFromDate:'',carryoverRootId:'',carryoverParentId:'',carryoverHistory:[]};
+  const copy={...structuredClone(src),id:uid(),title:`${src.title} 복사`,done:false,doneDates:[],fixedId:null,flexibleId:null,carryoverCount:0,carryoverFromDate:'',carryoverRootId:'',carryoverParentId:'',carryoverHistory:[]};
   state.events.push(copy); activeEventOccurrence=null; closeDialog($('#eventDlg')); save();
 };
 
@@ -1363,11 +1514,11 @@ $('#deleteCal').onclick=()=>{
   const id=$('#cid').value; if(!id) return;
   if(state.calendars.length<=1){ alert('캘린더는 최소 1개가 필요합니다.'); return; }
   const target=state.calendars.find(c=>c.id===id), kids=directChildren(id);
-  const msg=kids.length?`이 캘린더의 일정·고정업무를 삭제할까요? 부속캘린더 ${kids.length}개는 한 단계 위로 이동되어 유지됩니다.`:'이 캘린더와 포함된 일정·고정업무를 모두 삭제할까요?';
+  const msg=kids.length?`이 캘린더의 일정·고정업무·시간날때 업무를 삭제할까요? 부속캘린더 ${kids.length}개는 한 단계 위로 이동되어 유지됩니다.`:'이 캘린더와 포함된 일정·고정업무·시간날때 업무를 모두 삭제할까요?';
   if(confirm(msg)){
     const newParent=target?.parentId||'';
     kids.forEach(c=>c.parentId=newParent);
-    state.calendars=state.calendars.filter(x=>x.id!==id); state.events=state.events.filter(x=>x.calId!==id); state.fixed=state.fixed.filter(x=>x.calId!==id);
+    state.calendars=state.calendars.filter(x=>x.id!==id); state.events=state.events.filter(x=>x.calId!==id); state.fixed=state.fixed.filter(x=>x.calId!==id); state.flexible=(state.flexible||[]).filter(x=>x.calId!==id);
     state.settings.hiddenCalendars=(state.settings.hiddenCalendars||[]).filter(x=>x!==id); closeDialog($('#calDlg')); save();
   }
 };
@@ -1386,6 +1537,30 @@ $('#fnoDuration').onchange=()=>updateDurationUI('f');
 $('#cancelFixed').onclick=()=>closeDialog($('#fixedDlg'));
 $('#deleteFixed').onclick=()=>{ const id=$('#fid').value; if(id&&confirm('이 고정업무를 삭제할까요?')){state.fixed=state.fixed.filter(x=>x.id!==id);closeDialog($('#fixedDlg'));save();} };
 
+function openFlexible(id){
+  const f=(state.flexible||[]).find(x=>x.id===id);
+  $('#flexibleTitle').textContent=f?'시간날때 업무 수정':'시간날때 업무 추가';
+  $('#flexid').value=f?.id||''; $('#flexname').value=f?.name||''; $('#flexcal').value=f?.calId||cals()[0]?.id||'';
+  setDurationInputs(f?.hours??1,'flex'); $('#flexnoDuration').checked=!!f?.noDuration; updateDurationUI('flex'); $('#flexmemo').value=f?.memo||'';
+  $('#deleteFlexible').style.visibility=f?'visible':'hidden'; openDialog($('#flexibleDlg'));
+}
+$('#flexibleForm').onsubmit=e=>{
+  e.preventDefault(); const id=$('#flexid').value;
+  const obj={id:id||uid(),name:$('#flexname').value.trim(),calId:$('#flexcal').value,hours:getDurationInputs('flex'),noDuration:$('#flexnoDuration').checked,memo:$('#flexmemo').value};
+  if(!obj.name) return;
+  state.flexible=Array.isArray(state.flexible)?state.flexible:[];
+  if(id) state.flexible[state.flexible.findIndex(x=>x.id===id)]=obj; else state.flexible.push(obj);
+  closeDialog($('#flexibleDlg')); save();
+};
+$('#flexnoDuration').onchange=()=>updateDurationUI('flex');
+$('#cancelFlexible').onclick=()=>closeDialog($('#flexibleDlg'));
+$('#deleteFlexible').onclick=()=>{
+  const id=$('#flexid').value; if(!id) return;
+  if(confirm('이 시간날때 업무를 삭제할까요? 이미 달력에 배치된 일정과 완료기록은 그대로 남습니다.')){
+    state.flexible=(state.flexible||[]).filter(x=>x.id!==id); closeDialog($('#flexibleDlg')); save();
+  }
+};
+
 function openDiary(date){
   $('#diaryDate').value=date; $('#diaryTitle').textContent=`다이어리 · ${date}`; $('#diaryText').value=state.diary[date]?.text||'';
   $('#deleteDiary').style.visibility=state.diary[date]?.text?'visible':'hidden'; openDialog($('#diaryDlg'));
@@ -1399,9 +1574,10 @@ function renderSearch(){
   const results=[];
   for(const e of state.events){ const hay=[e.title,e.memo,e.place,cal(e.calId).name].join(' ').toLowerCase(); if(hay.includes(q)) results.push({type:'event',id:e.id,title:e.title,meta:`${e.date} · ${cal(e.calId).name}`}); }
   for(const f of state.fixed){ const hay=[f.name,f.memo,cal(f.calId).name].join(' ').toLowerCase(); if(hay.includes(q)) results.push({type:'fixed',id:f.id,title:f.name,meta:`고정업무 · ${cal(f.calId).name}`}); }
+  for(const f of (state.flexible||[])){ const hay=[f.name,f.memo,cal(f.calId).name].join(' ').toLowerCase(); if(hay.includes(q)) results.push({type:'flexible',id:f.id,title:f.name,meta:`시간날때 업무 · ${cal(f.calId).name}`}); }
   for(const [date,d] of Object.entries(state.diary)){ if((d.text||'').toLowerCase().includes(q)) results.push({type:'diary',id:date,title:`다이어리 ${date}`,meta:d.text.slice(0,60)}); }
   $('#searchResults').innerHTML=results.slice(0,100).map((r,i)=>`<div class="searchResult" data-idx="${i}"><b>${esc(r.title)}</b><small>${esc(r.meta)}</small></div>`).join('')||'<div class="empty">검색 결과가 없습니다.</div>';
-  $$('.searchResult').forEach(x=>x.onclick=()=>{const r=results[Number(x.dataset.idx)];closeDialog($('#searchDlg'));if(r.type==='event')openEvent(null,r.id);else if(r.type==='fixed')openFixed(r.id);else openDiary(r.id);});
+  $$('.searchResult').forEach(x=>x.onclick=()=>{const r=results[Number(x.dataset.idx)];closeDialog($('#searchDlg'));if(r.type==='event')openEvent(null,r.id);else if(r.type==='fixed')openFixed(r.id);else if(r.type==='flexible')openFlexible(r.id);else openDiary(r.id);});
 }
 $('#searchBtn').onclick=()=>{ $('#searchInput').value=''; $('#searchResults').innerHTML='<div class="empty">검색어를 입력하세요.</div>'; openDialog($('#searchDlg')); setTimeout(()=>$('#searchInput').focus(),50); };
 $('#searchInput').oninput=renderSearch; $('#closeSearch').onclick=()=>closeDialog($('#searchDlg')); $('#searchForm').onsubmit=e=>e.preventDefault();
@@ -1421,6 +1597,10 @@ $('#fixedAddMenu').onclick=e=>e.stopPropagation();
 document.addEventListener('click',e=>{ if(!e.target.closest('.fixedAddWrap')) setFixedAddMenu(false); });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape' && !$('#fixedAddMenu').classList.contains('hidden')) setFixedAddMenu(false); });
 $('#fixedFilter').onchange=e=>{selectedFixedFilter=e.target.value;renderFixed();};
+$('#flexibleFilter').onchange=e=>{selectedFlexibleFilter=e.target.value;renderFlexible();};
+$('#paymentFilter').onchange=e=>{selectedPaymentFilter=e.target.value;renderPayments();};
+$('#addFlexible').onclick=()=>openFlexible();
+$('#toggleFlexible').onclick=()=>{ state.settings.fixedPanelsCollapsed=state.settings.fixedPanelsCollapsed||{}; state.settings.fixedPanelsCollapsed.flexible=!state.settings.fixedPanelsCollapsed.flexible; save(); };
 $('#addPayment').onclick=()=>openEvent(ds(cursor),null,{preset:'payment'});
 $('#togglePayment').onclick=()=>{ state.settings.fixedPanelsCollapsed=state.settings.fixedPanelsCollapsed||{}; state.settings.fixedPanelsCollapsed.payment=!state.settings.fixedPanelsCollapsed.payment; save(); };
 $('#prev').onclick=()=>{ cursor=view==='month'?new Date(cursor.getFullYear(),cursor.getMonth()-1,1):add(cursor,view==='week'?-7:-1); render(); };
