@@ -1054,3 +1054,105 @@ body.resizingLane{cursor:ns-resize!important;user-select:none!important}body.res
   .scheduleLaneArrow{font-size:6px!important}
   .scheduleSummaryLabel{font-size:5.5px!important}
 }
+
+
+/* v1.55 - 글자 자체를 한 줄씩 쌓는 세로 라벨 + 좌측 이름 영역 너비 직접 조절 */
+#main.laneView{
+  --lane-label-w:var(--lane-label-w-user,30px)!important;
+}
+.scheduleBoard{
+  position:relative;
+}
+.scheduleLaneToggle b{
+  writing-mode:horizontal-tb!important;
+  text-orientation:mixed!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:0!important;
+  width:100%!important;
+  max-width:none!important;
+  max-height:calc(var(--lane-h,112px) - 24px)!important;
+  white-space:normal!important;
+  overflow:hidden!important;
+  line-height:1!important;
+  letter-spacing:0!important;
+}
+.scheduleLaneToggle b .laneTitleChar{
+  display:block;
+  flex:0 0 auto;
+  width:1em;
+  height:1.08em;
+  line-height:1.08em;
+  text-align:center;
+  white-space:nowrap;
+}
+.scheduleLaneToggle b .laneTitleSpace{
+  height:.45em;
+}
+.scheduleLaneToggle small{display:none!important}
+.scheduleSummaryLabel,.scheduleDateCorner{
+  writing-mode:horizontal-tb!important;
+  text-orientation:mixed!important;
+  letter-spacing:0!important;
+}
+.scheduleSummaryLabel{
+  font-size:0!important;
+}
+.scheduleSummaryLabel::after{
+  content:'합\A 계';
+  white-space:pre;
+  font-size:7px;
+  line-height:1.05;
+  text-align:center;
+}
+.scheduleDateCorner{
+  font-size:0!important;
+}
+.scheduleDateCorner::after{
+  content:'구\A 역';
+  white-space:pre;
+  font-size:7px;
+  line-height:1.05;
+  text-align:center;
+}
+.scheduleLane.collapsed .scheduleLaneToggle b{
+  writing-mode:horizontal-tb!important;
+  max-height:16px!important;
+}
+.laneLabelWidthResizer{
+  position:absolute;
+  z-index:30;
+  top:0;
+  bottom:0;
+  left:calc(var(--lane-label-w) - 4px);
+  width:8px;
+  cursor:ew-resize;
+  touch-action:none;
+  background:transparent;
+}
+.laneLabelWidthResizer::after{
+  content:'';
+  position:absolute;
+  top:0;
+  bottom:0;
+  left:3px;
+  width:1px;
+  background:transparent;
+}
+.laneLabelWidthResizer:hover::after,
+body.resizingLaneLabel .laneLabelWidthResizer::after{
+  width:2px;
+  background:#8ca0b5;
+}
+body.resizingLaneLabel,
+body.resizingLaneLabel *{
+  cursor:ew-resize!important;
+  user-select:none!important;
+}
+@media(max-width:760px){
+  #main.laneView{--lane-label-w:var(--lane-label-w-user,26px)!important}
+  .laneLabelWidthResizer{display:none}
+  .scheduleLaneToggle b{font-size:6.5px!important;max-height:calc(var(--lane-h,90px) - 18px)!important}
+}

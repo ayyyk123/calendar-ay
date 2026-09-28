@@ -68,7 +68,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.52',
+  version: '1.55',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -79,7 +79,7 @@ const defaultState = () => ({
   flexible: [],
   purchases: [],
   diary: {},
-  settings: { hiddenCalendars: [], fixedPanelsCollapsed: { recurring:false, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','load','dday'], laneHeights:{}, laneCollapsed:{} }
+  settings: { hiddenCalendars: [], fixedPanelsCollapsed: { recurring:false, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','load','dday'], laneHeights:{}, laneCollapsed:{}, laneLabelWidth:30 }
 });
 
 let state = defaultState();
@@ -311,7 +311,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.52',
+    version: '1.55',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -364,7 +364,8 @@ function normalizeState(raw){
       sidebarSectionOrder: normalizeSidebarSectionOrder(s.settings?.sidebarSectionOrder),
       dayCalendarGroupsCollapsed: (s.settings?.dayCalendarGroupsCollapsed && typeof s.settings.dayCalendarGroupsCollapsed==='object') ? {...s.settings.dayCalendarGroupsCollapsed} : {},
       laneHeights: (s.settings?.laneHeights && typeof s.settings.laneHeights==='object') ? Object.fromEntries(Object.entries(s.settings.laneHeights).map(([k,v])=>[k,Math.max(44,Math.min(480,Number(v)||0))]).filter(([,v])=>v)) : {},
-      laneCollapsed: (s.settings?.laneCollapsed && typeof s.settings.laneCollapsed==='object') ? {...s.settings.laneCollapsed} : {}
+      laneCollapsed: (s.settings?.laneCollapsed && typeof s.settings.laneCollapsed==='object') ? {...s.settings.laneCollapsed} : {},
+      laneLabelWidth: Math.max(22,Math.min(120,Number(s.settings?.laneLabelWidth)||30))
     }
   };
 }
@@ -1870,6 +1871,16 @@ function daySummaryHtml(date,es){
   const txt=unknown?`총 ${fmtH(total)} · 일부 미정`:(totalCap?`총 ${fmtH(total)} / ${fmtH(totalCap)}`:`총 ${fmtH(total)}`);
   return `<span class="${!unknown&&totalCap&&total>totalCap?'over':'ok'}">${txt}${blocked?` · 차단 ${blocked}`:''}</span>`;
 }
+function laneLabelWidth(){
+  state.settings=state.settings||{};
+  return Math.max(22,Math.min(120,Number(state.settings.laneLabelWidth)||30));
+}
+function laneVerticalTitleHtml(text){
+  return Array.from(String(text||'')).map(ch=>{
+    if(ch===' ') return '<span class="laneTitleChar laneTitleSpace" aria-hidden="true"></span>';
+    return `<span class="laneTitleChar">${esc(ch)}</span>`;
+  }).join('');
+}
 function scheduleLaneHtml(key,title,days,map,cellBuilder,{type='calendar',color='#d9d9d9',subtitle=''}={}){
   const collapsed=laneIsCollapsed(key), h=laneHeight(key,type);
   const cells=days.map(d=>{ const date=ds(d); return `<div class="scheduleLaneCell" data-dropdate="${date}" ondblclick="window.__newEvent?.('${date}')">${cellBuilder(date,map[date]||[])}</div>`; }).join('');
@@ -1877,7 +1888,7 @@ function scheduleLaneHtml(key,title,days,map,cellBuilder,{type='calendar',color=
     <aside class="scheduleLaneSide" style="--lane-color:${esc(color)}">
       <button type="button" class="scheduleLaneToggle" data-lane-toggle="${esc(key)}" title="구역 접기/펴기">
         <span class="scheduleLaneDot" style="background:${esc(color)}"></span>
-        <span class="scheduleLaneName"><b>${title}</b>${subtitle?`<small>${subtitle}</small>`:''}</span>
+        <span class="scheduleLaneName"><b aria-label="${esc(title)}">${laneVerticalTitleHtml(title)}</b>${subtitle?`<small>${esc(subtitle)}</small>`:''}</span>
         <span class="scheduleLaneArrow">${collapsed?'▸':'▾'}</span>
       </button>
     </aside>
@@ -1890,19 +1901,33 @@ function scheduleDateHeader(days){
 }
 function scheduleWeekBoard(days,map){
   const visible=visibleCals(),visibleIds=new Set(visible.map(c=>c.id));
-  let html=`<div class="scheduleBoard">${scheduleDateHeader(days)}`;
+  let html=`<div class="scheduleBoard"><div class="laneLabelWidthResizer" data-lane-label-resize="1" title="좌우로 드래그해 캘린더 이름 영역 너비 조절 · 더블클릭 기본너비"></div>${scheduleDateHeader(days)}`;
   html+=scheduleLaneHtml('common','공통일정',days,map,(date,es)=>laneCellCommonHtml(es),{type:'common',color:'#d9b5cc'});
   html+=scheduleLaneHtml('quick','Quick',days,map,(date,es)=>laneCellQuickHtml(es),{type:'quick',color:'#cfd5dc'});
   html+=scheduleLaneHtml('payment','납부',days,map,(date,es)=>laneCellPaymentHtml(es),{type:'payment',color:'#e6d399'});
   for(const root of topLevelCals()){
     const members=laneCalendarMembers(root,visibleIds); if(!members.length) continue;
     const subNames=members.filter(c=>c.id!==root.id).map(c=>c.name);
-    html+=scheduleLaneHtml(`cal:${root.id}`,esc(root.name),days,map,(date,es)=>rootLaneCellHtml(date,root,es,visibleIds),{type:'calendar',color:root.color,subtitle:subNames.length?`부속 ${subNames.length}`:root.period});
+    html+=scheduleLaneHtml(`cal:${root.id}`,root.name,days,map,(date,es)=>rootLaneCellHtml(date,root,es,visibleIds),{type:'calendar',color:root.color,subtitle:subNames.length?`부속 ${subNames.length}`:root.period});
   }
   html+=`<div class="scheduleSummaryGrid"><div class="scheduleSummaryLabel">합계</div>${days.map(d=>{const date=ds(d);return `<div class="scheduleSummaryCell">${daySummaryHtml(date,map[date]||[])}</div>`}).join('')}</div></div>`;
   return html;
 }
 function bindScheduleLanes(){
+  const main=$('#main');
+  if(main) main.style.setProperty('--lane-label-w-user',`${laneLabelWidth()}px`);
+  $$('[data-lane-label-resize]').forEach(handle=>{
+    handle.ondblclick=e=>{ e.preventDefault(); e.stopPropagation(); state.settings.laneLabelWidth=30; if(main) main.style.setProperty('--lane-label-w-user','30px'); save(); };
+    handle.onpointerdown=e=>{
+      if(window.matchMedia('(max-width:760px)').matches) return;
+      e.preventDefault(); e.stopPropagation();
+      const startX=e.clientX, startW=laneLabelWidth();
+      handle.setPointerCapture?.(e.pointerId); document.body.classList.add('resizingLaneLabel');
+      const move=ev=>{ const w=Math.max(22,Math.min(120,startW+(ev.clientX-startX))); if(main) main.style.setProperty('--lane-label-w-user',`${Math.round(w)}px`); };
+      const up=ev=>{ document.removeEventListener('pointermove',move); document.removeEventListener('pointerup',up); document.body.classList.remove('resizingLaneLabel'); const raw=parseFloat(getComputedStyle(main).getPropertyValue('--lane-label-w-user'))||startW; state.settings.laneLabelWidth=Math.max(22,Math.min(120,Math.round(raw))); save(); };
+      document.addEventListener('pointermove',move); document.addEventListener('pointerup',up,{once:true});
+    };
+  });
   $$('[data-lane-toggle]').forEach(btn=>btn.onclick=e=>{
     e.stopPropagation(); const key=btn.dataset.laneToggle; state.settings.laneCollapsed=state.settings.laneCollapsed||{}; state.settings.laneCollapsed[key]=!state.settings.laneCollapsed[key]; save();
   });
@@ -2648,7 +2673,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'1.52',
+    appVersion:'1.55',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
