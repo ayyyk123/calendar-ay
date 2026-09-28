@@ -2361,6 +2361,9 @@ $('#carryForm').onsubmit=e=>{
   if(old && old.childId){ deleteEventAndUnlink(old.childId); src.carryoverHistory=Array.isArray(src.carryoverHistory)?src.carryoverHistory:[]; }
   src.carryoverHistory=src.carryoverHistory.filter(r=>r.fromDate!==fromDate);
   src.carryoverHistory.push({fromDate,toDate,childId,remainingHours:remaining});
+  // v1.57: 다음날로 이월하는 순간, 원래 날짜의 일정은 완료 처리한다.
+  // 반복일정이면 해당 발생일만 완료되고, 반복 시리즈의 다른 날짜에는 영향을 주지 않는다.
+  setOccurrenceDoneState(src,fromDate,true);
   state.events.push(child);
   closeDialog($('#carryDlg')); closeDialog($('#eventDlg')); activeEventOccurrence=null; save();
 };
