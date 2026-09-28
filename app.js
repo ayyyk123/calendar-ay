@@ -68,7 +68,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.48',
+  version: '1.52',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -79,7 +79,7 @@ const defaultState = () => ({
   flexible: [],
   purchases: [],
   diary: {},
-  settings: { hiddenCalendars: [], fixedPanelsCollapsed: { recurring:false, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','load','dday'] }
+  settings: { hiddenCalendars: [], fixedPanelsCollapsed: { recurring:false, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','load','dday'], laneHeights:{}, laneCollapsed:{} }
 });
 
 let state = defaultState();
@@ -311,7 +311,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.48',
+    version: '1.52',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -362,7 +362,9 @@ function normalizeState(raw){
         payment: (s.settings?.sidebarCalendarGroupsCollapsed?.payment && typeof s.settings.sidebarCalendarGroupsCollapsed.payment==='object') ? {...s.settings.sidebarCalendarGroupsCollapsed.payment} : {}
       },
       sidebarSectionOrder: normalizeSidebarSectionOrder(s.settings?.sidebarSectionOrder),
-      dayCalendarGroupsCollapsed: (s.settings?.dayCalendarGroupsCollapsed && typeof s.settings.dayCalendarGroupsCollapsed==='object') ? {...s.settings.dayCalendarGroupsCollapsed} : {}
+      dayCalendarGroupsCollapsed: (s.settings?.dayCalendarGroupsCollapsed && typeof s.settings.dayCalendarGroupsCollapsed==='object') ? {...s.settings.dayCalendarGroupsCollapsed} : {},
+      laneHeights: (s.settings?.laneHeights && typeof s.settings.laneHeights==='object') ? Object.fromEntries(Object.entries(s.settings.laneHeights).map(([k,v])=>[k,Math.max(44,Math.min(480,Number(v)||0))]).filter(([,v])=>v)) : {},
+      laneCollapsed: (s.settings?.laneCollapsed && typeof s.settings.laneCollapsed==='object') ? {...s.settings.laneCollapsed} : {}
     }
   };
 }
@@ -1820,17 +1822,105 @@ function toggleDone(id,occ){
   save();
 }
 
+
+const LANE_HEIGHT_DEFAULTS={common:72,quick:64,payment:64,calendar:112};
+function laneHeight(key,type='calendar'){
+  state.settings.laneHeights=state.settings.laneHeights||{};
+  const stored=Number(state.settings.laneHeights[key]);
+  return stored?Math.max(44,Math.min(480,stored)):(LANE_HEIGHT_DEFAULTS[type]||112);
+}
+function laneIsCollapsed(key){
+  state.settings.laneCollapsed=state.settings.laneCollapsed||{};
+  return !!state.settings.laneCollapsed[key];
+}
+function laneCalendarMembers(root,visibleIds){
+  return [root,...descendants(root.id)].filter(c=>visibleIds.has(c.id));
+}
+function laneCellCommonHtml(es){
+  const xs=(es||[]).filter(e=>e.kind==='anniversary'||e.kind==='appointment');
+  return xs.map(e=>eventItemHtml(e,false)).join('');
+}
+function laneCellQuickHtml(es){ return (es||[]).filter(e=>e.kind==='todo').map(e=>eventItemHtml(e,false)).join(''); }
+function laneCellPaymentHtml(es){ return (es||[]).filter(e=>e.kind==='payment').map(e=>eventItemHtml(e,false)).join(''); }
+function rootLaneCellHtml(date,root,es,visibleIds){
+  const members=laneCalendarMembers(root,visibleIds), memberIds=new Set(members.map(c=>c.id));
+  const normal=(es||[]).filter(e=>memberIds.has(e.calId) && !['anniversary','appointment','todo','payment'].includes(e.kind));
+  const allForLoad=(es||[]).filter(e=>memberIds.has(e.calId) && !['anniversary','payment'].includes(e.kind));
+  const sum=allForLoad.reduce((a,e)=>a+workloadDuration(e),0), cap=capacityForDate(root,date);
+  let body='';
+  const direct=normal.filter(e=>e.calId===root.id);
+  if(direct.length) body+=direct.map(e=>eventItemHtml(e,false)).join('');
+  for(const child of members.filter(c=>c.id!==root.id)){
+    const xs=normal.filter(e=>e.calId===child.id); if(!xs.length) continue;
+    body+=`<div class="laneSubGroup"><div class="laneSubLabel" style="--sub-color:${esc(child.color)}"><span class="laneSubDot" style="background:${esc(child.color)}"></span>↳ ${esc(child.name)}</div>${xs.map(e=>eventItemHtml(e,false)).join('')}</div>`;
+  }
+  const capText=cap.unknown?`${fmtH(sum)} / 미정`:`${fmtH(sum)} / ${fmtH(cap.hours)}`;
+  const cls=cap.unknown?'unknown':(Number(cap.hours)>0&&sum>Number(cap.hours)?'over':'ok');
+  return `<div class="laneCellLoad ${cls}" title="${esc(root.name)} 가용시간">${capText}${cap.blocked?' · 차단':''}</div>${body}`;
+}
+function daySummaryHtml(date,es){
+  const visible=visibleCals(), visibleIds=new Set(visible.map(c=>c.id));
+  let total=0,totalCap=0,unknown=false,blocked=0;
+  for(const root of topLevelCals()){
+    const members=laneCalendarMembers(root,visibleIds); if(!members.length) continue;
+    const ids=new Set(members.map(c=>c.id));
+    total+=(es||[]).filter(e=>ids.has(e.calId)&&!['anniversary','payment'].includes(e.kind)).reduce((a,e)=>a+workloadDuration(e),0);
+    const ci=capacityForDate(root,date); if(ci.blocked) blocked++; if(ci.unknown) unknown=true; else totalCap+=Number(ci.hours)||0;
+  }
+  const txt=unknown?`총 ${fmtH(total)} · 일부 미정`:(totalCap?`총 ${fmtH(total)} / ${fmtH(totalCap)}`:`총 ${fmtH(total)}`);
+  return `<span class="${!unknown&&totalCap&&total>totalCap?'over':'ok'}">${txt}${blocked?` · 차단 ${blocked}`:''}</span>`;
+}
+function scheduleLaneHtml(key,title,days,map,cellBuilder,{type='calendar',color='#d9d9d9',subtitle=''}={}){
+  const collapsed=laneIsCollapsed(key), h=laneHeight(key,type);
+  const cells=days.map(d=>{ const date=ds(d); return `<div class="scheduleLaneCell" data-dropdate="${date}" ondblclick="window.__newEvent?.('${date}')">${cellBuilder(date,map[date]||[])}</div>`; }).join('');
+  return `<section class="scheduleLane ${collapsed?'collapsed':''}" data-lane-key="${esc(key)}" style="--lane-h:${h}px;--lane-color:${esc(color)}">
+    <div class="scheduleLaneHead"><button type="button" class="scheduleLaneToggle" data-lane-toggle="${esc(key)}" title="구역 접기/펴기"><span class="scheduleLaneDot" style="background:${esc(color)}"></span><b>${title}</b>${subtitle?`<small>${subtitle}</small>`:''}<span class="scheduleLaneArrow">${collapsed?'▸':'▾'}</span></button></div>
+    <div class="scheduleLaneGrid">${cells}</div>
+    <div class="laneHeightResizer" data-lane-resize="${esc(key)}" title="마우스로 드래그해 구역 높이 조절 · 더블클릭 기본높이"></div>
+  </section>`;
+}
+function scheduleDateHeader(days){
+  return `<div class="scheduleDateGrid">${days.map(d=>{const key=ds(d),hasDiary=!!state.diary[key]?.text,h=holidayLabel(key),dow=d.getDay(),dayClass=[key===ds(new Date())?'today':'',holidayClass(key),dow===0?'sunday':'',dow===6?'saturday':''].filter(Boolean).join(' ');return `<div class="scheduleDateHead ${dayClass}"><div class="dayTopLine"><span class="weekdayLabel">${['일','월','화','수','목','금','토'][dow]}</span><span class="dateNum">${d.getDate()}</span><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}" title="${hasDiary?'다이어리 보기':'다이어리 작성'}">📝</button></div><div class="holidayName ${h?'':'holidayEmpty'}" title="${h?esc(h):''}">${h?esc(h):'&nbsp;'}</div></div>`}).join('')}</div>`;
+}
+function scheduleWeekBoard(days,map){
+  const visible=visibleCals(),visibleIds=new Set(visible.map(c=>c.id));
+  let html=`<div class="scheduleBoard">${scheduleDateHeader(days)}`;
+  html+=scheduleLaneHtml('common','D-Day · 기념일 / 예약 · 약속',days,map,(date,es)=>laneCellCommonHtml(es),{type:'common',color:'#d9b5cc'});
+  html+=scheduleLaneHtml('quick','Quick',days,map,(date,es)=>laneCellQuickHtml(es),{type:'quick',color:'#cfd5dc'});
+  html+=scheduleLaneHtml('payment','납부',days,map,(date,es)=>laneCellPaymentHtml(es),{type:'payment',color:'#e6d399'});
+  for(const root of topLevelCals()){
+    const members=laneCalendarMembers(root,visibleIds); if(!members.length) continue;
+    const subNames=members.filter(c=>c.id!==root.id).map(c=>c.name);
+    html+=scheduleLaneHtml(`cal:${root.id}`,esc(root.name),days,map,(date,es)=>rootLaneCellHtml(date,root,es,visibleIds),{type:'calendar',color:root.color,subtitle:subNames.length?`부속 ${subNames.length}`:root.period});
+  }
+  html+=`<div class="scheduleSummaryGrid">${days.map(d=>{const date=ds(d);return `<div class="scheduleSummaryCell">${daySummaryHtml(date,map[date]||[])}</div>`}).join('')}</div></div>`;
+  return html;
+}
+function bindScheduleLanes(){
+  $$('[data-lane-toggle]').forEach(btn=>btn.onclick=e=>{
+    e.stopPropagation(); const key=btn.dataset.laneToggle; state.settings.laneCollapsed=state.settings.laneCollapsed||{}; state.settings.laneCollapsed[key]=!state.settings.laneCollapsed[key]; save();
+  });
+  $$('[data-lane-resize]').forEach(handle=>{
+    handle.ondblclick=e=>{ e.preventDefault(); const key=handle.dataset.laneResize; const type=key==='common'?'common':key==='quick'?'quick':key==='payment'?'payment':'calendar'; state.settings.laneHeights=state.settings.laneHeights||{}; delete state.settings.laneHeights[key]; save(); };
+    handle.onpointerdown=e=>{
+      if(window.matchMedia('(max-width:760px)').matches) return;
+      e.preventDefault(); e.stopPropagation();
+      const lane=handle.closest('.scheduleLane'), key=handle.dataset.laneResize; if(!lane) return;
+      const startY=e.clientY,startH=lane.getBoundingClientRect().height - lane.querySelector('.scheduleLaneHead').getBoundingClientRect().height - handle.getBoundingClientRect().height;
+      handle.setPointerCapture?.(e.pointerId); document.body.classList.add('resizingLane');
+      const move=ev=>{ const h=Math.max(44,Math.min(480,startH+(ev.clientY-startY))); lane.style.setProperty('--lane-h',`${Math.round(h)}px`); };
+      const up=ev=>{ document.removeEventListener('pointermove',move); document.removeEventListener('pointerup',up); document.body.classList.remove('resizingLane'); const grid=lane.querySelector('.scheduleLaneGrid'); const h=Math.max(44,Math.min(480,Math.round(grid?.getBoundingClientRect().height||startH))); state.settings.laneHeights=state.settings.laneHeights||{}; state.settings.laneHeights[key]=h; save(); };
+      document.addEventListener('pointermove',move); document.addEventListener('pointerup',up,{once:true});
+    };
+  });
+}
+
 function renderWeek(){
   const s=startWeek(cursor), days=[0,1,2,3,4,5,6].map(i=>add(s,i)), map=buildOccurrenceMap(ds(s),ds(days[6]),{calendarIds:focusedCalendarIds()});
   setRangeLabel(`${s.getFullYear()}. ${s.getMonth()+1}. ${s.getDate()} - ${days[6].getFullYear()}. ${days[6].getMonth()+1}. ${days[6].getDate()}${focusSuffix()}`,`${s.getMonth()+1}/${s.getDate()}–${days[6].getMonth()+1}/${days[6].getDate()}${compactFocusSuffix()}`);
-  $('#main').className='week';
-  $('#main').innerHTML=days.map(d=>{
-    const key=ds(d), hasDiary=!!state.diary[key]?.text, h=holidayLabel(key), dow=d.getDay();
-    const dayClass=[key===ds(new Date())?'today':'', holidayClass(key), dow===0?'sunday':'', dow===6?'saturday':''].filter(Boolean).join(' ');
-    const holidayText=h?esc(h):'&nbsp;';
-    return `<div class="dayCol"><div class="dayHead ${dayClass}"><div class="dayTopLine"><span class="weekdayLabel">${['일','월','화','수','목','금','토'][dow]}</span><span class="dateNum">${d.getDate()}</span><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}" title="${hasDiary?'다이어리 보기':'다이어리 작성'}">📝</button></div><div class="holidayName ${h?'':'holidayEmpty'}" title="${h?esc(h):''}">${holidayText}</div></div><div class="dayBody" data-dropdate="${key}" ondblclick="window.__newEvent?.('${key}')">${groupHtml(key,map[key]||[])}</div></div>`;
-  }).join('');
-  bindItems();
+  $('#main').className='laneView weekLaneView';
+  $('#main').innerHTML=scheduleWeekBoard(days,map);
+  bindItems(); bindScheduleLanes();
 }
 function monthCellEventsHtml(date, es){
   const limit=4;
@@ -1851,16 +1941,12 @@ function openDayList(date){
 $('#closeDayList').onclick=()=>closeDialog($('#dayListDlg'));
 
 function renderMultiWeek(weeks=2){
-  const s=startWeek(cursor), total=weeks*7, days=[...Array(total)].map((_,i)=>add(s,i)), map=buildOccurrenceMap(ds(s),ds(days[days.length-1]),{calendarIds:focusedCalendarIds()});
-  const last=days[days.length-1];
+  const s=startWeek(cursor), total=weeks*7, allDays=[...Array(total)].map((_,i)=>add(s,i)), map=buildOccurrenceMap(ds(s),ds(allDays[allDays.length-1]),{calendarIds:focusedCalendarIds()});
+  const last=allDays[allDays.length-1];
   setRangeLabel(`${s.getFullYear()}. ${s.getMonth()+1}. ${s.getDate()} - ${last.getFullYear()}. ${last.getMonth()+1}. ${last.getDate()}${focusSuffix()}`,`${s.getMonth()+1}/${s.getDate()}–${last.getMonth()+1}/${last.getDate()}${compactFocusSuffix()}`);
-  $('#main').className=`multiWeek weeks${weeks}`;
-  $('#main').innerHTML=days.map(d=>{
-    const key=ds(d), hasDiary=!!state.diary[key]?.text, h=holidayLabel(key), dow=d.getDay();
-    const dayClass=[key===ds(new Date())?'today':'', holidayClass(key), dow===0?'sunday':'', dow===6?'saturday':''].filter(Boolean).join(' ');
-    return `<div class="multiDay"><div class="dayHead ${dayClass}"><div class="dayTopLine"><span class="weekdayLabel">${['일','월','화','수','목','금','토'][dow]}</span><span class="dateNum">${d.getDate()}</span><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}" title="${hasDiary?'다이어리 보기':'다이어리 작성'}">📝</button></div><div class="holidayName ${h?'':'holidayEmpty'}" title="${h?esc(h):''}">${h?esc(h):'&nbsp;'}</div></div><div class="dayBody" data-dropdate="${key}" ondblclick="window.__newEvent?.('${key}')">${groupHtml(key,map[key]||[])}</div></div>`;
-  }).join('');
-  bindItems();
+  $('#main').className=`laneView multiLaneView weeks${weeks}`;
+  $('#main').innerHTML=`<div class="multiLaneWeeks">${[...Array(weeks)].map((_,w)=>{const days=allDays.slice(w*7,w*7+7);return `<div class="multiLaneWeek"><div class="multiLaneWeekLabel">${days[0].getMonth()+1}/${days[0].getDate()} – ${days[6].getMonth()+1}/${days[6].getDate()}</div>${scheduleWeekBoard(days,map)}</div>`}).join('')}</div>`;
+  bindItems(); bindScheduleLanes();
 }
 function renderMonth(){
   const y=cursor.getFullYear(),m=cursor.getMonth(),first=new Date(y,m,1),s=startWeek(first);
@@ -2555,7 +2641,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'1.48',
+    appVersion:'1.52',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state

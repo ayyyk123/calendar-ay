@@ -763,3 +763,45 @@ input,select,textarea{border-color:#d9dee5}.repeatBox,.dataManage,.weekdayCapaci
   .week .quickLaneItems,.multiWeek .quickLaneItems,
   .week .paymentLaneItems,.multiWeek .paymentLaneItems{height:31px!important;max-height:31px!important;padding:1px 0!important}
 }
+
+
+/* v1.52 - 주/2주/3주: 날짜 세로열이 아닌 캘린더별 가로 구역(레인) 중심 레이아웃 */
+.laneView{display:block!important;min-width:0;width:100%;height:100%;overflow:auto!important;background:#fff}
+.scheduleBoard{min-width:0;width:100%;background:#fff}
+.scheduleDateGrid,.scheduleLaneGrid,.scheduleSummaryGrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));min-width:0;width:100%}
+.scheduleDateGrid{position:sticky;top:0;z-index:8;background:#fff;border-bottom:1px solid #dfe3e8}
+.scheduleDateHead{height:54px;display:flex;flex-direction:column;justify-content:center;text-align:center;border-right:1px solid #edf0f3;padding:5px 2px;background:#fff;min-width:0}
+.scheduleDateHead.today{background:#f3f8ff}.scheduleDateHead.sunday,.scheduleDateHead.holiday{color:#d64242}.scheduleDateHead.saturday{color:#3977c9}
+.scheduleDateHead .dayTopLine{justify-content:center}.scheduleDateHead .holidayName{height:13px;line-height:13px;min-height:13px;margin-top:2px;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scheduleLane{position:relative;border-bottom:1px solid #dfe3e8;background:#fff;margin:0!important}
+.scheduleLaneHead{height:25px;min-height:25px;display:flex;align-items:center;border-bottom:1px solid #edf0f3;background:color-mix(in srgb,var(--lane-color,#d9d9d9) 12%,white)}
+.scheduleLaneToggle{width:100%;height:100%;padding:2px 7px;border:0;border-radius:0;background:transparent!important;display:flex;align-items:center;gap:6px;text-align:left;min-width:0;color:#344054}
+.scheduleLaneToggle b{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.scheduleLaneToggle small{font-size:9px;color:#8a94a5;white-space:nowrap}.scheduleLaneArrow{margin-left:auto;color:#7b8491}.scheduleLaneDot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+.scheduleLaneGrid{height:var(--lane-h,112px);min-height:44px;transition:height .08s linear}
+.scheduleLane.collapsed .scheduleLaneGrid{display:none}.scheduleLane.collapsed .laneHeightResizer{display:none}
+.scheduleLaneCell{position:relative;min-width:0;height:100%;padding:3px 4px;border-right:1px solid #edf0f3;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;background:#fff}
+.scheduleLaneCell.dropReady{outline:2px dashed #4f7cff;outline-offset:-2px;background:#f5f8ff}
+.scheduleLaneCell .item{margin:2px 0!important}
+.scheduleLaneCell .itemTitle{font-size:10.5px!important}
+.scheduleLaneCell .dragHandle{display:none}
+.laneCellLoad{position:sticky;top:0;z-index:2;display:block;width:max-content;max-width:100%;margin:0 0 2px auto;padding:1px 4px;border-radius:8px;background:#ffffffdf;font-size:8.5px;line-height:14px;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 0 0 1px #eef0f3}
+.laneCellLoad.over{color:#c33;font-weight:700}.laneCellLoad.ok{color:#60706a}.laneCellLoad.unknown{color:#7b6a9b}
+.laneSubGroup{margin:2px 0 3px}.laneSubLabel{display:flex;align-items:center;gap:3px;height:15px;margin:1px 0;color:#697386;font-size:8.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.laneSubDot{width:5px;height:5px;border-radius:50%;flex:0 0 auto}
+.laneHeightResizer{height:6px;cursor:ns-resize;background:linear-gradient(to bottom,transparent 2px,#d6dbe2 2px,#d6dbe2 3px,transparent 3px);touch-action:none;opacity:.5}
+.laneHeightResizer:hover{opacity:1;background:linear-gradient(to bottom,transparent 1px,#9aa7b5 1px,#9aa7b5 4px,transparent 4px)}
+body.resizingLane{cursor:ns-resize!important;user-select:none!important}body.resizingLane *{cursor:ns-resize!important}
+.scheduleSummaryGrid{border-bottom:1px solid #dfe3e8;background:#fafbfc}.scheduleSummaryCell{min-height:24px;padding:4px 3px;border-right:1px solid #edf0f3;font-size:8.5px;color:#7a8390;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.multiLaneWeeks{display:grid;gap:12px;padding-bottom:20px}.multiLaneWeek{border-bottom:1px solid #dfe3e8}.multiLaneWeekLabel{position:sticky;top:0;z-index:9;padding:4px 8px;background:#f7f8fa;border-bottom:1px solid #e5e7eb;color:#667085;font-size:10px;font-weight:700}
+/* 최상단 3구역은 항상 존재하며, 상위 캘린더+부속캘린더는 한 레인 안에서 함께 표시 */
+.scheduleLane[data-lane-key="common"] .scheduleLaneHead{background:#fbf6fa}.scheduleLane[data-lane-key="quick"] .scheduleLaneHead{background:#f7f8fa}.scheduleLane[data-lane-key="payment"] .scheduleLaneHead{background:#fcf9ef}
+/* 새 레인 화면에서는 v1.51 날짜 내부 고정높이 규칙을 사용하지 않음 */
+.laneView .commonTopLane,.laneView .quickLane,.laneView .paymentLane{height:auto!important;min-height:0!important;max-height:none!important;border:0!important;overflow:visible!important}
+@media(max-width:1180px){
+  .scheduleLaneToggle b{font-size:10px}.scheduleLaneToggle small{font-size:8px}.scheduleLaneCell{padding:2px}.scheduleLaneCell .itemTitle{font-size:9.5px!important}.laneCellLoad{font-size:7.5px}.laneSubLabel{font-size:7.5px}
+}
+@media(max-width:760px){
+  .laneView{overflow-x:hidden!important}.scheduleDateHead{height:44px;padding:3px 1px}.scheduleDateHead .weekdayLabel{font-size:8px}.scheduleDateHead .dateNum{font-size:12px}.scheduleDateHead .holidayName{height:10px;min-height:10px;line-height:10px;font-size:6.5px!important}
+  .scheduleLaneHead{height:20px;min-height:20px}.scheduleLaneToggle{padding:1px 3px;gap:3px}.scheduleLaneToggle b{font-size:8px}.scheduleLaneToggle small{font-size:6.5px}.scheduleLaneDot{width:6px;height:6px}
+  .scheduleLaneGrid{height:clamp(50px,var(--lane-h,90px),150px)}.scheduleLaneCell{padding:1px 2px}.scheduleLaneCell .item{padding:2px 2px!important;margin:1px 0!important}.scheduleLaneCell .itemTitle{font-size:7.8px!important;line-height:14px!important}.scheduleLaneCell .repeatMark,.scheduleLaneCell .carryBadge{font-size:6px}.scheduleLaneCell .importanceBtn{font-size:8px}.scheduleLaneCell .checklistToggle{font-size:6px;padding:0 1px}
+  .laneCellLoad{font-size:6px;line-height:10px;padding:0 2px}.laneSubLabel{height:11px;font-size:6px;margin:0}.laneSubDot{width:4px;height:4px}.laneHeightResizer{display:none}.scheduleSummaryCell{min-height:18px;padding:2px 1px;font-size:6px}.multiLaneWeekLabel{font-size:8px;padding:3px 5px}
+}
