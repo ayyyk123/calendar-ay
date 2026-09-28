@@ -657,3 +657,109 @@ input,select,textarea{border-color:#d9dee5}.repeatBox,.dataManage,.weekdayCapaci
   .commonTopLaneHead{font-size:8px}
   .commonTopLaneHead small{font-size:7px}
 }
+
+
+/* v1.51 - 캘린더 색상 일치 + 상단 3구역 고정 */
+/* 모든 일정 배경은 '종류 색'이 아니라 해당 캘린더 색을 직접 기준으로 만든다. */
+.item,
+.commonTopLane .item,
+.quickLane .item,
+.paymentLane .item,
+.appointmentLane .item,
+.anniversaryLane .item{
+  background:color-mix(in srgb,var(--item-color,#d9d9d9) 46%, white)!important;
+  border-color:color-mix(in srgb,var(--item-color,#d9d9d9) 72%, #d9dee5)!important;
+  border-left-color:var(--item-color,#d9d9d9)!important;
+}
+.item:hover,
+.commonTopLane .item:hover,
+.quickLane .item:hover,
+.paymentLane .item:hover{
+  background:color-mix(in srgb,var(--item-color,#d9d9d9) 58%, white)!important;
+}
+.item.done{
+  background:color-mix(in srgb,var(--item-color,#d9d9d9) 28%, white)!important;
+}
+/* v1.49/1.50의 종류별 고정 배경색을 덮어쓴다. */
+.commonTopLane .kind-anniversary,
+.commonTopLane .kind-appointment,
+.appointmentLane .item,
+.quickLane .item,
+.paymentLane .item,
+.anniversaryLane .item{
+  background:color-mix(in srgb,var(--item-color,#d9d9d9) 46%, white)!important;
+}
+
+/* 주/2주/3주/일 보기에서 공통일정 / Quick / 납부는 일정 유무와 무관하게 항상 같은 높이의 고정 구역 */
+.week .commonTopLane,
+.multiWeek .commonTopLane,
+.daySingle .commonTopLane{
+  height:64px!important;
+  min-height:64px!important;
+  max-height:64px!important;
+  margin:0!important;
+  border-bottom:1px solid #e4e7ec!important;
+  overflow:hidden!important;
+}
+.week .quickLane,
+.multiWeek .quickLane,
+.daySingle .quickLane,
+.week .paymentLane,
+.multiWeek .paymentLane,
+.daySingle .paymentLane{
+  height:58px!important;
+  min-height:58px!important;
+  max-height:58px!important;
+  margin:0!important;
+  border-bottom:1px solid #e4e7ec!important;
+  overflow:hidden!important;
+}
+.week .commonTopLaneHead,.multiWeek .commonTopLaneHead,.daySingle .commonTopLaneHead,
+.week .quickLaneHead,.multiWeek .quickLaneHead,.daySingle .quickLaneHead,
+.week .paymentLaneHead,.multiWeek .paymentLaneHead,.daySingle .paymentLaneHead{
+  height:18px!important;
+  min-height:18px!important;
+  padding:2px 3px!important;
+  margin:0!important;
+  border:0!important;
+  border-bottom:1px dashed #e5e7eb!important;
+  background:#fbfcfd!important;
+}
+.week .commonTopLaneItems,.multiWeek .commonTopLaneItems,.daySingle .commonTopLaneItems{
+  height:46px!important;
+  max-height:46px!important;
+  overflow-y:auto!important;
+  overflow-x:hidden!important;
+  padding:2px 1px!important;
+  scrollbar-width:thin;
+  overscroll-behavior:contain;
+}
+.week .quickLaneItems,.multiWeek .quickLaneItems,.daySingle .quickLaneItems,
+.week .paymentLaneItems,.multiWeek .paymentLaneItems,.daySingle .paymentLaneItems{
+  height:40px!important;
+  max-height:40px!important;
+  overflow-y:auto!important;
+  overflow-x:hidden!important;
+  padding:2px 1px!important;
+  scrollbar-width:thin;
+  overscroll-behavior:contain;
+}
+.week .emptyLane .commonTopLaneItems,
+.week .emptyLane .quickLaneItems,
+.week .emptyLane .paymentLaneItems,
+.multiWeek .emptyLane .commonTopLaneItems,
+.multiWeek .emptyLane .quickLaneItems,
+.multiWeek .emptyLane .paymentLaneItems{
+  background:#fff;
+}
+
+@media(max-width:760px){
+  .week .commonTopLane,.multiWeek .commonTopLane{height:48px!important;min-height:48px!important;max-height:48px!important}
+  .week .quickLane,.multiWeek .quickLane,.week .paymentLane,.multiWeek .paymentLane{height:44px!important;min-height:44px!important;max-height:44px!important}
+  .week .commonTopLaneHead,.multiWeek .commonTopLaneHead,
+  .week .quickLaneHead,.multiWeek .quickLaneHead,
+  .week .paymentLaneHead,.multiWeek .paymentLaneHead{height:13px!important;min-height:13px!important;padding:1px!important}
+  .week .commonTopLaneItems,.multiWeek .commonTopLaneItems{height:35px!important;max-height:35px!important;padding:1px 0!important}
+  .week .quickLaneItems,.multiWeek .quickLaneItems,
+  .week .paymentLaneItems,.multiWeek .paymentLaneItems{height:31px!important;max-height:31px!important;padding:1px 0!important}
+}

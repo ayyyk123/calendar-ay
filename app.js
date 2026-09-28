@@ -976,32 +976,32 @@ function appointmentLaneHtml(es, compact=false){
   if(!items.length) return '';
   return `<div class="appointmentLane ${compact?'compactAppointmentLane':''}"><div class="appointmentLaneHead"><span>예약 · 약속</span><small>${items.length}건</small></div><div class="appointmentLaneItems">${items.map(e=>eventItemHtml(e,compact)).join('')}</div></div>`;
 }
-function quickLaneHtml(es, compact=false){
+function quickLaneHtml(es, compact=false, force=false){
   const quick=(es||[]).filter(e=>e.kind==='todo');
-  if(!quick.length) return '';
-  return `<div class="quickLane ${compact?'compactQuickLane':''}"><div class="quickLaneHead"><span>Quick</span><small>${quick.length}건</small></div><div class="quickLaneItems">${quick.map(e=>eventItemHtml(e,compact)).join('')}</div></div>`;
+  if(!quick.length && !force) return '';
+  return `<div class="quickLane ${compact?'compactQuickLane':''} ${!quick.length?'emptyLane':''}"><div class="quickLaneHead"><span>Quick</span><small>${quick.length}건</small></div><div class="quickLaneItems">${quick.map(e=>eventItemHtml(e,compact)).join('')}</div></div>`;
 }
 function anniversaryLaneHtml(es, compact=false){
   const items=(es||[]).filter(e=>e.kind==='anniversary');
   if(!items.length) return '';
   return `<div class="anniversaryLane ${compact?'compactAnniversaryLane':''}"><div class="anniversaryLaneHead"><span>♥ D-Day · 기념일</span><small>${items.length}건</small></div><div class="anniversaryLaneItems">${items.map(e=>eventItemHtml(e,compact)).join('')}</div></div>`;
 }
-function commonTopLaneHtml(es, compact=false){
+function commonTopLaneHtml(es, compact=false, force=false){
   const anniversaries=(es||[]).filter(e=>e.kind==='anniversary');
   const appointments=(es||[]).filter(e=>e.kind==='appointment');
   const count=anniversaries.length+appointments.length;
-  if(!count) return '';
+  if(!count && !force) return '';
   const anniversaryRows=anniversaries.map(e=>eventItemHtml(e,compact)).join('');
   const appointmentRows=appointments.map(e=>eventItemHtml(e,compact)).join('');
-  return `<div class="commonTopLane ${compact?'compactCommonTopLane':''}"><div class="commonTopLaneHead"><span>공통 일정</span><small>${count}건</small></div><div class="commonTopLaneItems">${anniversaryRows}${appointmentRows}</div></div>`;
+  return `<div class="commonTopLane ${compact?'compactCommonTopLane':''} ${!count?'emptyLane':''}"><div class="commonTopLaneHead"><span>공통 일정</span><small>${count}건</small></div><div class="commonTopLaneItems">${anniversaryRows}${appointmentRows}</div></div>`;
 }
 function nonQuickItemsHtml(es, compact=false){
   return (es||[]).filter(e=>e.kind!=='todo' && e.kind!=='appointment' && e.kind!=='anniversary').map(e=>eventItemHtml(e,compact)).join('');
 }
-function paymentLaneHtml(es, compact=false){
+function paymentLaneHtml(es, compact=false, force=false){
   const payments=(es||[]).filter(e=>e.kind==='payment');
-  if(!payments.length) return '';
-  return `<div class="paymentLane ${compact?'compactPaymentLane':''}"><div class="paymentLaneHead"><span>₩ 납부</span><small>${payments.length}건</small></div><div class="paymentLaneItems">${payments.map(e=>eventItemHtml(e,compact)).join('')}</div></div>`;
+  if(!payments.length && !force) return '';
+  return `<div class="paymentLane ${compact?'compactPaymentLane':''} ${!payments.length?'emptyLane':''}"><div class="paymentLaneHead"><span>₩ 납부</span><small>${payments.length}건</small></div><div class="paymentLaneItems">${payments.map(e=>eventItemHtml(e,compact)).join('')}</div></div>`;
 }
 function capacityText(sum, cap, unknown=false){
   if(unknown) return `<span class="capacityUnknown">${fmtH(sum)} / 미정</span>`;
@@ -1018,9 +1018,9 @@ function daySubCalHeadHtml(date,c,label='↳ '){
   return `<button type="button" class="dayCalToggle" data-daycal-toggle="1" data-date="${esc(date)}" data-cal-id="${esc(c.id)}" aria-expanded="${collapsed?'false':'true'}" title="${esc(c.name)} 접기/펴기 · 가용시간은 상위 캘린더와 공유"><span class="dayCalHeadLabel">${label}${esc(c.name)}</span><span class="dayCalHeadRight sharedCapacityText">상위 공유 <b>${collapsed?'▸':'▾'}</b></span></button>`;
 }
 function groupHtml(date, es){
-  const commonTopHtml=commonTopLaneHtml(es,false);
-  const quickHtml=quickLaneHtml(es,false);
-  const paymentHtml=paymentLaneHtml(es,false);
+  const commonTopHtml=commonTopLaneHtml(es,false,true);
+  const quickHtml=quickLaneHtml(es,false,true);
+  const paymentHtml=paymentLaneHtml(es,false,true);
   const appointmentEvents=(es||[]).filter(e=>e.kind==='appointment');
   const quickEvents=(es||[]).filter(e=>e.kind==='todo');
   const workEvents=(es||[]).filter(e=>e.kind!=='payment' && e.kind!=='appointment' && e.kind!=='anniversary' && e.kind!=='todo');
