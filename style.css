@@ -1156,3 +1156,10 @@ body.resizingLaneLabel *{
   .laneLabelWidthResizer{display:none}
   .scheduleLaneToggle b{font-size:6.5px!important;max-height:calc(var(--lane-h,90px) - 18px)!important}
 }
+
+
+/* v1.56 - free ordering within the same date + visual lane (parent + subcalendar together) */
+.laneOrderedItem{position:relative;margin:0;min-width:0}
+.laneOrderedItem .item{margin-top:1px!important;margin-bottom:1px!important}
+.laneInlineCalTag{display:inline-flex;align-items:center;max-width:calc(100% - 4px);margin:1px 2px 0;padding:0 3px;border-left:2px solid var(--tag-color,#d9d9d9);font-size:8.5px;line-height:13px;color:#707782;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:color-mix(in srgb,var(--tag-color,#d9d9d9) 10%,white);border-radius:2px}
+@media(max-width:760px){.laneInlineCalTag{font-size:6.8px;line-height:10px;padding:0 2px;margin-top:0}}

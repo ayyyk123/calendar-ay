@@ -802,8 +802,6 @@ function buildOccurrenceMap(rangeStart, rangeEnd, options={}){
   }
   for(const k of Object.keys(map)){
     map[k].sort((a,b)=>{
-      const calOrder=cal(a.calId).order-cal(b.calId).order;
-      if(calOrder) return calOrder;
       const ao=Number(a.orderByDate?.[k]);
       const bo=Number(b.orderByDate?.[k]);
       const ah=Number.isFinite(ao)&&ao!==0, bh=Number.isFinite(bo)&&bo!==0;
@@ -817,6 +815,8 @@ function buildOccurrenceMap(rangeStart, rangeEnd, options={}){
         if(arh&&brh&&ar!==br) return ar-br;
         if(arh!==brh) return arh?-1:1;
       }
+      const calOrder=cal(a.calId).order-cal(b.calId).order;
+      if(calOrder) return calOrder;
       return ((a.allDay===b.allDay)?0:(a.allDay?-1:1)) || (a.start||'').localeCompare(b.start||'') || a.title.localeCompare(b.title,'ko');
     });
   }
@@ -1441,6 +1441,14 @@ function readDragPayload(dt){
   return null;
 }
 function occurrenceKey(e){ return `${e.id}|${e._occurrenceStart||e.date}`; }
+function eventOrderGroupKey(e){
+  if(!e) return '';
+  if(e.kind==='anniversary' || e.kind==='appointment') return 'common';
+  if(e.kind==='todo') return 'quick';
+  if(e.kind==='payment') return 'payment';
+  const root=topAncestor(e.calId);
+  return `cal:${root?.id||e.calId||''}`;
+}
 let pendingRepeatOrder=null;
 function buildReorderContext(payload,targetItem,before=true){
   if(!payload?.id || !payload.day) return null;
@@ -1448,13 +1456,12 @@ function buildReorderContext(payload,targetItem,before=true){
   if(!day || day!==payload.day) return null;
   const src=state.events.find(x=>x.id===payload.id), target=state.events.find(x=>x.id===targetItem.dataset.eid);
   if(!src||!target||src.id===target.id&&String(payload.occurrence||'')===String(targetItem.dataset.occurrence||'')) return null;
-  const targetLane=targetItem.dataset.lane||'work';
-  const sourceLane=payload.lane||((src.kind==='payment')?'payment':'work');
-  if(src.calId!==target.calId || sourceLane!==targetLane) return null;
-  const map=buildOccurrenceMap(day,day,{includeHidden:true});
+  const sourceGroup=eventOrderGroupKey(src), targetGroup=eventOrderGroupKey(target);
+  if(!sourceGroup || sourceGroup!==targetGroup) return null;
+  const map=buildOccurrenceMap(day,day,{calendarIds:focusedCalendarIds()});
   const list=[]; const seen=new Set();
   for(const e of (map[day]||[])){
-    if(e.calId!==src.calId || ((e.kind==='payment')?'payment':'work')!==sourceLane) continue;
+    if(eventOrderGroupKey(e)!==sourceGroup) continue;
     const k=occurrenceKey(e); if(seen.has(k)) continue; seen.add(k); list.push(e);
   }
   const sourceKey=`${payload.id}|${payload.occurrence||src.date}`;
@@ -1466,7 +1473,7 @@ function buildReorderContext(payload,targetItem,before=true){
   if(insertAt<0) insertAt=list.length;
   if(!before) insertAt++;
   list.splice(Math.min(insertAt,list.length),0,moved);
-  return {day,src,target,sourceLane,list};
+  return {day,src,target,sourceGroup,list};
 }
 function applyReorderContext(ctx,scope='day'){
   if(!ctx) return false;
@@ -1598,7 +1605,9 @@ function bindItems(){
       item.ondragover=e=>{
         const payload=activeDrag||readDragPayload(e.dataTransfer);
         const sameDay=payload?.type==='event' && payload.day && payload.day===item.dataset.renderDate;
-        const sameGroup=sameDay && payload.calId===item.dataset.calId && (payload.lane||'work')===(item.dataset.lane||'work');
+        const srcEvent=payload?.id?state.events.find(x=>x.id===payload.id):null;
+        const targetEvent=state.events.find(x=>x.id===item.dataset.eid);
+        const sameGroup=sameDay && !!srcEvent && !!targetEvent && eventOrderGroupKey(srcEvent)===eventOrderGroupKey(targetEvent);
         if(!sameGroup) return;
         e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect='move';
         const r=item.getBoundingClientRect(), before=e.clientY<r.top+r.height/2;
@@ -1608,7 +1617,9 @@ function bindItems(){
       item.ondrop=e=>{
         const payload=activeDrag||readDragPayload(e.dataTransfer);
         const sameDay=payload?.type==='event' && payload.day && payload.day===item.dataset.renderDate;
-        const sameGroup=sameDay && payload.calId===item.dataset.calId && (payload.lane||'work')===(item.dataset.lane||'work');
+        const srcEvent=payload?.id?state.events.find(x=>x.id===payload.id):null;
+        const targetEvent=state.events.find(x=>x.id===item.dataset.eid);
+        const sameGroup=sameDay && !!srcEvent && !!targetEvent && eventOrderGroupKey(srcEvent)===eventOrderGroupKey(targetEvent);
         item.classList.remove('orderDropBefore','orderDropAfter');
         if(!sameGroup) return;
         e.preventDefault(); e.stopPropagation();
@@ -1849,12 +1860,10 @@ function rootLaneCellHtml(date,root,es,visibleIds){
   const allForLoad=(es||[]).filter(e=>memberIds.has(e.calId) && !['anniversary','payment'].includes(e.kind));
   const sum=allForLoad.reduce((a,e)=>a+workloadDuration(e),0), cap=capacityForDate(root,date);
   let body='';
-  const direct=normal.filter(e=>e.calId===root.id);
-  if(direct.length) body+=direct.map(e=>eventItemHtml(e,false)).join('');
-  for(const child of members.filter(c=>c.id!==root.id)){
-    const xs=normal.filter(e=>e.calId===child.id); if(!xs.length) continue;
-    body+=`<div class="laneSubGroup"><div class="laneSubLabel" style="--sub-color:${esc(child.color)}"><span class="laneSubDot" style="background:${esc(child.color)}"></span>↳ ${esc(child.name)}</div>${xs.map(e=>eventItemHtml(e,false)).join('')}</div>`;
-  }
+  body=normal.map(e=>{
+    const c=cal(e.calId), isSub=e.calId!==root.id;
+    return `<div class="laneOrderedItem ${isSub?'laneOrderedSubItem':'laneOrderedRootItem'}" data-lane-cal-id="${esc(e.calId)}" title="${esc(calendarPath(e.calId))}">${isSub?`<span class="laneInlineCalTag" style="--tag-color:${esc(c.color)}">↳ ${esc(c.name)}</span>`:''}${eventItemHtml(e,false)}</div>`;
+  }).join('');
   const capText=cap.unknown?`${fmtH(sum)} / 미정`:`${fmtH(sum)} / ${fmtH(cap.hours)}`;
   const cls=cap.unknown?'unknown':(Number(cap.hours)>0&&sum>Number(cap.hours)?'over':'ok');
   return `<div class="laneCellLoad ${cls}" title="${esc(root.name)} 가용시간">${capText}${cap.blocked?' · 차단':''}</div>${body}`;
