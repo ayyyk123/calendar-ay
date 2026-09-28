@@ -805,3 +805,155 @@ body.resizingLane{cursor:ns-resize!important;user-select:none!important}body.res
   .scheduleLaneGrid{height:clamp(50px,var(--lane-h,90px),150px)}.scheduleLaneCell{padding:1px 2px}.scheduleLaneCell .item{padding:2px 2px!important;margin:1px 0!important}.scheduleLaneCell .itemTitle{font-size:7.8px!important;line-height:14px!important}.scheduleLaneCell .repeatMark,.scheduleLaneCell .carryBadge{font-size:6px}.scheduleLaneCell .importanceBtn{font-size:8px}.scheduleLaneCell .checklistToggle{font-size:6px;padding:0 1px}
   .laneCellLoad{font-size:6px;line-height:10px;padding:0 2px}.laneSubLabel{height:11px;font-size:6px;margin:0}.laneSubDot{width:4px;height:4px}.laneHeightResizer{display:none}.scheduleSummaryCell{min-height:18px;padding:2px 1px;font-size:6px}.multiLaneWeekLabel{font-size:8px;padding:3px 5px}
 }
+
+
+/* v1.53 - 캘린더 이름을 상단 띠가 아닌 좌측 고정 라벨 열로 이동 */
+.laneView{--lane-label-w:112px}
+.scheduleDateGrid,.scheduleSummaryGrid{
+  grid-template-columns:var(--lane-label-w) repeat(7,minmax(0,1fr))!important;
+}
+.scheduleDateCorner{
+  position:sticky;
+  left:0;
+  z-index:12;
+  height:54px;
+  display:flex;
+  align-items:flex-end;
+  justify-content:center;
+  padding:0 4px 6px;
+  border-right:1px solid #e5e8ec;
+  background:#f8f9fb;
+  color:#a0a7b1;
+  font-size:9px;
+  font-weight:700;
+}
+.scheduleLane{
+  display:grid!important;
+  grid-template-columns:var(--lane-label-w) minmax(0,1fr)!important;
+  grid-template-rows:auto 6px!important;
+  align-items:stretch;
+  border-bottom:0!important;
+  background:#fff;
+}
+.scheduleLaneHead{display:none!important}
+.scheduleLaneSide{
+  grid-column:1;
+  grid-row:1;
+  position:sticky;
+  left:0;
+  z-index:6;
+  min-width:0;
+  height:var(--lane-h,112px);
+  border-right:1px solid #e1e5ea;
+  border-bottom:1px solid #dfe3e8;
+  background:color-mix(in srgb,var(--lane-color,#d9d9d9) 10%,white);
+  transition:height .08s linear;
+}
+.scheduleLaneToggle{
+  width:100%;
+  height:100%;
+  padding:7px 7px 6px!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  display:flex!important;
+  flex-direction:column;
+  align-items:flex-start!important;
+  justify-content:flex-start;
+  gap:5px!important;
+  text-align:left;
+  color:#344054;
+  overflow:hidden;
+}
+.scheduleLaneName{display:flex;flex-direction:column;min-width:0;max-width:100%;gap:2px}
+.scheduleLaneToggle b{
+  display:block;
+  max-width:100%;
+  font-size:11px!important;
+  line-height:1.25;
+  white-space:normal!important;
+  overflow-wrap:anywhere;
+  overflow:hidden;
+}
+.scheduleLaneToggle small{
+  display:block;
+  max-width:100%;
+  font-size:8px!important;
+  line-height:1.2;
+  color:#8a94a5;
+  white-space:normal!important;
+  overflow:hidden;
+}
+.scheduleLaneDot{width:8px;height:8px;flex:0 0 auto}
+.scheduleLaneArrow{position:absolute;right:6px;bottom:5px;margin:0!important;font-size:10px}
+.scheduleLaneGrid{
+  grid-column:2;
+  grid-row:1;
+  display:grid!important;
+  grid-template-columns:repeat(7,minmax(0,1fr))!important;
+  width:100%;
+  height:var(--lane-h,112px);
+  min-height:44px;
+  border-bottom:1px solid #dfe3e8;
+}
+.scheduleLane.collapsed{
+  grid-template-rows:auto 0!important;
+}
+.scheduleLane.collapsed .scheduleLaneSide{
+  height:30px!important;
+}
+.scheduleLane.collapsed .scheduleLaneToggle{
+  flex-direction:row!important;
+  align-items:center!important;
+  gap:4px!important;
+  padding:4px 6px!important;
+}
+.scheduleLane.collapsed .scheduleLaneName{flex-direction:row;align-items:center;gap:4px}
+.scheduleLane.collapsed .scheduleLaneToggle b{white-space:nowrap!important;text-overflow:ellipsis}
+.scheduleLane.collapsed .scheduleLaneToggle small{display:none}
+.scheduleLane.collapsed .scheduleLaneArrow{position:static;margin-left:auto!important}
+.scheduleLane.collapsed .scheduleLaneGrid{display:none!important}
+.laneHeightResizer{
+  grid-column:1 / -1;
+  grid-row:2;
+  z-index:10;
+}
+.scheduleSummaryLabel{
+  position:sticky;
+  left:0;
+  z-index:5;
+  min-height:24px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:4px;
+  border-right:1px solid #e5e8ec;
+  background:#f4f6f8;
+  color:#8a94a5;
+  font-size:9px;
+  font-weight:700;
+}
+.scheduleSummaryGrid{background:#fafbfc}
+.scheduleLane[data-lane-key="common"] .scheduleLaneSide{background:#fbf6fa}
+.scheduleLane[data-lane-key="quick"] .scheduleLaneSide{background:#f7f8fa}
+.scheduleLane[data-lane-key="payment"] .scheduleLaneSide{background:#fcf9ef}
+
+@media(max-width:1180px){
+  .laneView{--lane-label-w:92px}
+  .scheduleLaneToggle{padding:6px 5px 5px!important}
+  .scheduleLaneToggle b{font-size:10px!important}
+  .scheduleLaneToggle small{font-size:7px!important}
+}
+@media(max-width:760px){
+  .laneView{--lane-label-w:48px}
+  .scheduleDateCorner{height:44px;padding:0 1px 4px;font-size:6px}
+  .scheduleLaneSide{height:clamp(50px,var(--lane-h,90px),150px)}
+  .scheduleLaneToggle{padding:4px 2px!important;gap:3px!important}
+  .scheduleLaneToggle b{font-size:7px!important;line-height:1.15;text-align:left}
+  .scheduleLaneToggle small{font-size:5.5px!important;line-height:1.1}
+  .scheduleLaneDot{width:6px;height:6px}
+  .scheduleLaneArrow{right:2px;bottom:2px;font-size:7px}
+  .scheduleLane.collapsed .scheduleLaneSide{height:22px!important}
+  .scheduleLane.collapsed .scheduleLaneToggle{padding:2px!important}
+  .scheduleSummaryLabel{min-height:18px;padding:2px 1px;font-size:6px}
+}

@@ -1874,13 +1874,19 @@ function scheduleLaneHtml(key,title,days,map,cellBuilder,{type='calendar',color=
   const collapsed=laneIsCollapsed(key), h=laneHeight(key,type);
   const cells=days.map(d=>{ const date=ds(d); return `<div class="scheduleLaneCell" data-dropdate="${date}" ondblclick="window.__newEvent?.('${date}')">${cellBuilder(date,map[date]||[])}</div>`; }).join('');
   return `<section class="scheduleLane ${collapsed?'collapsed':''}" data-lane-key="${esc(key)}" style="--lane-h:${h}px;--lane-color:${esc(color)}">
-    <div class="scheduleLaneHead"><button type="button" class="scheduleLaneToggle" data-lane-toggle="${esc(key)}" title="구역 접기/펴기"><span class="scheduleLaneDot" style="background:${esc(color)}"></span><b>${title}</b>${subtitle?`<small>${subtitle}</small>`:''}<span class="scheduleLaneArrow">${collapsed?'▸':'▾'}</span></button></div>
+    <aside class="scheduleLaneSide" style="--lane-color:${esc(color)}">
+      <button type="button" class="scheduleLaneToggle" data-lane-toggle="${esc(key)}" title="구역 접기/펴기">
+        <span class="scheduleLaneDot" style="background:${esc(color)}"></span>
+        <span class="scheduleLaneName"><b>${title}</b>${subtitle?`<small>${subtitle}</small>`:''}</span>
+        <span class="scheduleLaneArrow">${collapsed?'▸':'▾'}</span>
+      </button>
+    </aside>
     <div class="scheduleLaneGrid">${cells}</div>
     <div class="laneHeightResizer" data-lane-resize="${esc(key)}" title="마우스로 드래그해 구역 높이 조절 · 더블클릭 기본높이"></div>
   </section>`;
 }
 function scheduleDateHeader(days){
-  return `<div class="scheduleDateGrid">${days.map(d=>{const key=ds(d),hasDiary=!!state.diary[key]?.text,h=holidayLabel(key),dow=d.getDay(),dayClass=[key===ds(new Date())?'today':'',holidayClass(key),dow===0?'sunday':'',dow===6?'saturday':''].filter(Boolean).join(' ');return `<div class="scheduleDateHead ${dayClass}"><div class="dayTopLine"><span class="weekdayLabel">${['일','월','화','수','목','금','토'][dow]}</span><span class="dateNum">${d.getDate()}</span><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}" title="${hasDiary?'다이어리 보기':'다이어리 작성'}">📝</button></div><div class="holidayName ${h?'':'holidayEmpty'}" title="${h?esc(h):''}">${h?esc(h):'&nbsp;'}</div></div>`}).join('')}</div>`;
+  return `<div class="scheduleDateGrid"><div class="scheduleDateCorner">구역</div>${days.map(d=>{const key=ds(d),hasDiary=!!state.diary[key]?.text,h=holidayLabel(key),dow=d.getDay(),dayClass=[key===ds(new Date())?'today':'',holidayClass(key),dow===0?'sunday':'',dow===6?'saturday':''].filter(Boolean).join(' ');return `<div class="scheduleDateHead ${dayClass}"><div class="dayTopLine"><span class="weekdayLabel">${['일','월','화','수','목','금','토'][dow]}</span><span class="dateNum">${d.getDate()}</span><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}" title="${hasDiary?'다이어리 보기':'다이어리 작성'}">📝</button></div><div class="holidayName ${h?'':'holidayEmpty'}" title="${h?esc(h):''}">${h?esc(h):'&nbsp;'}</div></div>`}).join('')}</div>`;
 }
 function scheduleWeekBoard(days,map){
   const visible=visibleCals(),visibleIds=new Set(visible.map(c=>c.id));
@@ -1893,7 +1899,7 @@ function scheduleWeekBoard(days,map){
     const subNames=members.filter(c=>c.id!==root.id).map(c=>c.name);
     html+=scheduleLaneHtml(`cal:${root.id}`,esc(root.name),days,map,(date,es)=>rootLaneCellHtml(date,root,es,visibleIds),{type:'calendar',color:root.color,subtitle:subNames.length?`부속 ${subNames.length}`:root.period});
   }
-  html+=`<div class="scheduleSummaryGrid">${days.map(d=>{const date=ds(d);return `<div class="scheduleSummaryCell">${daySummaryHtml(date,map[date]||[])}</div>`}).join('')}</div></div>`;
+  html+=`<div class="scheduleSummaryGrid"><div class="scheduleSummaryLabel">합계</div>${days.map(d=>{const date=ds(d);return `<div class="scheduleSummaryCell">${daySummaryHtml(date,map[date]||[])}</div>`}).join('')}</div></div>`;
   return html;
 }
 function bindScheduleLanes(){
@@ -1906,7 +1912,8 @@ function bindScheduleLanes(){
       if(window.matchMedia('(max-width:760px)').matches) return;
       e.preventDefault(); e.stopPropagation();
       const lane=handle.closest('.scheduleLane'), key=handle.dataset.laneResize; if(!lane) return;
-      const startY=e.clientY,startH=lane.getBoundingClientRect().height - lane.querySelector('.scheduleLaneHead').getBoundingClientRect().height - handle.getBoundingClientRect().height;
+      const grid=lane.querySelector('.scheduleLaneGrid');
+      const startY=e.clientY,startH=Math.max(44,Math.round(grid?.getBoundingClientRect().height||laneHeight(key)));
       handle.setPointerCapture?.(e.pointerId); document.body.classList.add('resizingLane');
       const move=ev=>{ const h=Math.max(44,Math.min(480,startH+(ev.clientY-startY))); lane.style.setProperty('--lane-h',`${Math.round(h)}px`); };
       const up=ev=>{ document.removeEventListener('pointermove',move); document.removeEventListener('pointerup',up); document.body.classList.remove('resizingLane'); const grid=lane.querySelector('.scheduleLaneGrid'); const h=Math.max(44,Math.min(480,Math.round(grid?.getBoundingClientRect().height||startH))); state.settings.laneHeights=state.settings.laneHeights||{}; state.settings.laneHeights[key]=h; save(); };
