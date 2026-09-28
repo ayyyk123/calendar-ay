@@ -558,3 +558,102 @@ input,select,textarea{border-color:#d9dee5}.repeatBox,.dataManage,.weekdayCapaci
   .quickLaneHead,.appointmentLaneHead,.paymentLaneHead,.anniversaryLaneHead{min-height:13px;padding:1px 2px!important;font-size:6.8px!important}
   .dayTotal{font-size:6.7px!important;margin-top:1px;padding:2px 1px!important}
 }
+
+
+/* v1.49 - top sections (예약·약속 / Quick / 납부) shown as separated lanes without boxed containers */
+.appointmentLane,.quickLane,.paymentLane,.anniversaryLane{
+  margin:0 0 6px!important;
+  border:0!important;
+  background:transparent!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  overflow:visible!important;
+  padding:0!important;
+}
+.appointmentLaneHead,.quickLaneHead,.paymentLaneHead,.anniversaryLaneHead{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:6px;
+  min-height:auto!important;
+  margin:0 0 2px;
+  padding:0 1px 1px!important;
+  border:0!important;
+  border-bottom:1px dashed #d7dde5;
+  background:transparent!important;
+  font-size:10px!important;
+  font-weight:800;
+  letter-spacing:-.01em;
+}
+.appointmentLaneHead{color:#315e99}
+.quickLaneHead{color:#586172}
+.paymentLaneHead{color:#8b6a21}
+.anniversaryLaneHead{color:#9b3c74}
+.appointmentLaneHead small,.quickLaneHead small,.paymentLaneHead small,.anniversaryLaneHead small{
+  font-size:9px!important;
+  font-weight:700;
+  color:#8a94a5!important;
+}
+.appointmentLaneItems,.paymentLaneItems,.anniversaryLaneItems,.quickLaneItems{
+  padding:0!important;
+}
+.appointmentLane .item,.quickLane .item,.paymentLane .item,.anniversaryLane .item{
+  margin:1px 0!important;
+}
+.appointmentLane .item{background:color-mix(in srgb, #dbeafe 36%, white)!important}
+.quickLane .item{background:color-mix(in srgb, #e5e7eb 30%, white)!important}
+.paymentLane .item{background:color-mix(in srgb, #f6e7bd 40%, white)!important}
+.anniversaryLane .item{background:color-mix(in srgb, #f8d8eb 36%, white)!important}
+.month .appointmentLaneHead,.month .quickLaneHead,.month .paymentLaneHead,.month .anniversaryLaneHead{
+  font-size:8px!important;
+  padding:0 1px 1px!important;
+  margin-bottom:1px;
+}
+.month .appointmentLaneHead small,.month .quickLaneHead small,.month .paymentLaneHead small,.month .anniversaryLaneHead small{
+  font-size:7px!important;
+}
+@media(max-width:760px){
+  .appointmentLane,.quickLane,.paymentLane,.anniversaryLane{margin-bottom:4px!important}
+  .appointmentLaneHead,.quickLaneHead,.paymentLaneHead,.anniversaryLaneHead{font-size:8px!important}
+  .appointmentLaneHead small,.quickLaneHead small,.paymentLaneHead small,.anniversaryLaneHead small{font-size:7px!important}
+}
+
+
+/* v1.50 - D-Day/기념일 + 예약/약속 공통 상단구역 */
+.commonTopLane{
+  margin:0 0 6px;
+  padding:0;
+  border:0;
+  background:transparent;
+}
+.commonTopLaneHead{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:6px;
+  margin:0 0 2px;
+  padding:0 1px 1px;
+  border-bottom:1px dashed #d7dde5;
+  color:#667085;
+  font-size:10px;
+  font-weight:800;
+}
+.commonTopLaneHead small{font-size:9px;color:#98a2b3;font-weight:700}
+.commonTopLaneItems{padding:0}
+.commonTopLane .item{margin:1px 0!important}
+.commonTopLane .kind-anniversary{
+  background:color-mix(in srgb,#f8d8eb 38%,white)!important;
+}
+.commonTopLane .kind-anniversary .itemTitle{color:#8e3f70;font-weight:700}
+.commonTopLane .kind-appointment{
+  background:color-mix(in srgb,#dbeafe 38%,white)!important;
+}
+.commonTopLane .kind-appointment .itemTitle{color:#2f5f99;font-weight:700}
+.compactCommonTopLane{margin-bottom:4px}
+.compactCommonTopLane .commonTopLaneHead{font-size:8px;margin-bottom:1px;padding:0 1px 1px}
+.compactCommonTopLane .commonTopLaneHead small{font-size:7px}
+@media(max-width:760px){
+  .commonTopLane{margin-bottom:4px}
+  .commonTopLaneHead{font-size:8px}
+  .commonTopLaneHead small{font-size:7px}
+}

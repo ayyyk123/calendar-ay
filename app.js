@@ -966,7 +966,7 @@ function eventItemHtml(e, compact=false){
   const repeatBadge=recurring?`<span class="repeatMark" title="${esc(repeatRuleLabel(e))}">↻</span>`:'';
   const carryBadge=inLabel?`<span class="carryBadge carryIn" title="${esc(inLabel)}">↪</span>`:'';
   const amountInline=payment&&Number(e.paymentAmount)>0?`<span class="inlineMeta">₩${Number(e.paymentAmount).toLocaleString('ko-KR')}</span>`:'';
-  return `<div class="item ${done?'done':''} ${recurring?'recurringItem':''} ${payment?'paymentItem':''} ${e.fixedId?'manualPlacedItem':''} ${e.flexibleId?'flexiblePlacedItem':''} ${inLabel?'carriedIn':''} ${outRecord?'carriedOut':''}" draggable="${drag}" data-eid="${esc(e.id)}" data-occurrence="${esc(e._occurrenceStart||e.date)}" data-render-date="${esc(renderDate)}" data-cal-id="${esc(e.calId)}" data-lane="${payment?'payment':'work'}" style="--item-color:${esc(c.color)};border-left-color:${esc(c.color)}">
+  return `<div class="item ${done?'done':''} kind-${esc(e.kind||'event')} ${recurring?'recurringItem':''} ${payment?'paymentItem':''} ${e.fixedId?'manualPlacedItem':''} ${e.flexibleId?'flexiblePlacedItem':''} ${inLabel?'carriedIn':''} ${outRecord?'carriedOut':''}" draggable="${drag}" data-eid="${esc(e.id)}" data-occurrence="${esc(e._occurrenceStart||e.date)}" data-render-date="${esc(renderDate)}" data-cal-id="${esc(e.calId)}" data-lane="${payment?'payment':'work'}" style="--item-color:${esc(c.color)};border-left-color:${esc(c.color)}">
     <div class="itemRow">${dragHandle}${e.important?`<button type="button" class="importanceBtn on" data-action="importance" aria-label="중요 표시 해제" title="중요 표시 해제">★</button>`:''}${mainCheck}<div class="itemTitle" title="${esc(tooltip)}">${timePrefix}<span class="durationPrefix">${esc(durationPrefix)}</span>${payment?'₩ ':(!checkable?kindPrefix(e):'')}${esc(e.title)}</div>${amountInline}${repeatBadge}${carryBadge}${checklistButton}</div>
     ${expanded?checklistHtml(e,false):''}
   </div>`;
@@ -985,6 +985,15 @@ function anniversaryLaneHtml(es, compact=false){
   const items=(es||[]).filter(e=>e.kind==='anniversary');
   if(!items.length) return '';
   return `<div class="anniversaryLane ${compact?'compactAnniversaryLane':''}"><div class="anniversaryLaneHead"><span>♥ D-Day · 기념일</span><small>${items.length}건</small></div><div class="anniversaryLaneItems">${items.map(e=>eventItemHtml(e,compact)).join('')}</div></div>`;
+}
+function commonTopLaneHtml(es, compact=false){
+  const anniversaries=(es||[]).filter(e=>e.kind==='anniversary');
+  const appointments=(es||[]).filter(e=>e.kind==='appointment');
+  const count=anniversaries.length+appointments.length;
+  if(!count) return '';
+  const anniversaryRows=anniversaries.map(e=>eventItemHtml(e,compact)).join('');
+  const appointmentRows=appointments.map(e=>eventItemHtml(e,compact)).join('');
+  return `<div class="commonTopLane ${compact?'compactCommonTopLane':''}"><div class="commonTopLaneHead"><span>공통 일정</span><small>${count}건</small></div><div class="commonTopLaneItems">${anniversaryRows}${appointmentRows}</div></div>`;
 }
 function nonQuickItemsHtml(es, compact=false){
   return (es||[]).filter(e=>e.kind!=='todo' && e.kind!=='appointment' && e.kind!=='anniversary').map(e=>eventItemHtml(e,compact)).join('');
@@ -1009,14 +1018,15 @@ function daySubCalHeadHtml(date,c,label='↳ '){
   return `<button type="button" class="dayCalToggle" data-daycal-toggle="1" data-date="${esc(date)}" data-cal-id="${esc(c.id)}" aria-expanded="${collapsed?'false':'true'}" title="${esc(c.name)} 접기/펴기 · 가용시간은 상위 캘린더와 공유"><span class="dayCalHeadLabel">${label}${esc(c.name)}</span><span class="dayCalHeadRight sharedCapacityText">상위 공유 <b>${collapsed?'▸':'▾'}</b></span></button>`;
 }
 function groupHtml(date, es){
-  const anniversaryHtml=anniversaryLaneHtml(es,false);
-  const appointmentHtml=appointmentLaneHtml(es,false);
+  const commonTopHtml=commonTopLaneHtml(es,false);
+  const quickHtml=quickLaneHtml(es,false);
   const paymentHtml=paymentLaneHtml(es,false);
   const appointmentEvents=(es||[]).filter(e=>e.kind==='appointment');
-  const workEvents=(es||[]).filter(e=>e.kind!=='payment' && e.kind!=='appointment' && e.kind!=='anniversary');
+  const quickEvents=(es||[]).filter(e=>e.kind==='todo');
+  const workEvents=(es||[]).filter(e=>e.kind!=='payment' && e.kind!=='appointment' && e.kind!=='anniversary' && e.kind!=='todo');
   let html='';
   const visible=visibleCals(), visibleIds=new Set(visible.map(c=>c.id));
-  let total=appointmentEvents.reduce((sum,e)=>sum+workloadDuration(e),0), totalCapacity=0, hasUnknownCapacity=false, blockedRootCount=0;
+  let total=appointmentEvents.reduce((sum,e)=>sum+workloadDuration(e),0) + quickEvents.reduce((sum,e)=>sum+workloadDuration(e),0), totalCapacity=0, hasUnknownCapacity=false, blockedRootCount=0;
   for(const root of topLevelCals()){
     const members=[root,...descendants(root.id)].filter(c=>visibleIds.has(c.id));
     if(!members.length) continue;
@@ -1032,12 +1042,12 @@ function groupHtml(date, es){
     const blockedTitle=rootCapInfo.blocked?' · 가용시간 차단 일정 있음':'';
     html += `<div class="group calendarTreeGroup ${rootCollapsed?'collapsed':''}" style="--group-color:${esc(root.color)}"><div class="groupHead" style="background:${esc(root.color)}55" title="${esc(root.name)}${blockedTitle}">${dayCalHeadHtml(date,root,rootSum,rootCapInfo.hours,rootCapInfo.unknown)}</div><div class="dayCalGroupBody">`;
     const direct=groupEvents.filter(e=>e.calId===root.id);
-    if(direct.length) html += quickLaneHtml(direct,false)+nonQuickItemsHtml(direct,false);
+    if(direct.length) html += nonQuickItemsHtml(direct,false);
     for(const child of members.filter(c=>c.id!==root.id)){
       const xs=groupEvents.filter(e=>e.calId===child.id); if(!xs.length) continue;
       const depth=Math.max(1,calendarDepth(child.id));
       const childCollapsed=isDayCalCollapsed(date,child.id);
-      html += `<div class="subCalGroup ${childCollapsed?'collapsed':''}" style="--sub-depth:${depth}"><div class="subCalHead" style="border-left-color:${esc(child.color)};background:color-mix(in srgb, ${esc(child.color)} 14%, white)">${daySubCalHeadHtml(date,child,'↳ ')}</div><div class="dayCalGroupBody">${quickLaneHtml(xs,false)}${nonQuickItemsHtml(xs,false)}</div></div>`;
+      html += `<div class="subCalGroup ${childCollapsed?'collapsed':''}" style="--sub-depth:${depth}"><div class="subCalHead" style="border-left-color:${esc(child.color)};background:color-mix(in srgb, ${esc(child.color)} 14%, white)">${daySubCalHeadHtml(date,child,'↳ ')}</div><div class="dayCalGroupBody">${nonQuickItemsHtml(xs,false)}</div></div>`;
     }
     html += `</div></div>`;
   }
@@ -1046,7 +1056,7 @@ function groupHtml(date, es){
     ? `${totalCapacity?` · 확인된 가용 ${fmtH(totalCapacity)}`:''} · 일부 가용시간 미정`
     : (totalCapacity?` / 캘린더 가용 ${fmtH(totalCapacity)}`:'');
   if(blockedRootCount) capacitySummary += ` · 가용차단 ${blockedRootCount}개`;
-  return anniversaryHtml + appointmentHtml + paymentHtml + html + `<div class="dayTotal ${overallOver?'overallOver':''}">총 계획 ${fmtH(total)}${capacitySummary}</div>`;
+  return commonTopHtml + quickHtml + paymentHtml + html + `<div class="dayTotal ${overallOver?'overallOver':''}">총 계획 ${fmtH(total)}${capacitySummary}</div>`;
 }
 
 function calendarOptionsHtml(){
@@ -1823,13 +1833,13 @@ function renderWeek(){
   bindItems();
 }
 function monthCellEventsHtml(date, es){
-  const limit=3;
-  const priority=e=>e.kind==='anniversary'?0:e.kind==='appointment'?1:e.kind==='payment'?2:3;
+  const limit=4;
+  const priority=e=>e.kind==='anniversary'?0:e.kind==='appointment'?1:e.kind==='todo'?2:e.kind==='payment'?3:4;
   const ordered=[...(es||[])].sort((a,b)=>priority(a)-priority(b));
   const visible=ordered.slice(0,limit);
   const hidden=Math.max(0,ordered.length-visible.length);
-  const anniversaries=visible.filter(e=>e.kind==='anniversary'), appointments=visible.filter(e=>e.kind==='appointment'), payments=visible.filter(e=>e.kind==='payment'), normal=visible.filter(e=>e.kind!=='payment' && e.kind!=='appointment' && e.kind!=='anniversary');
-  return `${anniversaryLaneHtml(anniversaries,true)}${appointmentLaneHtml(appointments,true)}${paymentLaneHtml(payments,true)}${normal.map(e=>eventItemHtml(e,true)).join('')}${hidden?`<button type="button" class="moreEventsBtn" data-more-date="${esc(date)}">+ ${hidden}건</button>`:''}`;
+  const common=visible.filter(e=>e.kind==='anniversary' || e.kind==='appointment'), quick=visible.filter(e=>e.kind==='todo'), payments=visible.filter(e=>e.kind==='payment'), normal=visible.filter(e=>e.kind!=='payment' && e.kind!=='appointment' && e.kind!=='anniversary' && e.kind!=='todo');
+  return `${commonTopLaneHtml(common,true)}${quickLaneHtml(quick,true)}${paymentLaneHtml(payments,true)}${normal.map(e=>eventItemHtml(e,true)).join('')}${hidden?`<button type="button" class="moreEventsBtn" data-more-date="${esc(date)}">+ ${hidden}건</button>`:''}`;
 }
 function openDayList(date){
   const map=buildOccurrenceMap(date,date,{calendarIds:focusedCalendarIds()});
