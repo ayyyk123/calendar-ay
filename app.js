@@ -1891,7 +1891,7 @@ function scheduleDateHeader(days){
 function scheduleWeekBoard(days,map){
   const visible=visibleCals(),visibleIds=new Set(visible.map(c=>c.id));
   let html=`<div class="scheduleBoard">${scheduleDateHeader(days)}`;
-  html+=scheduleLaneHtml('common','D-Day · 기념일 / 예약 · 약속',days,map,(date,es)=>laneCellCommonHtml(es),{type:'common',color:'#d9b5cc'});
+  html+=scheduleLaneHtml('common','공통일정',days,map,(date,es)=>laneCellCommonHtml(es),{type:'common',color:'#d9b5cc'});
   html+=scheduleLaneHtml('quick','Quick',days,map,(date,es)=>laneCellQuickHtml(es),{type:'quick',color:'#cfd5dc'});
   html+=scheduleLaneHtml('payment','납부',days,map,(date,es)=>laneCellPaymentHtml(es),{type:'payment',color:'#e6d399'});
   for(const root of topLevelCals()){
