@@ -26,6 +26,7 @@ const add = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 const startWeek = d => { const x=new Date(d.getFullYear(), d.getMonth(), d.getDate()); return add(x, -((x.getDay()+6)%7)); };
 const uid = () => crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const esc = s => String(s ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
+const diaryIconHtml = hasDiary => `<span class="diaryGlyph ${hasDiary?'open':'closed'}" aria-hidden="true"></span>`;
 const DAY = 86400000;
 const dayNum = s => { const [y,m,d] = s.split('-').map(Number); return Math.round(Date.UTC(y, m - 1, d) / DAY); };
 const diffDays = (a,b) => dayNum(b) - dayNum(a);
@@ -68,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.61',
+  version: '1.62',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -1933,7 +1934,7 @@ function scheduleLaneHtml(key,title,days,map,cellBuilder,{type='calendar',color=
   </section>`;
 }
 function scheduleDateHeader(days){
-  return `<div class="scheduleDateGrid"><div class="scheduleDateCorner">구역</div>${days.map(d=>{const key=ds(d),hasDiary=!!state.diary[key]?.text,h=holidayLabel(key),dow=d.getDay(),dayClass=[key===ds(new Date())?'today':'',holidayClass(key),dow===0?'sunday':'',dow===6?'saturday':''].filter(Boolean).join(' ');return `<div class="scheduleDateHead ${dayClass}"><div class="dayTopLine"><span class="weekdayLabel">${['일','월','화','수','목','금','토'][dow]}</span><span class="dateNum">${d.getDate()}</span><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}" aria-label="${hasDiary?'다이어리 작성됨':'다이어리 미작성'}">${hasDiary?'📖':'📕'}</button></div><div class="holidayName ${h?'':'holidayEmpty'}" title="${h?esc(h):''}">${h?esc(h):'&nbsp;'}</div></div>`}).join('')}</div>`;
+  return `<div class="scheduleDateGrid"><div class="scheduleDateCorner">구역</div>${days.map(d=>{const key=ds(d),hasDiary=!!state.diary[key]?.text,h=holidayLabel(key),dow=d.getDay(),dayClass=[key===ds(new Date())?'today':'',holidayClass(key),dow===0?'sunday':'',dow===6?'saturday':''].filter(Boolean).join(' ');return `<div class="scheduleDateHead ${dayClass}"><div class="dayTopLine"><span class="weekdayLabel">${['일','월','화','수','목','금','토'][dow]}</span><span class="dateNum">${d.getDate()}</span><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}" aria-label="${hasDiary?'다이어리 작성됨':'다이어리 미작성'}">${diaryIconHtml(hasDiary)}</button></div><div class="holidayName ${h?'':'holidayEmpty'}" title="${h?esc(h):''}">${h?esc(h):'&nbsp;'}</div></div>`}).join('')}</div>`;
 }
 function scheduleWeekBoard(days,map){
   const visible=visibleCals(),visibleIds=new Set(visible.map(c=>c.id));
@@ -2012,7 +2013,7 @@ function mobileWeekStripHtml(days,map){
   return `<div class="mobileWeekStripWrap"><div class="mobileWeekStrip" style="--mobile-day-count:${days.length}">${days.map(d=>{
     const key=ds(d), es=map[key]||[], st=mobileDayWorkStats(key,es), dow=d.getDay(), h=holidayLabel(key), hasDiary=!!state.diary[key]?.text;
     const cls=[key===mobileSelectedDate?'selected':'',key===ds(new Date())?'today':'',dow===0?'sunday':'',dow===6?'saturday':'',h?'holiday':'',hasDiary?'hasDiary':''].filter(Boolean).join(' ');
-    return `<button type="button" class="mobileDayTab ${cls}" data-mobile-date="${key}" title="${esc([h,hasDiary?'다이어리 작성됨':'다이어리 미작성'].filter(Boolean).join(' · '))}"><span class="mobileDayDow">${['일','월','화','수','목','금','토'][dow]}</span><b>${d.getDate()}</b><small>${fmtH(st.total)}</small><span class="mobileDiaryState" aria-hidden="true">${hasDiary?'📖':'📕'}</span><span class="mobileDayDots">${mobileDayDotsHtml(es)}</span></button>`;
+    return `<button type="button" class="mobileDayTab ${cls}" data-mobile-date="${key}" title="${esc([h,hasDiary?'다이어리 작성됨':'다이어리 미작성'].filter(Boolean).join(' · '))}"><span class="mobileDayDow">${['일','월','화','수','목','금','토'][dow]}</span><b>${d.getDate()}</b><small>${fmtH(st.total)}</small><span class="mobileDiaryState" aria-hidden="true">${diaryIconHtml(hasDiary)}</span><span class="mobileDayDots">${mobileDayDotsHtml(es)}</span></button>`;
   }).join('')}</div></div>`;
 }
 function mobileSectionHtml(key,title,color,body,meta=''){
@@ -2059,7 +2060,7 @@ function renderMobileSchedule(days,map){
   for(const root of topLevelCals()) if(laneCalendarMembers(root,visibleIds).length) sections+=mobileRootSectionHtml(selected,root,es,visibleIds);
   const dow=d.getDay();
   $('#main').className='mobileScheduleView';
-  $('#main').innerHTML=`${mobileWeekStripHtml(days,map)}<div class="mobileSelectedDayHead"><div><b>${d.getMonth()+1}월 ${d.getDate()}일 ${['일','월','화','수','목','금','토'][dow]}요일</b>${h?`<small class="${holidayClass(selected)}">${esc(h)}</small>`:''}</div><span class="mobileDayTotal">${esc(dayMeta)}</span><button type="button" class="mobileDiaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${selected}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}" aria-label="${hasDiary?'다이어리 작성됨':'다이어리 미작성'}">${hasDiary?'📖':'📕'}</button><button type="button" class="mobileAddEvent" data-mobile-add="${selected}" aria-label="일정 추가">＋</button></div><div class="mobileAgenda" data-mobile-day-detail="1">${sections}</div>`;
+  $('#main').innerHTML=`${mobileWeekStripHtml(days,map)}<div class="mobileSelectedDayHead"><div><b>${d.getMonth()+1}월 ${d.getDate()}일 ${['일','월','화','수','목','금','토'][dow]}요일</b>${h?`<small class="${holidayClass(selected)}">${esc(h)}</small>`:''}</div><span class="mobileDayTotal">${esc(dayMeta)}</span><button type="button" class="mobileDiaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${selected}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}" aria-label="${hasDiary?'다이어리 작성됨':'다이어리 미작성'}">${diaryIconHtml(hasDiary)}</button><button type="button" class="mobileAddEvent" data-mobile-add="${selected}" aria-label="일정 추가">＋</button></div><div class="mobileAgenda" data-mobile-day-detail="1">${sections}</div>`;
   bindItems();
   $$('.mobileDayTab').forEach(btn=>btn.onclick=()=>{ mobileSelectedDate=btn.dataset.mobileDate; render(); });
   $$('.mobileAgendaHead').forEach(btn=>btn.onclick=()=>{ const key=btn.dataset.mobileSectionToggle; state.settings.mobileSectionsCollapsed=state.settings.mobileSectionsCollapsed||{}; state.settings.mobileSectionsCollapsed[key]=!mobileSectionIsCollapsed(key); save(); });
@@ -2126,14 +2127,14 @@ function renderMonth(){
     const d=add(s,i),key=ds(d),es=map[key]||[],hasDiary=!!state.diary[key]?.text,h=holidayLabel(key),dow=d.getDay();
     const cellClass=[d.getMonth()!==m?'other':'',holidayClass(key),dow===0?'sunday':'',dow===6?'saturday':''].filter(Boolean).join(' ');
     const holidayText=h?esc(h):'&nbsp;';
-    return `<div class="cell ${cellClass}" data-dropdate="${key}" ondblclick="window.__newEvent?.('${key}')"><div class="mhead"><span>${d.getDate()}</span><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}" aria-label="${hasDiary?'다이어리 작성됨':'다이어리 미작성'}">${hasDiary?'📖':'📕'}</button></div><div class="holidayName ${h?'':'holidayEmpty'}" title="${h?esc(h):''}">${holidayText}</div>${monthCellEventsHtml(key,es)}</div>`;
+    return `<div class="cell ${cellClass}" data-dropdate="${key}" ondblclick="window.__newEvent?.('${key}')"><div class="mhead"><span>${d.getDate()}</span><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}" aria-label="${hasDiary?'다이어리 작성됨':'다이어리 미작성'}">${diaryIconHtml(hasDiary)}</button></div><div class="holidayName ${h?'':'holidayEmpty'}" title="${h?esc(h):''}">${holidayText}</div>${monthCellEventsHtml(key,es)}</div>`;
   }).join('');
   $('#main').innerHTML=heads+cells; bindItems();
 }
 function renderDay(){
   const d=ds(cursor),map=buildOccurrenceMap(d,d,{calendarIds:focusedCalendarIds()}),hasDiary=!!state.diary[d]?.text;
   const h=holidayLabel(d); setRangeLabel(`${d}${focusSuffix()}`,`${d.slice(5).replace('-', '/')}${compactFocusSuffix()}`); $('#main').className='daySingle';
-  $('#main').innerHTML=`${h?`<div class="dayHolidayBanner">${esc(h)}</div>`:''}<div class="diaryStrip"><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${d}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}">${hasDiary?'📖':'📕'} ${hasDiary?'다이어리 보기':'다이어리 작성'}</button></div><div data-dropdate="${d}" ondblclick="window.__newEvent?.('${d}')">${groupHtml(d,map[d]||[])}</div>`; bindItems();
+  $('#main').innerHTML=`${h?`<div class="dayHolidayBanner">${esc(h)}</div>`:''}<div class="diaryStrip"><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${d}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}">${diaryIconHtml(hasDiary)} ${hasDiary?'다이어리 보기':'다이어리 작성'}</button></div><div data-dropdate="${d}" ondblclick="window.__newEvent?.('${d}')">${groupHtml(d,map[d]||[])}</div>`; bindItems();
 }
 function renderList(){
   const start=ds(add(new Date(),-30)),end=ds(add(new Date(),365));
@@ -2807,7 +2808,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'1.61',
+    appVersion:'1.62',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
