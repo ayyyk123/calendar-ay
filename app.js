@@ -68,7 +68,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.59',
+  version: '1.60',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -341,7 +341,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.59',
+    version: '1.60',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -1101,21 +1101,15 @@ function calendarOptionsHtml(){
   }).join('');
 }
 function syncSelects(){
-  const fixedPrev = selectedFixedFilter, flexiblePrev=selectedFlexibleFilter, paymentPrev=selectedPaymentFilter;
   const opts=calendarOptionsHtml();
   $('#cal').innerHTML=opts; $('#fcal').innerHTML=opts;
   const rootOpts=topLevelCals().map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
   if($('#availabilityTarget')) $('#availabilityTarget').innerHTML=rootOpts;
   if($('#flexcal')) $('#flexcal').innerHTML=opts;
-  $('#fixedFilter').innerHTML=`<option value="all">전체 캘린더</option>${opts}`;
-  $('#flexibleFilter').innerHTML=`<option value="all">전체 캘린더</option>${opts}`;
-  $('#paymentFilter').innerHTML=`<option value="all">전체 캘린더</option>${opts}`;
-  if([...$('#fixedFilter').options].some(o=>o.value===fixedPrev)) $('#fixedFilter').value=fixedPrev;
-  else { selectedFixedFilter='all'; $('#fixedFilter').value='all'; }
-  if([...$('#flexibleFilter').options].some(o=>o.value===flexiblePrev)) $('#flexibleFilter').value=flexiblePrev;
-  else { selectedFlexibleFilter='all'; $('#flexibleFilter').value='all'; }
-  if([...$('#paymentFilter').options].some(o=>o.value===paymentPrev)) $('#paymentFilter').value=paymentPrev;
-  else { selectedPaymentFilter='all'; $('#paymentFilter').value='all'; }
+  // v1.60: 좌측 목록은 이미 캘린더별 그룹으로 나뉘므로 중복되는 '전체 캘린더' 필터는 제거.
+  selectedFixedFilter='all';
+  selectedFlexibleFilter='all';
+  selectedPaymentFilter='all';
 }
 function renderSide(){
   applySidebarSectionOrder();
@@ -2671,9 +2665,6 @@ $('#addManualFixed').onclick=e=>{ e.stopPropagation(); setFixedAddMenu(false); o
 $('#fixedAddMenu').onclick=e=>e.stopPropagation();
 document.addEventListener('click',e=>{ if(!e.target.closest('.fixedAddWrap')) setFixedAddMenu(false); });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape' && !$('#fixedAddMenu').classList.contains('hidden')) setFixedAddMenu(false); });
-$('#fixedFilter').onchange=e=>{selectedFixedFilter=e.target.value;renderFixed();};
-$('#flexibleFilter').onchange=e=>{selectedFlexibleFilter=e.target.value;renderFlexible();};
-$('#paymentFilter').onchange=e=>{selectedPaymentFilter=e.target.value;renderPayments();};
 $('#addFlexible').onclick=()=>openFlexible();
 $('#toggleFlexible').onclick=()=>{ state.settings.fixedPanelsCollapsed=state.settings.fixedPanelsCollapsed||{}; state.settings.fixedPanelsCollapsed.flexible=!state.settings.fixedPanelsCollapsed.flexible; save(); };
 $('#addPayment').onclick=()=>openEvent(ds(cursor),null,{preset:'payment'});
@@ -2816,7 +2807,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'1.59',
+    appVersion:'1.60',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state

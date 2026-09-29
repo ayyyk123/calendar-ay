@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
-  <title>캘린더 v1.59</title>
+  <title>캘린더 v1.60</title>
   <link rel="manifest" href="manifest.json?v=1.59">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="icon-180.png">
@@ -14,7 +14,7 @@
 </head>
 <body>
 <header>
-  <div class="brand"><b>캘린더</b><small> v1.59</small></div>
+  <div class="brand"><b>캘린더</b><small> v1.60</small></div>
   <div id="saveBadge" class="saveBadge loading" title="Firebase 저장 상태"><span class="saveDot"></span><span id="saveBadgeText">Firebase 확인 중</span></div>
   <button id="manualSaveBtn" class="manualSaveBtn" type="button" title="현재 데이터를 Firebase에 즉시 저장"><span class="manualSaveFull">최신자료 저장</span><span class="manualSaveMobile">저장</span></button>
   <button id="sidebarToggle" class="mobileOnly" type="button" aria-label="메뉴">☰</button>
@@ -45,13 +45,11 @@
     </section>
     <section class="sidebarSection" data-sidebar-section="fixed">
       <div class="secHead fixedSectionHead"><div class="secTitleWithGrip"><span class="sidebarSectionGrip" draggable="true" title="드래그해서 메뉴 순서 변경">⋮⋮</span><b>반복 / 고정업무</b></div><div class="fixedAddWrap"><button id="addFixed" type="button" aria-haspopup="menu" aria-expanded="false" title="고정업무 추가">＋</button><div id="fixedAddMenu" class="fixedAddMenu hidden" role="menu"><button id="addRecurringFixed" type="button" role="menuitem"><b>자동반복 업무 추가</b><small>매주 · 매월 · 매년 등 자동 반복</small></button><button id="addManualFixed" type="button" role="menuitem"><b>날짜 지정 배치 추가</b><small>목록에서 원하는 날짜로 드래그</small></button></div></div></div>
-      <select id="fixedFilter"></select>
       <div id="fixedList"></div>
       <small class="hint">PC에서는 업무를 원하는 날짜로 드래그하세요.</small>
     </section>
     <section id="flexibleSection" class="sidebarSection" data-sidebar-section="flexible">
       <div class="secHead flexibleSectionHead"><div class="secTitleWithGrip"><span class="sidebarSectionGrip" draggable="true" title="드래그해서 메뉴 순서 변경">⋮⋮</span><b>시간날때 업무</b></div><div class="paymentHeadActions"><button id="toggleFlexible" type="button" title="시간날때 업무 접기/펴기">▾</button><button id="addFlexible" type="button" title="시간날때 업무 추가">＋</button></div></div>
-      <select id="flexibleFilter"></select>
       <div id="flexibleList"></div>
       <small class="hint">필요할 때마다 원하는 날짜로 드래그하고, 완료한 날짜는 이 목록에 누적 기록됩니다.</small>
     </section>
@@ -61,7 +59,6 @@
     </section>
     <section id="paymentSection" class="sidebarSection" data-sidebar-section="payment">
       <div class="secHead paymentSectionHead"><div class="secTitleWithGrip"><span class="sidebarSectionGrip" draggable="true" title="드래그해서 메뉴 순서 변경">⋮⋮</span><b>납부일정</b></div><div class="paymentHeadActions"><button id="togglePayment" type="button" title="납부일정 접기/펴기">▾</button><button id="addPayment" type="button" title="납부일정 추가">＋</button></div></div>
-      <select id="paymentFilter"></select>
       <div id="paymentList"></div>
     </section>
     <section class="sidebarSection" data-sidebar-section="load">
