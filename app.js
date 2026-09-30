@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.68',
+  version: '1.69',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -97,6 +97,7 @@ let selectedFixedFilter = 'all';
 let selectedFlexibleFilter = 'all';
 let selectedPaymentFilter = 'all';
 let selectedDiaryMonth = 'all';
+let diaryMainMode = 'calendar';
 let calendarFocusId = null;
 let activeDrag = null;
 let activeEventOccurrence = null;
@@ -343,7 +344,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.68',
+    version: '1.69',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -1454,13 +1455,20 @@ function renderDdays(){
   $$('.ddayRow').forEach(x=>x.onclick=()=>openEvent(null,x.dataset.eid));
 }
 
-function renderDiaryArchive(){
-  const filter=$('#diaryMonthFilter'), box=$('#diaryArchiveList');
-  if(!filter || !box) return;
-  const entries=Object.entries(state.diary||{})
+function diaryEntries(){
+  return Object.entries(state.diary||{})
     .filter(([date,d])=>/^\d{4}-\d{2}-\d{2}$/.test(date) && String(d?.text||'').trim())
     .map(([date,d])=>({date,text:String(d.text||'').trim(),updatedAt:String(d.updatedAt||'')}))
     .sort((a,b)=>b.date.localeCompare(a.date));
+}
+function diaryPreview(text,max=90){
+  const preview=String(text||'').replace(/\s+/g,' ').trim();
+  return preview.length>max?preview.slice(0,max)+'…':preview;
+}
+function renderDiaryArchive(){
+  const filter=$('#diaryMonthFilter'), box=$('#diaryArchiveList');
+  if(!filter || !box) return;
+  const entries=diaryEntries();
 
   const monthCounts=new Map();
   entries.forEach(x=>{ const m=x.date.slice(0,7); monthCounts.set(m,(monthCounts.get(m)||0)+1); });
@@ -1475,14 +1483,63 @@ function renderDiaryArchive(){
 
   const visible=selectedDiaryMonth==='all'?entries:entries.filter(x=>x.date.startsWith(selectedDiaryMonth+'-'));
   box.innerHTML=visible.map(x=>{
-    const d=parse(x.date), dow=['일','월','화','수','목','금','토'][d.getDay()];
-    const preview=x.text.replace(/\s+/g,' ').trim();
-    const excerpt=preview.length>72?preview.slice(0,72)+'…':preview;
-    return `<button type="button" class="diaryArchiveRow" data-diary-archive="${esc(x.date)}" title="${esc(x.text)}"><span class="diaryArchiveIcon">${diaryIconHtml(true)}</span><span class="diaryArchiveText"><b>${d.getMonth()+1}.${d.getDate()} ${dow}</b><small>${esc(excerpt)}</small></span></button>`;
+    const d=parse(x.date);
+    return `<button type="button" class="diaryArchiveRow" data-diary-archive="${esc(x.date)}" title="${esc(x.text)}"><b class="diaryArchiveDate">${d.getMonth()+1}.${d.getDate()}</b><small class="diaryArchivePreview">${esc(diaryPreview(x.text,54))}</small></button>`;
   }).join('') || `<div class="empty compactEmpty">${selectedDiaryMonth==='all'?'작성된 다이어리가 없습니다.':'이 달에 작성된 다이어리가 없습니다.'}</div>`;
   box.querySelectorAll('[data-diary-archive]').forEach(row=>{
     row.onclick=()=>openDiary(row.dataset.diaryArchive);
   });
+  const openMain=$('#diaryOpenMain');
+  if(openMain){
+    openMain.onclick=e=>{
+      e.preventDefault(); e.stopPropagation();
+      if(selectedDiaryMonth!=='all'){
+        const [y,m]=selectedDiaryMonth.split('-').map(Number);
+        cursor=new Date(y,m-1,1);
+      }else if(entries.length){
+        const d=parse(entries[0].date); cursor=new Date(d.getFullYear(),d.getMonth(),1);
+      }
+      view='diary'; render();
+    };
+  }
+}
+
+function diaryMonthInfo(){
+  const y=cursor.getFullYear(), m=cursor.getMonth(), first=new Date(y,m,1), s=startWeek(first);
+  const monthDays=new Date(y,m+1,0).getDate(), mondayOffset=(first.getDay()+6)%7;
+  const weekCount=Math.ceil((mondayOffset+monthDays)/7), total=weekCount*7;
+  return {y,m,s,weekCount,total};
+}
+function bindDiaryMainActions(){
+  $$('[data-diary-main-mode]').forEach(b=>b.onclick=()=>{ diaryMainMode=b.dataset.diaryMainMode; renderDiaryMain(); });
+  $$('[data-diary-main-date]').forEach(x=>x.onclick=()=>openDiary(x.dataset.diaryMainDate));
+  $('#diaryBackToSchedule')?.addEventListener('click',()=>{view='week';render();});
+}
+function renderDiaryMain(){
+  const {y,m,s,weekCount,total}=diaryMonthInfo();
+  const entries=diaryEntries(), byDate=new Map(entries.map(x=>[x.date,x]));
+  const monthPrefix=`${y}-${pad(m+1)}`;
+  const monthEntries=entries.filter(x=>x.date.startsWith(monthPrefix+'-'));
+  setRangeLabel(`다이어리 · ${y}년 ${m+1}월`,`다이어리 ${m+1}월`);
+  $('#main').className='diaryMainView';
+  const toolbar=`<div class="diaryMainToolbar"><div class="diaryMainHeading"><b>다이어리</b><small>${y}년 ${m+1}월 · ${monthEntries.length}일 작성</small></div><div class="diaryMainActions"><button type="button" data-diary-main-mode="calendar" class="${diaryMainMode==='calendar'?'on':''}">달력형</button><button type="button" data-diary-main-mode="list" class="${diaryMainMode==='list'?'on':''}">목록형</button><button type="button" id="diaryBackToSchedule">일정으로</button></div></div>`;
+  if(diaryMainMode==='list'){
+    const rows=monthEntries.map(x=>{
+      const d=parse(x.date), dow=['일','월','화','수','목','금','토'][d.getDay()];
+      return `<button type="button" class="diaryWideListRow" data-diary-main-date="${esc(x.date)}" title="${esc(x.text)}"><span class="diaryWideDate"><b>${d.getMonth()+1}.${d.getDate()}</b><small>${dow}요일</small></span><span class="diaryWidePreview">${esc(diaryPreview(x.text,180))}</span><span class="diaryWideOpen">${diaryIconHtml(true)}</span></button>`;
+    }).join('');
+    $('#main').innerHTML=toolbar+`<div class="diaryWideList">${rows||'<div class="diaryMainEmpty">이 달에 작성된 다이어리가 없습니다.</div>'}</div>`;
+  }else{
+    const heads=['월','화','수','목','금','토','일'].map((x,i)=>`<div class="diaryCalendarWeekday ${i===5?'saturday':i===6?'sunday':''}">${x}</div>`).join('');
+    const cells=[...Array(total)].map((_,i)=>{
+      const d=add(s,i), key=ds(d), item=byDate.get(key), has=!!item, dow=d.getDay();
+      const classes=[d.getMonth()!==m?'other':'',key===ds(new Date())?'today':'',dow===0?'sunday':'',dow===6?'saturday':'',has?'hasDiary':''].filter(Boolean).join(' ');
+      return `<div class="diaryCalendarCell ${classes}" data-diary-main-date="${key}" title="${has?esc(item.text):'다이어리 작성'}"><div class="diaryCalendarCellHead"><b>${d.getDate()}</b><span class="diaryCalendarGlyph">${diaryIconHtml(has)}</span></div><div class="diaryCalendarCellPreview">${has?esc(diaryPreview(item.text,64)):'<span class="diaryEmptyHint">미작성</span>'}</div></div>`;
+    }).join('');
+    $('#main').style.setProperty('--diary-weeks',String(weekCount));
+    $('#main').innerHTML=toolbar+`<div class="diaryCalendarGrid">${heads}${cells}</div>`;
+  }
+  bindDiaryMainActions();
 }
 
 function readDragPayload(dt){
@@ -2358,7 +2415,7 @@ function render(){
   const keep={sidebarTop:sidebar?.scrollTop||0,sidebarLeft:sidebar?.scrollLeft||0,mainTop:main?.scrollTop||0,mainLeft:main?.scrollLeft||0};
   renderSide();
   $$('.views [data-view]').forEach(b=>b.classList.toggle('on',b.dataset.view===view));
-  ({week:renderWeek,'2week':()=>renderMultiWeek(2),'3week':()=>renderMultiWeek(3),month:renderMonth,day:renderDay,list:renderList}[view])();
+  ({week:renderWeek,'2week':()=>renderMultiWeek(2),'3week':()=>renderMultiWeek(3),month:renderMonth,day:renderDay,list:renderList,diary:renderDiaryMain}[view]||renderWeek)();
   const sidebar2=$('#sidebar'), main2=$('#main');
   if(sidebar2){ sidebar2.scrollTop=keep.sidebarTop; sidebar2.scrollLeft=keep.sidebarLeft; }
   if(main2){ main2.scrollTop=keep.mainTop; main2.scrollLeft=keep.mainLeft; }
@@ -2863,8 +2920,8 @@ $('#addFlexible').onclick=()=>openFlexible();
 $('#toggleFlexible').onclick=()=>{ state.settings.fixedPanelsCollapsed=state.settings.fixedPanelsCollapsed||{}; state.settings.fixedPanelsCollapsed.flexible=!state.settings.fixedPanelsCollapsed.flexible; save(); };
 $('#addPayment').onclick=()=>openEvent(ds(cursor),null,{preset:'payment'});
 $('#togglePayment').onclick=()=>{ state.settings.fixedPanelsCollapsed=state.settings.fixedPanelsCollapsed||{}; state.settings.fixedPanelsCollapsed.payment=!state.settings.fixedPanelsCollapsed.payment; save(); };
-$('#prev').onclick=()=>{ const step=view==='week'?7:view==='2week'?14:view==='3week'?21:1; cursor=view==='month'?new Date(cursor.getFullYear(),cursor.getMonth()-1,1):add(cursor,-step); mobileSelectedDate=''; render(); };
-$('#next').onclick=()=>{ const step=view==='week'?7:view==='2week'?14:view==='3week'?21:1; cursor=view==='month'?new Date(cursor.getFullYear(),cursor.getMonth()+1,1):add(cursor,step); mobileSelectedDate=''; render(); };
+$('#prev').onclick=()=>{ const step=view==='week'?7:view==='2week'?14:view==='3week'?21:1; cursor=(view==='month'||view==='diary')?new Date(cursor.getFullYear(),cursor.getMonth()-1,1):add(cursor,-step); mobileSelectedDate=''; render(); };
+$('#next').onclick=()=>{ const step=view==='week'?7:view==='2week'?14:view==='3week'?21:1; cursor=(view==='month'||view==='diary')?new Date(cursor.getFullYear(),cursor.getMonth()+1,1):add(cursor,step); mobileSelectedDate=''; render(); };
 $('#today').onclick=()=>{cursor=new Date();mobileSelectedDate=ds(new Date());render();};
 $('#jumpDate').onchange=e=>{ if(e.target.value){cursor=parse(e.target.value);render();} };
 $$('.views [data-view]').forEach(b=>b.onclick=()=>{view=b.dataset.view; render();});
@@ -3001,7 +3058,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'1.68',
+    appVersion:'1.69',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
