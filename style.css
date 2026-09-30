@@ -1687,3 +1687,17 @@ body.resizingLaneLabel *{
   .diaryCalendarGrid{grid-template-rows:auto repeat(var(--diary-weeks,5),minmax(82px,1fr))}.diaryCalendarWeekday{padding:5px 2px;font-size:9px}.diaryCalendarCell{min-height:82px;padding:4px}.diaryCalendarCellHead>b{font-size:11px}.diaryCalendarGlyph .diaryGlyph{width:12px;height:12px}.diaryCalendarCellPreview{margin-top:5px;font-size:8.5px;line-height:1.35;-webkit-line-clamp:3}.diaryEmptyHint{font-size:8px}
   .diaryWideListRow{grid-template-columns:58px minmax(0,1fr) 20px;gap:7px;padding:11px 3px}.diaryWideDate b{font-size:12px}.diaryWidePreview{font-size:11px}.diaryWideOpen .diaryGlyph{width:13px;height:13px}
 }
+
+
+/* v1.70: 일정 화면 상단의 빨간 다이어리 바로가기 */
+.diaryMainShortcut{
+  width:32px;height:32px;padding:0;display:inline-grid;place-items:center;
+  border:1px solid #ead6d6;background:#fff;border-radius:7px;flex:0 0 auto;
+}
+.diaryMainShortcut .diaryGlyph{width:16px;height:16px;background:#cf3f3f}
+.diaryMainShortcut:hover{background:#fff5f5;border-color:#ddbcbc}
+.diaryMainShortcut:focus-visible{outline:2px solid #e7aaaa;outline-offset:1px}
+@media(max-width:760px){
+  .diaryMainShortcut{width:30px;height:30px}
+  .diaryMainShortcut .diaryGlyph{width:15px;height:15px}
+}
