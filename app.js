@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.65',
+  version: '1.66',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -342,7 +342,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.65',
+    version: '1.66',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -1479,6 +1479,28 @@ function eventOrderGroupKey(e){
   return `cal:${root?.id||e.calId||''}`;
 }
 let pendingRepeatOrder=null;
+function reorderDropBefore(payload,targetItem){
+  if(!payload?.id || !payload.day || !targetItem) return null;
+  const day=targetItem.dataset.renderDate||'';
+  if(!day || day!==payload.day) return null;
+  const src=state.events.find(x=>x.id===payload.id), target=state.events.find(x=>x.id===targetItem.dataset.eid);
+  if(!src||!target) return null;
+  const sourceGroup=eventOrderGroupKey(src), targetGroup=eventOrderGroupKey(target);
+  if(!sourceGroup || sourceGroup!==targetGroup) return null;
+  const map=buildOccurrenceMap(day,day,{calendarIds:focusedCalendarIds()});
+  const list=[]; const seen=new Set();
+  for(const e of (map[day]||[])){
+    if(eventOrderGroupKey(e)!==sourceGroup) continue;
+    const k=occurrenceKey(e); if(seen.has(k)) continue; seen.add(k); list.push(e);
+  }
+  const sourceKey=`${payload.id}|${payload.occurrence||src.date}`;
+  const targetKey=`${targetItem.dataset.eid}|${targetItem.dataset.occurrence||target.date}`;
+  const from=list.findIndex(e=>occurrenceKey(e)===sourceKey), to=list.findIndex(e=>occurrenceKey(e)===targetKey);
+  if(from<0||to<0||from===to) return null;
+  // 위 항목을 아래로 끌면 대상 뒤에, 아래 항목을 위로 끌면 대상 앞에 둔다.
+  // 카드의 정확한 위/아래 절반을 맞출 필요가 없어 양방향 정렬이 동일하게 쉽게 동작한다.
+  return from>to;
+}
 function buildReorderContext(payload,targetItem,before=true){
   if(!payload?.id || !payload.day) return null;
   const day=targetItem.dataset.renderDate||'';
@@ -1639,7 +1661,8 @@ function bindItems(){
         const sameGroup=sameDay && !!srcEvent && !!targetEvent && eventOrderGroupKey(srcEvent)===eventOrderGroupKey(targetEvent);
         if(!sameGroup) return;
         e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect='move';
-        const r=item.getBoundingClientRect(), before=e.clientY<r.top+r.height/2;
+        const before=reorderDropBefore(payload,item);
+        if(before===null) return;
         item.classList.toggle('orderDropBefore',before); item.classList.toggle('orderDropAfter',!before);
       };
       item.ondragleave=()=>item.classList.remove('orderDropBefore','orderDropAfter');
@@ -1652,7 +1675,8 @@ function bindItems(){
         item.classList.remove('orderDropBefore','orderDropAfter');
         if(!sameGroup) return;
         e.preventDefault(); e.stopPropagation();
-        const r=item.getBoundingClientRect(), before=e.clientY<r.top+r.height/2;
+        const before=reorderDropBefore(payload,item);
+        if(before===null) return;
         reorderOccurrenceInDay(payload,item,before); activeDrag=null;
       };
       item.ondragend=()=>{ activeDrag=null; item.classList.remove('dragging','orderDropBefore','orderDropAfter'); $$('.dropReady').forEach(el=>el.classList.remove('dropReady')); $$('.orderDropBefore,.orderDropAfter').forEach(el=>el.classList.remove('orderDropBefore','orderDropAfter')); };
@@ -2906,7 +2930,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'1.65',
+    appVersion:'1.66',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
