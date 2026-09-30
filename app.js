@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.64',
+  version: '1.65',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -342,7 +342,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.64',
+    version: '1.65',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -2202,19 +2202,21 @@ function bindDayViewResizers(){
       e.preventDefault(); e.stopPropagation();
       const section=handle.closest('.dayResizableSection'), key=handle.dataset.dayLaneResize;
       if(!section) return;
-      const startY=e.clientY, startH=Math.max(52,Math.round(section.getBoundingClientRect().height||dayLaneHeight(key,handle.dataset.dayLaneType||'calendar')));
+      const type=handle.dataset.dayLaneType||'calendar';
+      const startY=e.clientY, startH=dayLaneHeight(key,type);
+      let currentH=startH;
       handle.setPointerCapture?.(e.pointerId);
       document.body.classList.add('resizingDayLane');
       const move=ev=>{
-        const h=Math.max(52,Math.min(640,startH+(ev.clientY-startY)));
-        section.style.setProperty('--day-lane-h',`${Math.round(h)}px`);
+        currentH=Math.max(52,Math.min(640,startH+(ev.clientY-startY)));
+        section.style.setProperty('--day-lane-h',`${Math.round(currentH)}px`);
       };
       const up=ev=>{
         handle.removeEventListener('pointermove',move);
         handle.removeEventListener('pointerup',up);
         handle.removeEventListener('pointercancel',up);
         document.body.classList.remove('resizingDayLane');
-        const h=Math.max(52,Math.min(640,Math.round(section.getBoundingClientRect().height||startH)));
+        const h=Math.max(52,Math.min(640,Math.round(currentH)));
         state.settings.dayLaneHeights=state.settings.dayLaneHeights||{};
         state.settings.dayLaneHeights[key]=h;
         save({rerender:false});
@@ -2904,7 +2906,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'1.64',
+    appVersion:'1.65',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
