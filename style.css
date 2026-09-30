@@ -1494,3 +1494,22 @@ body.resizingLaneLabel *{
   .mobileDiaryState{right:3px;bottom:2px;width:10px!important;height:10px!important}
   .mobileDiaryState .diaryGlyph{width:9px;height:9px}
 }
+
+
+/* v1.63: 일 보기에서도 구역별 세로 높이 직접 조절 */
+.dayResizableBoard{display:grid;gap:8px}
+.dayResizableSection{position:relative;height:var(--day-lane-h,176px);min-height:52px;overflow:hidden;border-radius:7px;background:#fff}
+.dayResizableContent{height:calc(100% - 9px);overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:2px}
+.dayResizableSection .commonTopLane,.dayResizableSection .quickLane,.dayResizableSection .paymentLane,.dayResizableSection .group{margin-bottom:0!important}
+.dayLaneHeightResizer{position:absolute;left:0;right:0;bottom:0;height:9px;cursor:ns-resize;touch-action:none;user-select:none;display:flex;align-items:center;justify-content:center;background:linear-gradient(to bottom,transparent,#f8fafc)}
+.dayLaneHeightResizer span{display:block;width:38px;height:3px;border-radius:999px;background:#c8ced7;transition:background .12s,width .12s}
+.dayLaneHeightResizer:hover span,.resizingDayLane .dayLaneHeightResizer span{width:54px;background:#7f8a99}
+.resizingDayLane,.resizingDayLane *{cursor:ns-resize!important;user-select:none!important}
+@media(max-width:760px){
+  .daySingle{padding:8px!important}
+  .dayResizableBoard{gap:6px}
+  .dayResizableSection{border:1px solid #eef0f3;border-radius:8px}
+  .dayResizableContent{height:calc(100% - 11px)}
+  .dayLaneHeightResizer{height:11px;background:#fff}
+  .dayLaneHeightResizer span{width:42px;height:3px;background:#b7bec8}
+}

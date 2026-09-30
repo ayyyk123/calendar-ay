@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.62',
+  version: '1.63',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -80,7 +80,7 @@ const defaultState = () => ({
   flexible: [],
   purchases: [],
   diary: {},
-  settings: { hiddenCalendars: [], fixedPanelsCollapsed: { recurring:false, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','load','dday'], sidebarSectionsCollapsed:{}, laneHeights:{}, laneCollapsed:{}, laneLabelWidth:30, mobileSectionsCollapsed:{} }
+  settings: { hiddenCalendars: [], fixedPanelsCollapsed: { recurring:false, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','load','dday'], sidebarSectionsCollapsed:{}, laneHeights:{}, laneCollapsed:{}, laneLabelWidth:30, mobileSectionsCollapsed:{}, dayLaneHeights:{} }
 });
 
 let state = defaultState();
@@ -397,6 +397,7 @@ function normalizeState(raw){
       mobileSectionsCollapsed: (s.settings?.mobileSectionsCollapsed && typeof s.settings.mobileSectionsCollapsed==='object') ? {...s.settings.mobileSectionsCollapsed} : {},
       dayCalendarGroupsCollapsed: (s.settings?.dayCalendarGroupsCollapsed && typeof s.settings.dayCalendarGroupsCollapsed==='object') ? {...s.settings.dayCalendarGroupsCollapsed} : {},
       laneHeights: (s.settings?.laneHeights && typeof s.settings.laneHeights==='object') ? Object.fromEntries(Object.entries(s.settings.laneHeights).map(([k,v])=>[k,Math.max(44,Math.min(480,Number(v)||0))]).filter(([,v])=>v)) : {},
+      dayLaneHeights: (s.settings?.dayLaneHeights && typeof s.settings.dayLaneHeights==='object') ? Object.fromEntries(Object.entries(s.settings.dayLaneHeights).map(([k,v])=>[k,Math.max(52,Math.min(640,Number(v)||0))]).filter(([,v])=>v)) : {},
       laneCollapsed: (s.settings?.laneCollapsed && typeof s.settings.laneCollapsed==='object') ? {...s.settings.laneCollapsed} : {},
       laneLabelWidth: Math.max(22,Math.min(120,Number(s.settings?.laneLabelWidth)||30))
     }
@@ -2131,10 +2132,105 @@ function renderMonth(){
   }).join('');
   $('#main').innerHTML=heads+cells; bindItems();
 }
+
+const DAY_LANE_HEIGHT_DEFAULTS={common:112,quick:112,payment:112,calendar:176};
+function dayLaneHeight(key,type='calendar'){
+  state.settings.dayLaneHeights=state.settings.dayLaneHeights||{};
+  const stored=Number(state.settings.dayLaneHeights[key]);
+  return stored?Math.max(52,Math.min(640,stored)):(DAY_LANE_HEIGHT_DEFAULTS[type]||176);
+}
+function dayResizableSectionHtml(key,innerHtml,{type='calendar',color='#d9d9d9'}={}){
+  const h=dayLaneHeight(key,type);
+  return `<section class="dayResizableSection" data-day-lane-key="${esc(key)}" style="--day-lane-h:${h}px;--day-lane-color:${esc(color)}"><div class="dayResizableContent">${innerHtml}</div><div class="dayLaneHeightResizer" data-day-lane-resize="${esc(key)}" data-day-lane-type="${esc(type)}" title="위아래로 드래그해 구역 높이 조절 · 더블클릭 기본높이"><span></span></div></section>`;
+}
+function dayViewGroupHtml(date,es){
+  const commonTopHtml=dayResizableSectionHtml('common',commonTopLaneHtml(es,false,true),{type:'common',color:'#d9b5cc'});
+  const quickHtml=dayResizableSectionHtml('quick',quickLaneHtml(es,false,true),{type:'quick',color:'#cfd5dc'});
+  const paymentHtml=dayResizableSectionHtml('payment',paymentLaneHtml(es,false,true),{type:'payment',color:'#e6d399'});
+  const appointmentEvents=(es||[]).filter(e=>e.kind==='appointment');
+  const quickEvents=(es||[]).filter(e=>e.kind==='todo');
+  const workEvents=(es||[]).filter(e=>e.kind!=='payment' && e.kind!=='appointment' && e.kind!=='anniversary' && e.kind!=='todo');
+  let html='';
+  const visible=visibleCals(), visibleIds=new Set(visible.map(c=>c.id));
+  let total=appointmentEvents.reduce((sum,e)=>sum+workloadDuration(e),0) + quickEvents.reduce((sum,e)=>sum+workloadDuration(e),0), totalCapacity=0, hasUnknownCapacity=false, blockedRootCount=0;
+  for(const root of topLevelCals()){
+    const members=[root,...descendants(root.id)].filter(c=>visibleIds.has(c.id));
+    if(!members.length) continue;
+    const memberIds=new Set(members.map(c=>c.id));
+    const groupEvents=workEvents.filter(e=>memberIds.has(e.calId));
+    if(!groupEvents.length) continue;
+    const rootSum=groupEvents.reduce((sum,e)=>sum+workloadDuration(e),0);
+    total+=rootSum;
+    const rootCapInfo=capacityForDate(root,date);
+    if(rootCapInfo.blocked) blockedRootCount++;
+    if(rootCapInfo.unknown) hasUnknownCapacity=true; else totalCapacity+=rootCapInfo.hours;
+    const rootCollapsed=isDayCalCollapsed(date,root.id);
+    const blockedTitle=rootCapInfo.blocked?' · 가용시간 차단 일정 있음':'';
+    let body=`<div class="group calendarTreeGroup ${rootCollapsed?'collapsed':''}" style="--group-color:${esc(root.color)}"><div class="groupHead" style="background:${esc(root.color)}55" title="${esc(root.name)}${blockedTitle}">${dayCalHeadHtml(date,root,rootSum,rootCapInfo.hours,rootCapInfo.unknown)}</div><div class="dayCalGroupBody">`;
+    const direct=groupEvents.filter(e=>e.calId===root.id);
+    if(direct.length) body+=nonQuickItemsHtml(direct,false);
+    for(const child of members.filter(c=>c.id!==root.id)){
+      const xs=groupEvents.filter(e=>e.calId===child.id); if(!xs.length) continue;
+      const depth=Math.max(1,calendarDepth(child.id));
+      const childCollapsed=isDayCalCollapsed(date,child.id);
+      body+=`<div class="subCalGroup ${childCollapsed?'collapsed':''}" style="--sub-depth:${depth}"><div class="subCalHead" style="border-left-color:${esc(child.color)};background:color-mix(in srgb, ${esc(child.color)} 14%, white)">${daySubCalHeadHtml(date,child,'↳ ')}</div><div class="dayCalGroupBody">${nonQuickItemsHtml(xs,false)}</div></div>`;
+    }
+    body+=`</div></div>`;
+    html+=dayResizableSectionHtml(`cal:${root.id}`,body,{type:'calendar',color:root.color});
+  }
+  const overallOver=!hasUnknownCapacity && totalCapacity>0 && total>totalCapacity;
+  let capacitySummary=hasUnknownCapacity
+    ? `${totalCapacity?` · 확인된 가용 ${fmtH(totalCapacity)}`:''} · 일부 가용시간 미정`
+    : (totalCapacity?` / 캘린더 가용 ${fmtH(totalCapacity)}`:'');
+  if(blockedRootCount) capacitySummary+=` · 가용차단 ${blockedRootCount}개`;
+  return commonTopHtml+quickHtml+paymentHtml+html+`<div class="dayTotal ${overallOver?'overallOver':''}">총 계획 ${fmtH(total)}${capacitySummary}</div>`;
+}
+function bindDayViewResizers(){
+  $$('[data-day-lane-resize]').forEach(handle=>{
+    handle.ondblclick=e=>{
+      e.preventDefault(); e.stopPropagation();
+      const key=handle.dataset.dayLaneResize;
+      state.settings.dayLaneHeights=state.settings.dayLaneHeights||{};
+      delete state.settings.dayLaneHeights[key];
+      const section=handle.closest('.dayResizableSection');
+      const type=handle.dataset.dayLaneType||'calendar';
+      section?.style.setProperty('--day-lane-h',`${DAY_LANE_HEIGHT_DEFAULTS[type]||176}px`);
+      save({rerender:false});
+    };
+    handle.onpointerdown=e=>{
+      if(e.pointerType==='mouse' && e.button!==0) return;
+      e.preventDefault(); e.stopPropagation();
+      const section=handle.closest('.dayResizableSection'), key=handle.dataset.dayLaneResize;
+      if(!section) return;
+      const startY=e.clientY, startH=Math.max(52,Math.round(section.getBoundingClientRect().height||dayLaneHeight(key,handle.dataset.dayLaneType||'calendar')));
+      handle.setPointerCapture?.(e.pointerId);
+      document.body.classList.add('resizingDayLane');
+      const move=ev=>{
+        const h=Math.max(52,Math.min(640,startH+(ev.clientY-startY)));
+        section.style.setProperty('--day-lane-h',`${Math.round(h)}px`);
+      };
+      const up=ev=>{
+        handle.removeEventListener('pointermove',move);
+        handle.removeEventListener('pointerup',up);
+        handle.removeEventListener('pointercancel',up);
+        document.body.classList.remove('resizingDayLane');
+        const h=Math.max(52,Math.min(640,Math.round(section.getBoundingClientRect().height||startH)));
+        state.settings.dayLaneHeights=state.settings.dayLaneHeights||{};
+        state.settings.dayLaneHeights[key]=h;
+        save({rerender:false});
+        try{handle.releasePointerCapture?.(ev.pointerId)}catch{}
+      };
+      handle.addEventListener('pointermove',move);
+      handle.addEventListener('pointerup',up,{once:true});
+      handle.addEventListener('pointercancel',up,{once:true});
+    };
+  });
+}
+
 function renderDay(){
   const d=ds(cursor),map=buildOccurrenceMap(d,d,{calendarIds:focusedCalendarIds()}),hasDiary=!!state.diary[d]?.text;
   const h=holidayLabel(d); setRangeLabel(`${d}${focusSuffix()}`,`${d.slice(5).replace('-', '/')}${compactFocusSuffix()}`); $('#main').className='daySingle';
-  $('#main').innerHTML=`${h?`<div class="dayHolidayBanner">${esc(h)}</div>`:''}<div class="diaryStrip"><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${d}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}">${diaryIconHtml(hasDiary)} ${hasDiary?'다이어리 보기':'다이어리 작성'}</button></div><div data-dropdate="${d}" ondblclick="window.__newEvent?.('${d}')">${groupHtml(d,map[d]||[])}</div>`; bindItems();
+  $('#main').innerHTML=`${h?`<div class="dayHolidayBanner">${esc(h)}</div>`:''}<div class="diaryStrip"><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${d}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}">${diaryIconHtml(hasDiary)} ${hasDiary?'다이어리 보기':'다이어리 작성'}</button></div><div class="dayResizableBoard" data-dropdate="${d}" ondblclick="window.__newEvent?.('${d}')">${dayViewGroupHtml(d,map[d]||[])}</div>`; bindItems(); bindDayViewResizers();
 }
 function renderList(){
   const start=ds(add(new Date(),-30)),end=ds(add(new Date(),365));
@@ -2808,7 +2904,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'1.62',
+    appVersion:'1.63',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
