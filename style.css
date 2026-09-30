@@ -1513,3 +1513,51 @@ body.resizingLaneLabel *{
   .dayLaneHeightResizer{height:11px;background:#fff}
   .dayLaneHeightResizer span{width:42px;height:3px;background:#b7bec8}
 }
+
+
+/* v1.64: 일 보기 상단 3개 구역은 내부 고정 스크롤을 쓰지 않고 조절한 구역 높이를 그대로 사용 */
+.dayResizableSection .commonTopLane,
+.dayResizableSection .quickLane,
+.dayResizableSection .paymentLane{
+  height:auto!important;
+  min-height:0!important;
+  max-height:none!important;
+  overflow:visible!important;
+}
+.dayResizableSection .commonTopLaneItems,
+.dayResizableSection .quickLaneItems,
+.dayResizableSection .paymentLaneItems{
+  height:auto!important;
+  min-height:0!important;
+  max-height:none!important;
+  overflow:visible!important;
+  padding:2px 1px!important;
+  scrollbar-width:auto!important;
+  overscroll-behavior:auto!important;
+}
+.dayResizableSection .commonTopLaneHead,
+.dayResizableSection .quickLaneHead,
+.dayResizableSection .paymentLaneHead{
+  flex:0 0 auto;
+}
+/* 실제 스크롤은 높이 조절 대상인 바깥 구역 하나만 담당 */
+.dayResizableSection .dayResizableContent{
+  overflow-y:auto!important;
+  overflow-x:hidden!important;
+}
+@media(max-width:760px){
+  .dayResizableSection .commonTopLane,
+  .dayResizableSection .quickLane,
+  .dayResizableSection .paymentLane{
+    height:auto!important;
+    min-height:0!important;
+    max-height:none!important;
+  }
+  .dayResizableSection .commonTopLaneItems,
+  .dayResizableSection .quickLaneItems,
+  .dayResizableSection .paymentLaneItems{
+    height:auto!important;
+    max-height:none!important;
+    overflow:visible!important;
+  }
+}
