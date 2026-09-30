@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.66',
+  version: '1.67',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -342,7 +342,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.66',
+    version: '1.67',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -1487,18 +1487,33 @@ function reorderDropBefore(payload,targetItem){
   if(!src||!target) return null;
   const sourceGroup=eventOrderGroupKey(src), targetGroup=eventOrderGroupKey(target);
   if(!sourceGroup || sourceGroup!==targetGroup) return null;
+
+  // v1.67: 계산된 데이터 순서가 아니라 사용자가 현재 보고 있는 DOM 순서를 우선한다.
+  // 위에 보이는 카드를 아래 카드로 끌면 무조건 '대상 뒤', 아래 카드를 위로 끌면 '대상 앞'.
+  const occ=payload.occurrence||src.date;
+  const candidates=[...document.querySelectorAll('.item')].filter(el=>
+    el.dataset.eid===payload.id &&
+    (el.dataset.occurrence||'')===String(occ) &&
+    (el.dataset.renderDate||'')===day
+  );
+  const sourceItem=candidates.find(el=>el!==targetItem) || candidates[0];
+  if(sourceItem && sourceItem!==targetItem){
+    const pos=sourceItem.compareDocumentPosition(targetItem);
+    if(pos & Node.DOCUMENT_POSITION_FOLLOWING) return false; // source가 위 -> target 뒤
+    if(pos & Node.DOCUMENT_POSITION_PRECEDING) return true;  // source가 아래 -> target 앞
+  }
+
+  // DOM 판정이 불가능한 경우에만 데이터 순서로 보정한다.
   const map=buildOccurrenceMap(day,day,{calendarIds:focusedCalendarIds()});
   const list=[]; const seen=new Set();
   for(const e of (map[day]||[])){
     if(eventOrderGroupKey(e)!==sourceGroup) continue;
     const k=occurrenceKey(e); if(seen.has(k)) continue; seen.add(k); list.push(e);
   }
-  const sourceKey=`${payload.id}|${payload.occurrence||src.date}`;
+  const sourceKey=`${payload.id}|${occ}`;
   const targetKey=`${targetItem.dataset.eid}|${targetItem.dataset.occurrence||target.date}`;
   const from=list.findIndex(e=>occurrenceKey(e)===sourceKey), to=list.findIndex(e=>occurrenceKey(e)===targetKey);
   if(from<0||to<0||from===to) return null;
-  // 위 항목을 아래로 끌면 대상 뒤에, 아래 항목을 위로 끌면 대상 앞에 둔다.
-  // 카드의 정확한 위/아래 절반을 맞출 필요가 없어 양방향 정렬이 동일하게 쉽게 동작한다.
   return from>to;
 }
 function buildReorderContext(payload,targetItem,before=true){
@@ -1526,6 +1541,32 @@ function buildReorderContext(payload,targetItem,before=true){
   list.splice(Math.min(insertAt,list.length),0,moved);
   return {day,src,target,sourceGroup,list};
 }
+function buildReorderToEndContext(payload,day){
+  if(!payload?.id || !day || payload.day!==day) return null;
+  const src=state.events.find(x=>x.id===payload.id); if(!src) return null;
+  const sourceGroup=eventOrderGroupKey(src); if(!sourceGroup) return null;
+  const map=buildOccurrenceMap(day,day,{calendarIds:focusedCalendarIds()});
+  const list=[]; const seen=new Set();
+  for(const e of (map[day]||[])){
+    if(eventOrderGroupKey(e)!==sourceGroup) continue;
+    const k=occurrenceKey(e); if(seen.has(k)) continue; seen.add(k); list.push(e);
+  }
+  const sourceKey=`${payload.id}|${payload.occurrence||src.date}`;
+  const from=list.findIndex(e=>occurrenceKey(e)===sourceKey);
+  if(from<0 || from===list.length-1) return null;
+  const [moved]=list.splice(from,1); list.push(moved);
+  return {day,src,target:null,sourceGroup,list};
+}
+function commitReorderContext(ctx){
+  if(!ctx) return false;
+  if((ctx.src.repeat||'none')!=='none'){
+    pendingRepeatOrder=ctx;
+    $('#repeatOrderInfo').textContent=`${ctx.day} 순서 변경을 이 날짜에만 적용할지, 다른 반복 날짜에도 적용할지 선택하세요.`;
+    openDialog($('#repeatOrderDlg'));
+    return true;
+  }
+  return applyReorderContext(ctx,'day');
+}
 function applyReorderContext(ctx,scope='day'){
   if(!ctx) return false;
   ctx.list.forEach((occ,i)=>{
@@ -1538,15 +1579,7 @@ function applyReorderContext(ctx,scope='day'){
   return true;
 }
 function reorderOccurrenceInDay(payload,targetItem,before=true){
-  const ctx=buildReorderContext(payload,targetItem,before);
-  if(!ctx) return false;
-  if((ctx.src.repeat||'none')!=='none'){
-    pendingRepeatOrder=ctx;
-    $('#repeatOrderInfo').textContent=`${ctx.day} 순서 변경을 이 날짜에만 적용할지, 다른 반복 날짜에도 적용할지 선택하세요.`;
-    openDialog($('#repeatOrderDlg'));
-    return true;
-  }
-  return applyReorderContext(ctx,'day');
+  return commitReorderContext(buildReorderContext(payload,targetItem,before));
 }
 $('#orderOccurrenceOnly').onclick=()=>{
   if(pendingRepeatOrder) applyReorderContext(pendingRepeatOrder,'day');
@@ -1711,7 +1744,17 @@ function bindItems(){
         }
         return;
       }
-      if(payload.type==='event' && payload.id) moveEventToDate(payload.id,x.dataset.dropdate,payload.occurrence||'',payload.day||'');
+      if(payload.type==='event' && payload.id){
+        const dropDay=x.dataset.dropdate;
+        // 같은 날짜의 빈 공간/카드 아래쪽에 놓으면 해당 구역의 맨 아래로 보낸다.
+        // 카드 자체에 놓은 경우에는 위의 item.ondrop이 먼저 처리한다.
+        if(payload.day && payload.day===dropDay){
+          const ctx=buildReorderToEndContext(payload,dropDay);
+          if(ctx){ commitReorderContext(ctx); return; }
+          return;
+        }
+        moveEventToDate(payload.id,dropDay,payload.occurrence||'',payload.day||'');
+      }
     };
   });
   $$('[data-daycal-toggle]').forEach(b=>b.onclick=e=>{
@@ -2190,15 +2233,11 @@ function dayViewGroupHtml(date,es){
     if(rootCapInfo.unknown) hasUnknownCapacity=true; else totalCapacity+=rootCapInfo.hours;
     const rootCollapsed=isDayCalCollapsed(date,root.id);
     const blockedTitle=rootCapInfo.blocked?' · 가용시간 차단 일정 있음':'';
-    let body=`<div class="group calendarTreeGroup ${rootCollapsed?'collapsed':''}" style="--group-color:${esc(root.color)}"><div class="groupHead" style="background:${esc(root.color)}55" title="${esc(root.name)}${blockedTitle}">${dayCalHeadHtml(date,root,rootSum,rootCapInfo.hours,rootCapInfo.unknown)}</div><div class="dayCalGroupBody">`;
-    const direct=groupEvents.filter(e=>e.calId===root.id);
-    if(direct.length) body+=nonQuickItemsHtml(direct,false);
-    for(const child of members.filter(c=>c.id!==root.id)){
-      const xs=groupEvents.filter(e=>e.calId===child.id); if(!xs.length) continue;
-      const depth=Math.max(1,calendarDepth(child.id));
-      const childCollapsed=isDayCalCollapsed(date,child.id);
-      body+=`<div class="subCalGroup ${childCollapsed?'collapsed':''}" style="--sub-depth:${depth}"><div class="subCalHead" style="border-left-color:${esc(child.color)};background:color-mix(in srgb, ${esc(child.color)} 14%, white)">${daySubCalHeadHtml(date,child,'↳ ')}</div><div class="dayCalGroupBody">${nonQuickItemsHtml(xs,false)}</div></div>`;
-    }
+    let body=`<div class="group calendarTreeGroup ${rootCollapsed?'collapsed':''}" style="--group-color:${esc(root.color)}"><div class="groupHead" style="background:${esc(root.color)}55" title="${esc(root.name)}${blockedTitle}">${dayCalHeadHtml(date,root,rootSum,rootCapInfo.hours,rootCapInfo.unknown)}</div><div class="dayCalGroupBody laneMergedDayItems">`;
+    body+=groupEvents.map(e=>{
+      const c=cal(e.calId), isSub=e.calId!==root.id;
+      return `<div class="laneOrderedItem ${isSub?'laneOrderedSubItem':'laneOrderedRootItem'}" data-lane-cal-id="${esc(e.calId)}" title="${esc(calendarPath(e.calId))}">${isSub?`<span class="laneInlineCalTag" style="--tag-color:${esc(c.color)}">↳ ${esc(c.name)}</span>`:''}${eventItemHtml(e,false)}</div>`;
+    }).join('');
     body+=`</div></div>`;
     html+=dayResizableSectionHtml(`cal:${root.id}`,body,{type:'calendar',color:root.color});
   }
@@ -2930,7 +2969,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'1.66',
+    appVersion:'1.67',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state

@@ -1601,3 +1601,10 @@ body.resizingLaneLabel *{
   .dayLaneHeightResizer{height:7px!important;min-height:7px;flex-basis:7px!important}
   .dayLaneHeightResizer span{width:30px!important;height:2px!important}
 }
+
+
+/* v1.67: 일정 순서 드래그 양방향 안정화 */
+.laneMergedDayItems>.laneOrderedItem{margin:0;min-width:0}
+.laneMergedDayItems>.laneOrderedItem+.laneOrderedItem{margin-top:1px}
+.item.orderDropBefore{box-shadow:inset 0 3px 0 #4f7cff,0 0 0 1px #4f7cff55!important}
+.item.orderDropAfter{box-shadow:inset 0 -3px 0 #4f7cff,0 0 0 1px #4f7cff55!important}
