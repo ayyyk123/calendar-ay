@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.67',
+  version: '1.68',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -80,7 +80,7 @@ const defaultState = () => ({
   flexible: [],
   purchases: [],
   diary: {},
-  settings: { hiddenCalendars: [], fixedPanelsCollapsed: { recurring:false, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','load','dday'], sidebarSectionsCollapsed:{}, laneHeights:{}, laneCollapsed:{}, laneLabelWidth:30, mobileSectionsCollapsed:{}, dayLaneHeights:{} }
+  settings: { hiddenCalendars: [], fixedPanelsCollapsed: { recurring:false, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','load','dday','diary'], sidebarSectionsCollapsed:{}, laneHeights:{}, laneCollapsed:{}, laneLabelWidth:30, mobileSectionsCollapsed:{}, dayLaneHeights:{} }
 });
 
 let state = defaultState();
@@ -96,6 +96,7 @@ let saveTimer = null;
 let selectedFixedFilter = 'all';
 let selectedFlexibleFilter = 'all';
 let selectedPaymentFilter = 'all';
+let selectedDiaryMonth = 'all';
 let calendarFocusId = null;
 let activeDrag = null;
 let activeEventOccurrence = null;
@@ -235,7 +236,7 @@ async function loadHolidayData(){
 }
 
 
-const DEFAULT_SIDEBAR_SECTION_ORDER=['calendar','fixed','flexible','purchase','payment','load','dday'];
+const DEFAULT_SIDEBAR_SECTION_ORDER=['calendar','fixed','flexible','purchase','payment','load','dday','diary'];
 function normalizeSidebarSectionOrder(value){
   const src=Array.isArray(value)?value.map(String):[];
   const valid=src.filter((x,i)=>DEFAULT_SIDEBAR_SECTION_ORDER.includes(x)&&src.indexOf(x)===i);
@@ -342,7 +343,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.67',
+    version: '1.68',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -1158,7 +1159,7 @@ function renderSide(){
     };
     row.querySelector('.calEdit').onclick=e=>{ e.stopPropagation(); openCal(row.dataset.cid); };
   });
-  renderFixed(); renderFlexible(); renderPurchases(); renderPayments(); renderLoad(); renderDdays();
+  renderFixed(); renderFlexible(); renderPurchases(); renderPayments(); renderLoad(); renderDdays(); renderDiaryArchive();
 }
 function currentMonthRange(){
   const start=new Date(cursor.getFullYear(),cursor.getMonth(),1);
@@ -1451,6 +1452,37 @@ function renderDdays(){
   }).filter(Boolean).sort((a,b)=>Math.abs(a.diff)-Math.abs(b.diff)).slice(0,8);
   $('#ddayList').innerHTML=rows.map(({e,target,diff})=>`<div class="ddayRow" data-eid="${esc(e.id)}"><div>${esc(e.title)}<small>${target}</small></div><b>${diff===0?'D-Day':diff>0?`D-${diff}`:`D+${Math.abs(diff)}`}</b></div>`).join('')||'<div class="empty">등록된 기념일이 없습니다.</div>';
   $$('.ddayRow').forEach(x=>x.onclick=()=>openEvent(null,x.dataset.eid));
+}
+
+function renderDiaryArchive(){
+  const filter=$('#diaryMonthFilter'), box=$('#diaryArchiveList');
+  if(!filter || !box) return;
+  const entries=Object.entries(state.diary||{})
+    .filter(([date,d])=>/^\d{4}-\d{2}-\d{2}$/.test(date) && String(d?.text||'').trim())
+    .map(([date,d])=>({date,text:String(d.text||'').trim(),updatedAt:String(d.updatedAt||'')}))
+    .sort((a,b)=>b.date.localeCompare(a.date));
+
+  const monthCounts=new Map();
+  entries.forEach(x=>{ const m=x.date.slice(0,7); monthCounts.set(m,(monthCounts.get(m)||0)+1); });
+  const months=[...monthCounts.keys()].sort((a,b)=>b.localeCompare(a));
+  if(selectedDiaryMonth!=='all' && !monthCounts.has(selectedDiaryMonth)) selectedDiaryMonth='all';
+  filter.innerHTML=`<option value="all">전체 (${entries.length})</option>`+months.map(m=>{
+    const [y,mo]=m.split('-');
+    return `<option value="${esc(m)}">${Number(y)}년 ${Number(mo)}월 (${monthCounts.get(m)})</option>`;
+  }).join('');
+  filter.value=selectedDiaryMonth;
+  filter.onchange=()=>{ selectedDiaryMonth=filter.value||'all'; renderDiaryArchive(); };
+
+  const visible=selectedDiaryMonth==='all'?entries:entries.filter(x=>x.date.startsWith(selectedDiaryMonth+'-'));
+  box.innerHTML=visible.map(x=>{
+    const d=parse(x.date), dow=['일','월','화','수','목','금','토'][d.getDay()];
+    const preview=x.text.replace(/\s+/g,' ').trim();
+    const excerpt=preview.length>72?preview.slice(0,72)+'…':preview;
+    return `<button type="button" class="diaryArchiveRow" data-diary-archive="${esc(x.date)}" title="${esc(x.text)}"><span class="diaryArchiveIcon">${diaryIconHtml(true)}</span><span class="diaryArchiveText"><b>${d.getMonth()+1}.${d.getDate()} ${dow}</b><small>${esc(excerpt)}</small></span></button>`;
+  }).join('') || `<div class="empty compactEmpty">${selectedDiaryMonth==='all'?'작성된 다이어리가 없습니다.':'이 달에 작성된 다이어리가 없습니다.'}</div>`;
+  box.querySelectorAll('[data-diary-archive]').forEach(row=>{
+    row.onclick=()=>openDiary(row.dataset.diaryArchive);
+  });
 }
 
 function readDragPayload(dt){
@@ -2969,7 +3001,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'1.67',
+    appVersion:'1.68',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
