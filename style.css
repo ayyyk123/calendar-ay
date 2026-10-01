@@ -1701,3 +1701,40 @@ body.resizingLaneLabel *{
   .diaryMainShortcut{width:30px;height:30px}
   .diaryMainShortcut .diaryGlyph{width:15px;height:15px}
 }
+
+
+/* v1.71: 네이버 메일 바로가기 */
+.naverMailShortcut{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:31px;
+  height:31px;
+  padding:0;
+  border:1px solid #03c75a;
+  border-radius:7px;
+  background:#03c75a;
+  color:#fff;
+  text-decoration:none;
+  font-family:Arial,sans-serif;
+  font-size:17px;
+  font-weight:900;
+  line-height:1;
+  flex:0 0 auto;
+}
+.naverMailShortcut:hover{background:#02b652;border-color:#02b652;color:#fff}
+@media(max-width:760px){
+  .naverMailShortcut{width:30px;height:30px;font-size:16px;border-radius:7px}
+}
+
+
+/* v1.72: 일정↔다이어리 같은 위치 전환 + 구매목록 드래그 순서변경 */
+.diaryMainShortcut.scheduleReturn{background:#f8fafc;border-color:#d9dee6;color:#222}
+.diaryMainShortcut.scheduleReturn:hover{background:#f1f4f7;border-color:#c8ced8}
+.calendarSwitchGlyph{display:inline-flex;align-items:center;justify-content:center;font-size:17px;line-height:1;filter:grayscale(1)}
+.purchaseRow{grid-template-columns:auto auto minmax(0,1fr)}
+.purchaseDragHandle{display:inline-flex;align-items:center;justify-content:center;width:14px;color:#9aa3ae;font-size:13px;line-height:1;letter-spacing:-3px;cursor:grab;user-select:none;padding-right:2px}
+.purchaseDragHandle:active{cursor:grabbing}.purchaseRow.dragging{opacity:.45}
+.purchaseRow.purchaseDropBefore{box-shadow:inset 0 2px 0 #4f7cff}
+.purchaseRow.purchaseDropAfter{box-shadow:inset 0 -2px 0 #4f7cff}
+@media(max-width:760px){.purchaseDragHandle{display:none}}
