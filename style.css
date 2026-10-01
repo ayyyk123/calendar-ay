@@ -1777,3 +1777,93 @@ body.resizingLaneLabel *{
 body.calendarEventDragging .multiLaneView .scheduleDateHead[data-date-drop-head="1"]{cursor:grabbing;}
 body.calendarEventDragging .multiLaneView .scheduleLaneCell{transition:background .1s ease,outline-color .1s ease;}
 body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 날짜로 그대로 드래그 가능';font-weight:500;color:#8a94a5;}
+
+
+/* v1.79: 모바일 상단 오늘 이동버튼 위치 수정
+   - 모바일 보기 버튼 줄: 네이버 · 가계부 · 다이어리↔일정 · 주 · 월 · 목록 · 찾기 · 설정 · ‹ 오늘 ›
+   - 2주/3주/일은 모바일에서만 숨김
+   - 다음 줄에는 현재 기간만 단독으로 화면 중앙 정렬
+   - PC에서는 기존 날짜이동/보기 버튼 배치를 그대로 유지 */
+.dateNavButtons{display:contents}
+@media(max-width:760px){
+  :root{--header-h:136px}
+  header{
+    grid-template-rows:34px 36px 34px!important;
+  }
+  .views{
+    display:grid!important;
+    grid-template-columns:repeat(8,minmax(0,1fr)) 96px!important;
+    gap:4px!important;
+    overflow:visible!important;
+    padding-bottom:0!important;
+  }
+  .views [data-view="2week"],
+  .views [data-view="3week"],
+  .views [data-view="day"]{display:none!important}
+  .views > button,
+  .views > a{
+    width:100%!important;
+    min-width:0!important;
+    height:34px!important;
+    margin:0!important;
+    padding:0!important;
+    border-radius:8px!important;
+    box-sizing:border-box;
+  }
+  .views > button{font-size:12px!important}
+  .naverMailShortcut,.accountBookShortcut,.diaryMainShortcut{justify-self:stretch!important;align-self:stretch!important}
+  .views > .dateNavButtons{
+    display:grid!important;
+    grid-template-columns:25px minmax(42px,1fr) 25px;
+    align-items:center;
+    justify-self:stretch;
+    gap:2px;
+    min-width:0;
+    width:100%;
+    height:34px;
+  }
+  .views > .dateNavButtons button{
+    width:100%!important;
+    min-width:0!important;
+    height:34px!important;
+    margin:0!important;
+    padding:0!important;
+    border-radius:8px!important;
+    font-size:11px!important;
+    white-space:nowrap;
+    overflow:hidden;
+  }
+  .views > .dateNavButtons #today{font-size:10.5px!important;font-weight:700}
+  nav{
+    position:relative;
+    display:flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    gap:0!important;
+    overflow:visible!important;
+  }
+  #jumpDate{display:none!important}
+  #range{
+    display:block!important;
+    width:100%!important;
+    min-width:0!important;
+    max-width:none!important;
+    text-align:center!important;
+    padding:0!important;
+    margin:0!important;
+    overflow:visible!important;
+    text-overflow:clip!important;
+    font-size:11px!important;
+    font-weight:700;
+    white-space:nowrap;
+  }
+}
+@media(max-width:390px){
+  .views{grid-template-columns:repeat(8,minmax(0,1fr)) 88px!important;gap:3px!important}
+  .views > button,.views > a{height:32px!important}
+  .views > button{font-size:10.5px!important}
+  .views > .dateNavButtons{grid-template-columns:23px minmax(38px,1fr) 23px;height:32px;gap:2px}
+  .views > .dateNavButtons button{height:32px!important;font-size:10px!important}
+  .views > .dateNavButtons #today{font-size:9.5px!important}
+  #range{font-size:10.5px!important}
+}

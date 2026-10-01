@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.77',
+  version: '1.79',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -346,7 +346,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.77',
+    version: '1.79',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -3121,6 +3121,23 @@ $('#togglePayment').onclick=()=>{ state.settings.fixedPanelsCollapsed=state.sett
 $('#prev').onclick=()=>{ const step=view==='week'?7:view==='2week'?14:view==='3week'?21:1; cursor=(view==='month'||view==='diary')?new Date(cursor.getFullYear(),cursor.getMonth()-1,1):add(cursor,-step); mobileSelectedDate=''; render(); };
 $('#next').onclick=()=>{ const step=view==='week'?7:view==='2week'?14:view==='3week'?21:1; cursor=(view==='month'||view==='diary')?new Date(cursor.getFullYear(),cursor.getMonth()+1,1):add(cursor,step); mobileSelectedDate=''; render(); };
 $('#today').onclick=()=>{cursor=new Date();mobileSelectedDate=ds(new Date());render();};
+
+// v1.79: 모바일에서는 ‹ 오늘 › 날짜이동 묶음을 보기 버튼 줄의 맨 오른쪽으로 이동한다.
+// 데스크톱으로 돌아오면 기존 nav 위치로 복원해 PC 배치는 그대로 유지한다.
+function syncDateNavPlacement(){
+  const group=document.querySelector('.dateNavButtons');
+  const views=document.querySelector('header .views');
+  const nav=document.querySelector('header nav');
+  const jump=$('#jumpDate');
+  if(!group||!views||!nav) return;
+  if(window.matchMedia('(max-width:760px)').matches){
+    if(group.parentElement!==views) views.appendChild(group);
+  }else if(group.parentElement!==nav){
+    nav.insertBefore(group,jump||nav.firstChild);
+  }
+}
+syncDateNavPlacement();
+window.addEventListener('resize',syncDateNavPlacement,{passive:true});
 $('#jumpDate').onchange=e=>{ if(e.target.value){cursor=parse(e.target.value);render();} };
 $('#diaryMainShortcut').onclick=()=>{ if(view==='diary'){ view=lastScheduleView||'week'; } else { lastScheduleView=view; view='diary'; } render(); };
 $$('.views [data-view]').forEach(b=>b.onclick=()=>{view=b.dataset.view; if(view!=='diary') lastScheduleView=view; render();});
@@ -3257,7 +3274,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'1.77',
+    appVersion:'1.79',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
