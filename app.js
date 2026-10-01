@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.74',
+  version: '1.75',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -80,7 +80,8 @@ const defaultState = () => ({
   flexible: [],
   purchases: [],
   diary: {},
-  settings: { hiddenCalendars: [], fixedPanelsCollapsed: { recurring:false, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','load','dday','diary'], sidebarSectionsCollapsed:{}, laneHeights:{}, laneCollapsed:{}, laneLabelWidth:30, mobileSectionsCollapsed:{}, dayLaneHeights:{} }
+  actualWork: {},
+  settings: { hiddenCalendars: [], fixedPanelsCollapsed: { recurring:false, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','load','dday','diary'], sidebarSectionsCollapsed:{}, laneHeights:{}, laneCollapsed:{}, laneLabelWidth:30, mobileSectionsCollapsed:{}, dayLaneHeights:{}, workloadRange:'week' }
 });
 
 let state = defaultState();
@@ -345,7 +346,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.74',
+    version: '1.75',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -380,6 +381,10 @@ function normalizeState(raw){
     flexible: Array.isArray(s.flexible) ? s.flexible.filter(f=>f && f.id && f.name).map(f=>({...f,hours:Number(f.hours)||0,noDuration:!!f.noDuration,important:!!f.important,checklist:Array.isArray(f.checklist)?f.checklist.filter(x=>x&&String(x.text||'').trim()).map((x,i)=>({id:String(x.id||`xcl-${i}-${uid()}`),text:String(x.text||'').trim()})):[]})) : [],
     purchases: Array.isArray(s.purchases) ? s.purchases.filter(p=>p && p.id && p.name).map((p,i)=>({id:String(p.id),name:String(p.name),qty:Math.max(1,Number(p.qty)||1),memo:String(p.memo||''),done:!!p.done,createdAt:String(p.createdAt||''),order:Number.isFinite(Number(p.order))?Number(p.order):i})) : [],
     diary: s.diary && typeof s.diary === 'object' ? s.diary : {},
+    actualWork: (s.actualWork && typeof s.actualWork==='object') ? Object.fromEntries(Object.entries(s.actualWork).map(([date,rows])=>[
+      String(date),
+      (rows && typeof rows==='object') ? Object.fromEntries(Object.entries(rows).map(([calId,v])=>[String(calId),Math.max(0,Math.min(24,Number(v)||0))])) : {}
+    ])) : {},
     settings: {
       hiddenCalendars: Array.isArray(s.settings?.hiddenCalendars) ? s.settings.hiddenCalendars : [],
       fixedPanelsCollapsed: {
@@ -402,7 +407,8 @@ function normalizeState(raw){
       laneHeights: (s.settings?.laneHeights && typeof s.settings.laneHeights==='object') ? Object.fromEntries(Object.entries(s.settings.laneHeights).map(([k,v])=>[k,Math.max(44,Math.min(480,Number(v)||0))]).filter(([,v])=>v)) : {},
       dayLaneHeights: (s.settings?.dayLaneHeights && typeof s.settings.dayLaneHeights==='object') ? Object.fromEntries(Object.entries(s.settings.dayLaneHeights).map(([k,v])=>[k,Math.max(52,Math.min(640,Number(v)||0))]).filter(([,v])=>v)) : {},
       laneCollapsed: (s.settings?.laneCollapsed && typeof s.settings.laneCollapsed==='object') ? {...s.settings.laneCollapsed} : {},
-      laneLabelWidth: Math.max(22,Math.min(120,Number(s.settings?.laneLabelWidth)||30))
+      laneLabelWidth: Math.max(22,Math.min(120,Number(s.settings?.laneLabelWidth)||30)),
+      workloadRange: ['week','month','year'].includes(s.settings?.workloadRange) ? s.settings.workloadRange : 'week'
     }
   };
 }
@@ -1458,24 +1464,118 @@ function openPurchase(id=''){
   $('#purchaseId').value=p?.id||''; $('#purchaseName').value=p?.name||''; $('#purchaseQty').value=p?.qty||1; $('#purchaseMemo').value=p?.memo||''; $('#purchaseDone').checked=!!p?.done;
   $('#deletePurchase').style.visibility=p?'visible':'hidden'; openDialog($('#purchaseDlg'));
 }
-function renderLoad(){
-  const s=startWeek(cursor), e=add(s,6), map=buildOccurrenceMap(ds(s),ds(e)), visibleIds=new Set(visibleCals().map(c=>c.id));
-  const rows=[];
-  for(const root of topLevelCals()){
-    const members=[root,...descendants(root.id)].filter(c=>visibleIds.has(c.id));
-    if(!members.length) continue;
-    const memberIds=new Set(members.map(c=>c.id));
-    let rootSum=0;
-    for(const day of Object.values(map)) rootSum += day.filter(x=>memberIds.has(x.calId) && x.kind!=='payment').reduce((a,x)=>a+workloadDuration(x),0);
-    const rootWeek=capacityForWeek(root,s);
-    const cap=rootWeek.hours, unknownDays=rootWeek.unknownDays, blockedDays=rootWeek.blockedDays||0;
-    const p=cap?rootSum/cap*100:0;
-    let capText=unknownDays?` / ${cap?`${fmtH(cap)} + `:''}미정 ${unknownDays}일`:(cap?` / ${fmtH(cap)}`:' / 0h');
-    if(blockedDays) capText += ` · 차단 ${blockedDays}일`;
-    rows.push(`<div class="loadLine ${unknownDays?'unknownCapacity':''}"><b>${esc(root.name)}</b> ${fmtH(rootSum)}${capText}<div class="loadBar ${unknownDays?'unknownLoadBar':''}"><i class="${!unknownDays&&cap>0&&p>100?'overBar':''}" style="width:${unknownDays||!cap?0:Math.min(100,p)}%"></i></div></div>`);
-  }
-  $('#weekLoad').innerHTML=rows.join('') || '<div class="empty">표시 중인 캘린더가 없습니다.</div>';
+function actualWorkValue(date,rootId){
+  const row=state.actualWork?.[date];
+  if(!row || !Object.prototype.hasOwnProperty.call(row,rootId)) return null;
+  const n=Number(row[rootId]);
+  return Number.isFinite(n)?Math.max(0,n):null;
 }
+function setActualWorkValue(date,rootId,value){
+  state.actualWork=state.actualWork||{};
+  const raw=String(value??'').trim();
+  if(raw===''){
+    if(state.actualWork[date]){
+      delete state.actualWork[date][rootId];
+      if(!Object.keys(state.actualWork[date]).length) delete state.actualWork[date];
+    }
+    save(); return;
+  }
+  const n=Math.max(0,Math.min(24,Number(raw)||0));
+  state.actualWork[date]=state.actualWork[date]||{};
+  state.actualWork[date][rootId]=Math.round(n*100)/100;
+  save();
+}
+function workloadRootMembers(root){ return [root,...descendants(root.id)]; }
+function plannedHoursForRootDate(root,date,map){
+  const ids=new Set(workloadRootMembers(root).map(c=>c.id));
+  return (map[date]||[]).filter(e=>ids.has(e.calId)&&!['payment','anniversary'].includes(e.kind)).reduce((a,e)=>a+workloadDuration(e),0);
+}
+function workloadChildBreakdown(root,date,map){
+  const out=[];
+  for(const c of workloadRootMembers(root)){
+    const sum=(map[date]||[]).filter(e=>e.calId===c.id&&!['payment','anniversary'].includes(e.kind)).reduce((a,e)=>a+workloadDuration(e),0);
+    if(sum>0) out.push({c,sum});
+  }
+  return out;
+}
+function workloadPeriodBounds(mode){
+  if(mode==='month') return {start:new Date(cursor.getFullYear(),cursor.getMonth(),1),end:new Date(cursor.getFullYear(),cursor.getMonth()+1,0)};
+  if(mode==='year') return {start:new Date(cursor.getFullYear(),0,1),end:new Date(cursor.getFullYear(),11,31)};
+  const start=startWeek(cursor); return {start,end:add(start,6)};
+}
+function workloadPeriodLabel(mode,start,end){
+  if(mode==='month') return `${start.getFullYear()}년 ${start.getMonth()+1}월`;
+  if(mode==='year') return `${start.getFullYear()}년`;
+  return `${start.getMonth()+1}.${start.getDate()}–${end.getMonth()+1}.${end.getDate()}`;
+}
+function workloadSummaryForRoot(root,start,end,map){
+  let planned=0,actual=0,recordedPlanned=0,recordedCount=0,missingCount=0;
+  const todayKey=ds(new Date());
+  for(let d=new Date(start); d<=end; d=add(d,1)){
+    const date=ds(d), p=plannedHoursForRootDate(root,date,map), a=actualWorkValue(date,root.id);
+    planned+=p;
+    if(a!==null){ actual+=a; recordedPlanned+=p; recordedCount++; }
+    else if(p>0 && date<=todayKey) missingCount++;
+  }
+  return {planned,actual,recordedPlanned,recordedCount,missingCount,diff:actual-recordedPlanned};
+}
+function diffHoursHtml(diff){
+  const n=Math.round((Number(diff)||0)*100)/100;
+  const cls=n>0?'workDiffPlus':n<0?'workDiffMinus':'workDiffZero';
+  const sign=n>0?'+':n<0?'-':'';
+  return `<span class="${cls}">${sign}${fmtH(Math.abs(n))}</span>`;
+}
+function renderLoad(){
+  const mode=['week','month','year'].includes(state.settings?.workloadRange)?state.settings.workloadRange:'week';
+  const {start,end}=workloadPeriodBounds(mode), startS=ds(start), endS=ds(end);
+  const map=buildOccurrenceMap(startS,endS);
+  const roots=topLevelCals();
+  const periodLabel=workloadPeriodLabel(mode,start,end);
+  const modeButtons=`<div class="workloadTabs"><button type="button" data-workload-range="week" class="${mode==='week'?'on':''}">주</button><button type="button" data-workload-range="month" class="${mode==='month'?'on':''}">월</button><button type="button" data-workload-range="year" class="${mode==='year'?'on':''}">연</button></div>`;
+  let html=`${modeButtons}<div class="workloadPeriodTitle">${esc(periodLabel)}</div>`;
+  if(mode==='week'){
+    let weekPlanned=0, weekActual=0, weekRecordedPlanned=0, weekMissing=0;
+    const todayKey=ds(new Date());
+    for(let i=0;i<7;i++){
+      const d=add(start,i), date=ds(d), dow=['일','월','화','수','목','금','토'][d.getDay()];
+      let dayPlanned=0, dayActual=0, dayRecordedPlanned=0, dayRecorded=0, dayMissing=0;
+      const rows=[];
+      for(const root of roots){
+        const planned=plannedHoursForRootDate(root,date,map), actual=actualWorkValue(date,root.id), cap=capacityForDate(root,date);
+        const details=workloadChildBreakdown(root,date,map);
+        dayPlanned+=planned;
+        if(actual!==null){ dayActual+=actual; dayRecordedPlanned+=planned; dayRecorded++; }
+        else if(planned>0 && date<=todayKey) dayMissing++;
+        const capText=cap.blocked?'가용 0h · 차단':cap.unknown?'가용 미정':`가용 ${fmtH(cap.hours)}`;
+        const diff=actual===null?'':` · 차이 ${diffHoursHtml(actual-planned)}`;
+        const childText=details.length?`<div class="workloadBreakdown">${details.map(({c,sum})=>`<span style="--work-cal:${esc(c.color)}"><i></i>${esc(c.name)} ${fmtH(sum)}</span>`).join('')}</div>`:'';
+        rows.push(`<div class="workloadCalRow" style="--work-cal:${esc(root.color)}"><div class="workloadCalTop"><span class="workloadCalName"><i></i><b>${esc(root.name)}</b></span><span class="workloadPlan">배치 ${fmtH(planned)}</span></div><div class="workloadCalMeta"><span>${capText}</span><label>실제 <input class="actualWorkInput" type="number" min="0" max="24" step="0.25" inputmode="decimal" data-work-date="${date}" data-work-root="${esc(root.id)}" value="${actual===null?'':String(actual)}" placeholder="미입력"> h</label>${diff}</div>${childText}</div>`);
+      }
+      weekPlanned+=dayPlanned; weekActual+=dayActual; weekRecordedPlanned+=dayRecordedPlanned; weekMissing+=dayMissing;
+      const dayDiff=dayRecorded?` · 기록분 차이 ${diffHoursHtml(dayActual-dayRecordedPlanned)}`:'';
+      html+=`<div class="workloadDay"><div class="workloadDayHead"><b>${dow} ${d.getMonth()+1}/${d.getDate()}</b><span>배치 ${fmtH(dayPlanned)} · 실제 ${fmtH(dayActual)}${dayDiff}${dayMissing?` · 미입력 ${dayMissing}`:''}</span></div>${rows.join('')}</div>`;
+    }
+    html+=`<div class="workloadGrand"><b>주 합계</b><div><span>배치 <strong>${fmtH(weekPlanned)}</strong></span><span>실제 <strong>${fmtH(weekActual)}</strong></span><span>기록분 차이 ${diffHoursHtml(weekActual-weekRecordedPlanned)}</span>${weekMissing?`<span class="workMissing">미입력 ${weekMissing}건</span>`:''}</div></div>`;
+  }else{
+    let totalPlanned=0,totalActual=0,totalRecordedPlanned=0,totalMissing=0;
+    const rows=[];
+    for(const root of roots){
+      const x=workloadSummaryForRoot(root,start,end,map);
+      totalPlanned+=x.planned; totalActual+=x.actual; totalRecordedPlanned+=x.recordedPlanned; totalMissing+=x.missingCount;
+      rows.push(`<div class="workloadAggregateRow" style="--work-cal:${esc(root.color)}"><div class="workloadAggName"><i></i><b>${esc(root.name)}</b></div><div class="workloadAggNums"><span>배치 <strong>${fmtH(x.planned)}</strong></span><span>실제 <strong>${fmtH(x.actual)}</strong></span><span>기록분 차이 ${diffHoursHtml(x.diff)}</span>${x.missingCount?`<span class="workMissing">미입력 ${x.missingCount}건</span>`:''}</div></div>`);
+    }
+    html+=rows.join('')||'<div class="empty">등록된 캘린더가 없습니다.</div>';
+    html+=`<div class="workloadGrand"><b>${mode==='month'?'월':'연'} 합계</b><div><span>배치 <strong>${fmtH(totalPlanned)}</strong></span><span>실제 <strong>${fmtH(totalActual)}</strong></span><span>기록분 차이 ${diffHoursHtml(totalActual-totalRecordedPlanned)}</span>${totalMissing?`<span class="workMissing">미입력 ${totalMissing}건</span>`:''}</div></div>`;
+    html+=`<p class="workloadHint">실제시간은 주 보기에서 날짜·상위캘린더별로 입력합니다. 부속캘린더의 배치시간은 상위캘린더에 합산됩니다.</p>`;
+  }
+  $('#weekLoad').innerHTML=html;
+  $$('#weekLoad [data-workload-range]').forEach(btn=>btn.onclick=()=>{ state.settings.workloadRange=btn.dataset.workloadRange; save(); });
+  $$('#weekLoad .actualWorkInput').forEach(inp=>{
+    inp.addEventListener('change',()=>setActualWorkValue(inp.dataset.workDate,inp.dataset.workRoot,inp.value));
+    inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); inp.blur(); } });
+  });
+}
+
 function nextOccurrenceFor(e, from=ds(new Date()), horizonDays=740){
   const ends=ds(add(parse(from),horizonDays));
   const starts=generateOccurrenceStarts(e,from,ends).filter(d=>ds(d)>=from);
@@ -3106,7 +3206,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'1.74',
+    appVersion:'1.75',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
