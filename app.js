@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.76',
+  version: '1.77',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -346,7 +346,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.76',
+    version: '1.77',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -1884,6 +1884,53 @@ const mobileBreakpoint=window.matchMedia('(max-width: 760px)');
 mobileBreakpoint.addEventListener?.('change',()=>render());
 document.addEventListener('scroll',e=>{ if(!$('#eventPopover')?.classList.contains('hidden') && !$('#eventPopover')?.contains(e.target)) closeEventPopover(); },true);
 
+let multiWeekDragScrollFrame=0;
+let multiWeekDragScrollSpeed=0;
+function stopMultiWeekDragScroll(){
+  multiWeekDragScrollSpeed=0;
+  if(multiWeekDragScrollFrame){ cancelAnimationFrame(multiWeekDragScrollFrame); multiWeekDragScrollFrame=0; }
+}
+function runMultiWeekDragScroll(){
+  if(!multiWeekDragScrollSpeed){ multiWeekDragScrollFrame=0; return; }
+  const main=$('#main');
+  if(!main || !main.classList.contains('multiLaneView')){ stopMultiWeekDragScroll(); return; }
+  const before=main.scrollTop;
+  main.scrollTop+=multiWeekDragScrollSpeed;
+  // 끝까지 도달했으면 불필요한 반복을 멈춥니다.
+  if(main.scrollTop===before) multiWeekDragScrollSpeed=0;
+  multiWeekDragScrollFrame=multiWeekDragScrollSpeed?requestAnimationFrame(runMultiWeekDragScroll):0;
+}
+function updateMultiWeekDragScroll(clientY){
+  const main=$('#main');
+  if(!main || !main.classList.contains('multiLaneView')) return stopMultiWeekDragScroll();
+  const rect=main.getBoundingClientRect();
+  const edge=Math.max(72,Math.min(150,rect.height*.22));
+  let speed=0;
+  if(clientY<rect.top+edge){
+    const ratio=Math.max(0,Math.min(1,(rect.top+edge-clientY)/edge));
+    speed=-(4+Math.round(18*ratio));
+  }else if(clientY>rect.bottom-edge){
+    const ratio=Math.max(0,Math.min(1,(clientY-(rect.bottom-edge))/edge));
+    speed=4+Math.round(18*ratio);
+  }
+  multiWeekDragScrollSpeed=speed;
+  if(speed && !multiWeekDragScrollFrame) multiWeekDragScrollFrame=requestAnimationFrame(runMultiWeekDragScroll);
+  if(!speed) stopMultiWeekDragScroll();
+}
+function bindMultiWeekDragAssist(){
+  const main=$('#main'); if(!main || !main.classList.contains('multiLaneView')) return;
+  // 2주/3주 화면은 세로로 길기 때문에 카드를 잡은 채 화면 가장자리로 가면 자동 스크롤합니다.
+  main.ondragover=e=>{
+    const payload=activeDrag||readDragPayload(e.dataTransfer);
+    if(payload?.type==='event') updateMultiWeekDragScroll(e.clientY);
+  };
+  main.ondragleave=e=>{
+    const r=main.getBoundingClientRect();
+    if(e.clientY<r.top-8 || e.clientY>r.bottom+8 || e.clientX<r.left-8 || e.clientX>r.right+8) stopMultiWeekDragScroll();
+  };
+  main.ondrop=()=>stopMultiWeekDragScroll();
+}
+
 function bindItems(){
   $$('.item').forEach(item=>{
     item.onclick=e=>{
@@ -1909,6 +1956,7 @@ function bindItems(){
         const payload={type:'event',id:item.dataset.eid,occurrence:item.dataset.occurrence,day:item.dataset.renderDate||'',calId:item.dataset.calId||'',lane:item.dataset.lane||''};
         activeDrag=payload;
         item.classList.add('dragging');
+        document.body.classList.add('calendarEventDragging');
         e.dataTransfer.effectAllowed='move';
         try{ e.dataTransfer.setData('application/x-calendar-event',JSON.stringify(payload)); }catch(_e){}
         e.dataTransfer.setData('text/plain',`calendar-event:${payload.id}:${payload.occurrence||''}:${payload.day||''}`);
@@ -1939,7 +1987,7 @@ function bindItems(){
         if(before===null) return;
         reorderOccurrenceInDay(payload,item,before); activeDrag=null;
       };
-      item.ondragend=()=>{ activeDrag=null; item.classList.remove('dragging','orderDropBefore','orderDropAfter'); $$('.dropReady').forEach(el=>el.classList.remove('dropReady')); $$('.orderDropBefore,.orderDropAfter').forEach(el=>el.classList.remove('orderDropBefore','orderDropAfter')); };
+      item.ondragend=()=>{ activeDrag=null; stopMultiWeekDragScroll(); document.body.classList.remove('calendarEventDragging'); item.classList.remove('dragging','orderDropBefore','orderDropAfter'); $$('.dropReady').forEach(el=>el.classList.remove('dropReady')); $$('.orderDropBefore,.orderDropAfter').forEach(el=>el.classList.remove('orderDropBefore','orderDropAfter')); };
     }
   });
   $$('[data-dropdate]').forEach(x=>{
@@ -1947,13 +1995,14 @@ function bindItems(){
     x.ondragover=e=>{
       e.preventDefault();
       const payload=activeDrag||readDragPayload(e.dataTransfer);
+      if(payload?.type==='event') updateMultiWeekDragScroll(e.clientY);
       e.dataTransfer.dropEffect=(payload?.type==='fixed'||payload?.type==='flexible')?'copy':'move';
       x.classList.add('dropReady');
     };
     x.ondragleave=e=>{ if(!x.contains(e.relatedTarget)) x.classList.remove('dropReady'); };
     x.ondrop=e=>{
       e.preventDefault(); e.stopPropagation(); x.classList.remove('dropReady');
-      const payload=activeDrag||readDragPayload(e.dataTransfer); activeDrag=null;
+      const payload=activeDrag||readDragPayload(e.dataTransfer); activeDrag=null; stopMultiWeekDragScroll(); document.body.classList.remove('calendarEventDragging');
       if(!payload) return;
       if(payload.type==='fixed'){
         const f=state.fixed.find(z=>z.id===payload.id);
@@ -2229,7 +2278,9 @@ function scheduleLaneHtml(key,title,days,map,cellBuilder,{type='calendar',color=
   </section>`;
 }
 function scheduleDateHeader(days){
-  return `<div class="scheduleDateGrid"><div class="scheduleDateCorner">구역</div>${days.map(d=>{const key=ds(d),hasDiary=!!state.diary[key]?.text,h=holidayLabel(key),dow=d.getDay(),dayClass=[key===ds(new Date())?'today':'',holidayClass(key),dow===0?'sunday':'',dow===6?'saturday':''].filter(Boolean).join(' ');return `<div class="scheduleDateHead ${dayClass}"><div class="dayTopLine"><span class="weekdayLabel">${['일','월','화','수','목','금','토'][dow]}</span><span class="dateNum">${d.getDate()}</span><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}" aria-label="${hasDiary?'다이어리 작성됨':'다이어리 미작성'}">${diaryIconHtml(hasDiary)}</button></div><div class="holidayName ${h?'':'holidayEmpty'}" title="${h?esc(h):''}">${h?esc(h):'&nbsp;'}</div></div>`}).join('')}</div>`;
+  // 날짜 헤더 전체도 드롭 영역으로 사용합니다. 2주/3주 보기에서 다른 주로 옮길 때
+  // 좁은 일정 칸을 정확히 찾지 않아도 날짜 머리글에 놓으면 해당 날짜로 이동합니다.
+  return `<div class="scheduleDateGrid"><div class="scheduleDateCorner">구역</div>${days.map(d=>{const key=ds(d),hasDiary=!!state.diary[key]?.text,h=holidayLabel(key),dow=d.getDay(),dayClass=[key===ds(new Date())?'today':'',holidayClass(key),dow===0?'sunday':'',dow===6?'saturday':''].filter(Boolean).join(' ');return `<div class="scheduleDateHead ${dayClass}" data-dropdate="${key}" data-date-drop-head="1" title="${key} · 일정을 여기에 놓아 이동"><div class="dayTopLine"><span class="weekdayLabel">${['일','월','화','수','목','금','토'][dow]}</span><span class="dateNum">${d.getDate()}</span><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}" aria-label="${hasDiary?'다이어리 작성됨':'다이어리 미작성'}">${diaryIconHtml(hasDiary)}</button></div><div class="holidayName ${h?'':'holidayEmpty'}" title="${h?esc(h):''}">${h?esc(h):'&nbsp;'}</div></div>`}).join('')}</div>`;
 }
 function scheduleWeekBoard(days,map){
   const visible=visibleCals(),visibleIds=new Set(visible.map(c=>c.id));
@@ -2403,7 +2454,7 @@ function renderMultiWeek(weeks=2){
   if(isMobileSchedule()){ renderMobileSchedule(allDays,map); return; }
   $('#main').className=`laneView multiLaneView weeks${weeks}`;
   $('#main').innerHTML=`<div class="multiLaneWeeks">${[...Array(weeks)].map((_,w)=>{const days=allDays.slice(w*7,w*7+7);return `<div class="multiLaneWeek"><div class="multiLaneWeekLabel">${days[0].getMonth()+1}/${days[0].getDate()} – ${days[6].getMonth()+1}/${days[6].getDate()}</div>${scheduleWeekBoard(days,map)}</div>`}).join('')}</div>`;
-  bindItems(); bindScheduleLanes();
+  bindItems(); bindScheduleLanes(); bindMultiWeekDragAssist();
 }
 function renderMonth(){
   const y=cursor.getFullYear(),m=cursor.getMonth(),first=new Date(y,m,1),s=startWeek(first);
@@ -3206,7 +3257,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'1.76',
+    appVersion:'1.77',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
