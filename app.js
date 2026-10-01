@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.75',
+  version: '1.76',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -81,7 +81,7 @@ const defaultState = () => ({
   purchases: [],
   diary: {},
   actualWork: {},
-  settings: { hiddenCalendars: [], fixedPanelsCollapsed: { recurring:false, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','load','dday','diary'], sidebarSectionsCollapsed:{}, laneHeights:{}, laneCollapsed:{}, laneLabelWidth:30, mobileSectionsCollapsed:{}, dayLaneHeights:{}, workloadRange:'week' }
+  settings: { hiddenCalendars: [], fixedPanelsCollapsed: { recurring:false, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','dday','diary'], sidebarSectionsCollapsed:{}, laneHeights:{}, laneCollapsed:{}, laneLabelWidth:30, mobileSectionsCollapsed:{}, dayLaneHeights:{}, workloadRange:'week' }
 });
 
 let state = defaultState();
@@ -239,7 +239,7 @@ async function loadHolidayData(){
 }
 
 
-const DEFAULT_SIDEBAR_SECTION_ORDER=['calendar','fixed','flexible','purchase','payment','load','dday','diary'];
+const DEFAULT_SIDEBAR_SECTION_ORDER=['calendar','fixed','flexible','purchase','payment','dday','diary'];
 function normalizeSidebarSectionOrder(value){
   const src=Array.isArray(value)?value.map(String):[];
   const valid=src.filter((x,i)=>DEFAULT_SIDEBAR_SECTION_ORDER.includes(x)&&src.indexOf(x)===i);
@@ -346,7 +346,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.75',
+    version: '1.76',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -1167,7 +1167,7 @@ function renderSide(){
     };
     row.querySelector('.calEdit').onclick=e=>{ e.stopPropagation(); openCal(row.dataset.cid); };
   });
-  renderFixed(); renderFlexible(); renderPurchases(); renderPayments(); renderLoad(); renderDdays(); renderDiaryArchive();
+  renderFixed(); renderFlexible(); renderPurchases(); renderPayments(); renderDdays(); renderDiaryArchive();
 }
 function currentMonthRange(){
   const start=new Date(cursor.getFullYear(),cursor.getMonth(),1);
@@ -3206,7 +3206,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'1.75',
+    appVersion:'1.76',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
