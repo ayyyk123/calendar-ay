@@ -1703,7 +1703,7 @@ body.resizingLaneLabel *{
 }
 
 
-/* v1.71: 네이버 메일 바로가기 */
+/* v1.73: 네이버 바로가기 - 흰 배경 + 초록 N */
 .naverMailShortcut{
   display:inline-flex;
   align-items:center;
@@ -1711,18 +1711,20 @@ body.resizingLaneLabel *{
   width:31px;
   height:31px;
   padding:0;
-  border:1px solid #03c75a;
+  border:1px solid #dfe4e8;
   border-radius:7px;
-  background:#03c75a;
-  color:#fff;
+  background:#fff;
+  color:#03c75a;
   text-decoration:none;
   font-family:Arial,sans-serif;
   font-size:17px;
   font-weight:900;
   line-height:1;
   flex:0 0 auto;
+  box-shadow:0 1px 2px rgba(15,23,42,.05);
 }
-.naverMailShortcut:hover{background:#02b652;border-color:#02b652;color:#fff}
+.naverMailShortcut:hover{background:#f7fffa;border-color:#bfe9d0;color:#03b653}
+.naverMailShortcut:focus-visible{outline:2px solid #9fe0bb;outline-offset:1px}
 @media(max-width:760px){
   .naverMailShortcut{width:30px;height:30px;font-size:16px;border-radius:7px}
 }
@@ -1738,3 +1740,28 @@ body.resizingLaneLabel *{
 .purchaseRow.purchaseDropBefore{box-shadow:inset 0 2px 0 #4f7cff}
 .purchaseRow.purchaseDropAfter{box-shadow:inset 0 -2px 0 #4f7cff}
 @media(max-width:760px){.purchaseDragHandle{display:none}}
+
+
+/* v1.74: 가계부 바로가기 - 가계부 노란 하트 */
+.accountBookShortcut{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:31px;
+  height:31px;
+  padding:0;
+  border:1px solid #e6e0c7;
+  border-radius:7px;
+  background:#fff;
+  text-decoration:none;
+  font-family:Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,sans-serif;
+  font-size:16px;
+  line-height:1;
+  flex:0 0 auto;
+  box-shadow:0 1px 2px rgba(15,23,42,.05);
+}
+.accountBookShortcut:hover{background:#fffdf2;border-color:#e7d98c}
+.accountBookShortcut:focus-visible{outline:2px solid #eadf9b;outline-offset:1px}
+@media(max-width:760px){
+  .accountBookShortcut{width:30px;height:30px;font-size:15px;border-radius:7px}
+}
