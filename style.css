@@ -1799,6 +1799,7 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
   }
   .views [data-view="2week"],
   .views [data-view="3week"],
+  .views [data-view="4week"],
   .views [data-view="day"]{display:none!important}
   .views > button,
   .views > a{
@@ -1867,3 +1868,136 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
   .views > .dateNavButtons #today{font-size:9.5px!important}
   #range{font-size:10.5px!important}
 }
+
+
+/* v1.80: 네이버 캘린더형 2주/3주/4주 보기
+   - 월~일 7열 고정 + 선택한 주 수만큼 행을 쌓는 달력형 배치
+   - 각 날짜 안에서 일정은 한 줄 카드로 압축하고 넘치는 항목은 +N으로 표시
+   - 2주/3주/4주가 화면 높이를 균등하게 나눠 사용 */
+.multiCompactView{
+  --multi-weeks:2;
+  display:grid!important;
+  grid-template-columns:repeat(7,minmax(0,1fr));
+  grid-template-rows:30px repeat(var(--multi-weeks),minmax(0,1fr));
+  width:100%;
+  height:100%;
+  min-width:0;
+  min-height:0;
+  overflow:hidden!important;
+  align-content:stretch;
+  background:#fff;
+}
+.multiCompactWeekday{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-width:0;
+  padding:4px 2px;
+  border-right:1px solid #eceef1;
+  border-bottom:1px solid #dfe3e8;
+  background:#fafbfc;
+  color:#4f5661;
+  font-size:10px;
+  font-weight:700;
+}
+.multiCompactWeekday.saturday{color:#356cc8}
+.multiCompactWeekday.sunday{color:#d33}
+.multiCompactCell{
+  position:relative;
+  min-width:0;
+  min-height:0;
+  overflow:hidden;
+  padding:3px 4px 18px;
+  border-right:1px solid #eceef1;
+  border-bottom:1px solid #e3e6ea;
+  background:#fff;
+}
+.multiCompactCell.today{background:#f7fbff}
+.multiCompactCell.dropReady{box-shadow:inset 0 0 0 2px #4f7cff;background:#f4f7ff!important}
+.multiCompactDate{
+  height:18px;
+  min-height:18px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:4px;
+  margin-bottom:2px;
+  color:#4f5661;
+  font-size:9px;
+  line-height:18px;
+}
+.multiCompactDate>span{font-weight:650}
+.multiCompactDate>b{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:#d33;
+  font-size:8px;
+  font-weight:650;
+}
+.multiCompactCell.saturday .multiCompactDate>span{color:#356cc8}
+.multiCompactCell.sunday .multiCompactDate>span,
+.multiCompactCell.holiday .multiCompactDate>span{color:#d33}
+.multiCompactEvents{min-width:0;overflow:hidden}
+.multiCompactView .item{
+  min-height:17px!important;
+  height:17px!important;
+  margin:1px 0!important;
+  padding:0 3px!important;
+  border-left-width:3px!important;
+  border-radius:1px!important;
+  overflow:hidden!important;
+}
+.multiCompactView .itemRow{
+  min-height:17px!important;
+  height:17px!important;
+  gap:2px!important;
+  align-items:center!important;
+}
+.multiCompactView .itemTitle{
+  min-width:0!important;
+  font-size:9px!important;
+  line-height:17px!important;
+  font-weight:500!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+.multiCompactView .dragHandle{display:none!important}
+.multiCompactView .importanceBtn{font-size:9px!important;padding:0!important}
+.multiCompactView .repeatMark,.multiCompactView .carryBadge,.multiCompactView .inlineMeta{font-size:7px!important}
+.multiCompactView .checklistToggle{display:none!important}
+.multiCompactMore{
+  position:absolute;
+  right:4px;
+  bottom:2px;
+  z-index:3;
+  min-width:0;
+  padding:0!important;
+  border:0!important;
+  background:transparent!important;
+  color:#333!important;
+  font-size:8px!important;
+  font-weight:700;
+  line-height:14px;
+}
+.multiCompactMore:hover{text-decoration:underline}
+.multiCompactView.weeks2 .item{height:20px!important;min-height:20px!important}
+.multiCompactView.weeks2 .itemRow{height:20px!important;min-height:20px!important}
+.multiCompactView.weeks2 .itemTitle{font-size:10px!important;line-height:20px!important}
+.multiCompactView.weeks2 .multiCompactDate{height:21px;min-height:21px;font-size:10px;line-height:21px}
+.multiCompactView.weeks2 .multiCompactDate>b{font-size:9px}
+.multiCompactView.weeks3 .item{height:18px!important;min-height:18px!important}
+.multiCompactView.weeks3 .itemRow{height:18px!important;min-height:18px!important}
+.multiCompactView.weeks3 .itemTitle{font-size:9.5px!important;line-height:18px!important}
+.multiCompactView.weeks4 .item{height:16px!important;min-height:16px!important}
+.multiCompactView.weeks4 .itemRow{height:16px!important;min-height:16px!important}
+.multiCompactView.weeks4 .itemTitle{font-size:8.5px!important;line-height:16px!important}
+@media(max-width:980px) and (min-width:761px){
+  .multiCompactCell{padding-left:2px;padding-right:2px}
+  .multiCompactView .itemTitle{font-size:8px!important}
+  .multiCompactView.weeks2 .itemTitle{font-size:8.7px!important}
+  .multiCompactDate>b{font-size:7px}
+}
+.multiCompactView .subtaskList{display:none!important}

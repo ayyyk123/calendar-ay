@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.79',
+  version: '1.80',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -346,7 +346,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.79',
+    version: '1.80',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -2447,14 +2447,31 @@ function openDayList(date){
 }
 $('#closeDayList').onclick=()=>closeDialog($('#dayListDlg'));
 
+function multiWeekCellEventsHtml(date, es, weeks){
+  const priority=e=>e.kind==='anniversary'?0:e.kind==='appointment'?1:e.kind==='todo'?2:e.kind==='payment'?3:4;
+  const ordered=[...(es||[])].sort((a,b)=>priority(a)-priority(b));
+  const limit=weeks===2?11:weeks===3?7:5;
+  const visible=ordered.slice(0,limit);
+  const hidden=Math.max(0,ordered.length-visible.length);
+  return `<div class="multiCompactEvents">${visible.map(e=>eventItemHtml(e,true)).join('')}</div>${hidden?`<button type="button" class="multiCompactMore" data-more-date="${esc(date)}">+${hidden}</button>`:''}`;
+}
 function renderMultiWeek(weeks=2){
   const s=startWeek(cursor), total=weeks*7, allDays=[...Array(total)].map((_,i)=>add(s,i)), map=buildOccurrenceMap(ds(s),ds(allDays[allDays.length-1]),{calendarIds:focusedCalendarIds()});
   const last=allDays[allDays.length-1];
   setRangeLabel(`${s.getFullYear()}. ${s.getMonth()+1}. ${s.getDate()} - ${last.getFullYear()}. ${last.getMonth()+1}. ${last.getDate()}${focusSuffix()}`,`${s.getMonth()+1}/${s.getDate()}–${last.getMonth()+1}/${last.getDate()}${compactFocusSuffix()}`);
   if(isMobileSchedule()){ renderMobileSchedule(allDays,map); return; }
-  $('#main').className=`laneView multiLaneView weeks${weeks}`;
-  $('#main').innerHTML=`<div class="multiLaneWeeks">${[...Array(weeks)].map((_,w)=>{const days=allDays.slice(w*7,w*7+7);return `<div class="multiLaneWeek"><div class="multiLaneWeekLabel">${days[0].getMonth()+1}/${days[0].getDate()} – ${days[6].getMonth()+1}/${days[6].getDate()}</div>${scheduleWeekBoard(days,map)}</div>`}).join('')}</div>`;
-  bindItems(); bindScheduleLanes(); bindMultiWeekDragAssist();
+  $('#main').className=`multiCompactView weeks${weeks}`;
+  $('#main').style.setProperty('--multi-weeks',String(weeks));
+  const heads=['월','화','수','목','금','토','일'].map((x,i)=>`<div class="multiCompactWeekday ${i===5?'saturday':i===6?'sunday':''}">${x}</div>`).join('');
+  const today=ds(new Date());
+  const cells=allDays.map(d=>{
+    const key=ds(d), es=map[key]||[], h=holidayLabel(key), dow=d.getDay();
+    const cls=[key===today?'today':'',holidayClass(key),dow===0?'sunday':'',dow===6?'saturday':''].filter(Boolean).join(' ');
+    return `<div class="multiCompactCell ${cls}" data-dropdate="${key}" ondblclick="window.__newEvent?.('${key}')"><div class="multiCompactDate"><span>${d.getDate()}</span><b title="${h?esc(h):''}">${h?esc(h):''}</b></div>${multiWeekCellEventsHtml(key,es,weeks)}</div>`;
+  }).join('');
+  $('#main').innerHTML=heads+cells;
+  bindItems();
+  $$('.multiCompactMore').forEach(btn=>btn.onclick=e=>{e.stopPropagation();openDayList(btn.dataset.moreDate)});
 }
 function renderMonth(){
   const y=cursor.getFullYear(),m=cursor.getMonth(),first=new Date(y,m,1),s=startWeek(first);
@@ -2613,7 +2630,7 @@ function render(){
     viewSwitch.setAttribute('aria-label',inDiary?'일정으로':'다이어리로');
     viewSwitch.innerHTML=inDiary?'<span class="calendarSwitchGlyph" aria-hidden="true">📅</span>':diaryIconHtml(true);
   }
-  ({week:renderWeek,'2week':()=>renderMultiWeek(2),'3week':()=>renderMultiWeek(3),month:renderMonth,day:renderDay,list:renderList,diary:renderDiaryMain}[view]||renderWeek)();
+  ({week:renderWeek,'2week':()=>renderMultiWeek(2),'3week':()=>renderMultiWeek(3),'4week':()=>renderMultiWeek(4),month:renderMonth,day:renderDay,list:renderList,diary:renderDiaryMain}[view]||renderWeek)();
   const sidebar2=$('#sidebar'), main2=$('#main');
   if(sidebar2){ sidebar2.scrollTop=keep.sidebarTop; sidebar2.scrollLeft=keep.sidebarLeft; }
   if(main2){ main2.scrollTop=keep.mainTop; main2.scrollLeft=keep.mainLeft; }
@@ -3118,8 +3135,8 @@ $('#addFlexible').onclick=()=>openFlexible();
 $('#toggleFlexible').onclick=()=>{ state.settings.fixedPanelsCollapsed=state.settings.fixedPanelsCollapsed||{}; state.settings.fixedPanelsCollapsed.flexible=!state.settings.fixedPanelsCollapsed.flexible; save(); };
 $('#addPayment').onclick=()=>openEvent(ds(cursor),null,{preset:'payment'});
 $('#togglePayment').onclick=()=>{ state.settings.fixedPanelsCollapsed=state.settings.fixedPanelsCollapsed||{}; state.settings.fixedPanelsCollapsed.payment=!state.settings.fixedPanelsCollapsed.payment; save(); };
-$('#prev').onclick=()=>{ const step=view==='week'?7:view==='2week'?14:view==='3week'?21:1; cursor=(view==='month'||view==='diary')?new Date(cursor.getFullYear(),cursor.getMonth()-1,1):add(cursor,-step); mobileSelectedDate=''; render(); };
-$('#next').onclick=()=>{ const step=view==='week'?7:view==='2week'?14:view==='3week'?21:1; cursor=(view==='month'||view==='diary')?new Date(cursor.getFullYear(),cursor.getMonth()+1,1):add(cursor,step); mobileSelectedDate=''; render(); };
+$('#prev').onclick=()=>{ const step=view==='week'?7:view==='2week'?14:view==='3week'?21:view==='4week'?28:1; cursor=(view==='month'||view==='diary')?new Date(cursor.getFullYear(),cursor.getMonth()-1,1):add(cursor,-step); mobileSelectedDate=''; render(); };
+$('#next').onclick=()=>{ const step=view==='week'?7:view==='2week'?14:view==='3week'?21:view==='4week'?28:1; cursor=(view==='month'||view==='diary')?new Date(cursor.getFullYear(),cursor.getMonth()+1,1):add(cursor,step); mobileSelectedDate=''; render(); };
 $('#today').onclick=()=>{cursor=new Date();mobileSelectedDate=ds(new Date());render();};
 
 // v1.79: 모바일에서는 ‹ 오늘 › 날짜이동 묶음을 보기 버튼 줄의 맨 오른쪽으로 이동한다.
@@ -3274,7 +3291,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'1.79',
+    appVersion:'1.80',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
