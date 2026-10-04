@@ -1870,7 +1870,7 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 }
 
 
-/* v1.80: 네이버 캘린더형 2주/3주/4주 보기
+/* v1.82: 네이버 캘린더형 1주(간결)/2주/3주/4주 보기
    - 월~일 7열 고정 + 선택한 주 수만큼 행을 쌓는 달력형 배치
    - 각 날짜 안에서 일정은 한 줄 카드로 압축하고 넘치는 항목은 +N으로 표시
    - 2주/3주/4주가 화면 높이를 균등하게 나눠 사용 */
@@ -1907,7 +1907,7 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
   min-width:0;
   min-height:0;
   overflow:hidden;
-  padding:3px 4px 18px;
+  padding:3px 4px 3px;
   border-right:1px solid #eceef1;
   border-bottom:1px solid #e3e6ea;
   background:#fff;
@@ -2001,3 +2001,68 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
   .multiCompactDate>b{font-size:7px}
 }
 .multiCompactView .subtaskList{display:none!important}
+
+
+/* v1.82: 주 버튼 재클릭 간결 1주 보기 + 구역 더블클릭 등록 */
+.multiCompactView.weeks1 .item{height:20px!important;min-height:20px!important}
+.multiCompactView.weeks1 .itemRow{height:20px!important;min-height:20px!important}
+.multiCompactView.weeks1 .itemTitle{font-size:10px!important;line-height:20px!important}
+.multiCompactView.weeks1 .multiCompactDate{height:21px;min-height:21px;font-size:10px;line-height:21px}
+.multiCompactView.weeks1 .multiCompactDate>b{font-size:9px}
+.views [data-view="week"].weekCompactActive{box-shadow:inset 0 -2px 0 currentColor}
+.scheduleLaneCell,.dayResizableSection{cursor:default}
+
+
+/* v1.83: 좁은 PC 헤더 자동 2행 전환 — 버튼 겹침 방지 */
+@media (min-width:761px) and (max-width:1180px){
+  :root{--header-h:98px}
+  header{
+    height:var(--header-h)!important;
+    min-height:var(--header-h)!important;
+    display:grid!important;
+    grid-template-columns:auto minmax(120px,160px) auto minmax(0,1fr);
+    grid-template-rows:43px 39px;
+    grid-template-areas:
+      "brand badge save nav"
+      "views views views views";
+    align-items:center;
+    gap:4px 8px!important;
+    padding:6px 12px!important;
+    overflow:hidden;
+  }
+  header .brand{grid-area:brand;min-width:0;font-size:17px;line-height:1;white-space:nowrap}
+  #saveBadge{grid-area:badge;max-width:160px!important;min-width:0!important;width:100%;height:30px;padding:4px 7px!important}
+  #saveBadgeText{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #manualSaveBtn{grid-area:save;height:32px;min-width:0;padding:5px 9px!important;font-size:11px!important}
+  header nav{
+    grid-area:nav;
+    width:100%;min-width:0;margin:0!important;
+    display:flex!important;align-items:center;justify-content:flex-end;
+    gap:4px!important;overflow:hidden!important;
+  }
+  header nav button{height:32px;min-width:30px;padding:4px 7px!important;font-size:11px;white-space:nowrap}
+  #jumpDate{width:118px!important;min-width:104px!important;height:32px;padding:4px 5px!important;font-size:11px!important}
+  #range{min-width:0;max-width:155px;margin-left:2px!important;font-size:12px!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  header .views{
+    grid-area:views;
+    width:100%;min-width:0;margin:0!important;
+    display:flex!important;align-items:center;justify-content:center;
+    gap:4px!important;overflow:visible!important;flex-wrap:nowrap!important;
+  }
+  header .views>button,
+  header .views>a{height:34px!important;min-width:34px;margin:0!important;box-sizing:border-box}
+  header .views>button{padding:5px 9px!important;font-size:11px!important;white-space:nowrap}
+  .naverMailShortcut,.accountBookShortcut,.diaryMainShortcut{width:34px!important;height:34px!important;flex:0 0 34px!important}
+  .layout{height:calc(100dvh - var(--header-h))!important}
+}
+@media (min-width:761px) and (max-width:900px){
+  header{grid-template-columns:auto minmax(88px,112px) auto minmax(0,1fr);padding-left:8px!important;padding-right:8px!important;column-gap:6px!important}
+  #saveBadge{max-width:112px!important;font-size:10px!important}
+  #manualSaveBtn{padding-left:7px!important;padding-right:7px!important}
+  #manualSaveBtn .manualSaveFull{display:none!important}
+  #manualSaveBtn .manualSaveMobile{display:inline!important}
+  #jumpDate{width:106px!important;min-width:96px!important}
+  #range{max-width:120px;font-size:11px!important}
+  header .views{gap:3px!important}
+  header .views>button{padding-left:7px!important;padding-right:7px!important;font-size:10.5px!important}
+}

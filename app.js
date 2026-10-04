@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.80',
+  version: '1.83',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -81,7 +81,7 @@ const defaultState = () => ({
   purchases: [],
   diary: {},
   actualWork: {},
-  settings: { hiddenCalendars: [], fixedPanelsCollapsed: { recurring:false, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','dday','diary'], sidebarSectionsCollapsed:{}, laneHeights:{}, laneCollapsed:{}, laneLabelWidth:30, mobileSectionsCollapsed:{}, dayLaneHeights:{}, workloadRange:'week' }
+  settings: { hiddenCalendars: [], fixedPanelsCollapsed: { recurring:false, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','dday','diary'], sidebarSectionsCollapsed:{}, laneHeights:{}, laneCollapsed:{}, laneLabelWidth:30, mobileSectionsCollapsed:{}, dayLaneHeights:{}, workloadRange:'week', weekViewMode:'detailed' }
 });
 
 let state = defaultState();
@@ -346,7 +346,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.80',
+    version: '1.83',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -408,7 +408,8 @@ function normalizeState(raw){
       dayLaneHeights: (s.settings?.dayLaneHeights && typeof s.settings.dayLaneHeights==='object') ? Object.fromEntries(Object.entries(s.settings.dayLaneHeights).map(([k,v])=>[k,Math.max(52,Math.min(640,Number(v)||0))]).filter(([,v])=>v)) : {},
       laneCollapsed: (s.settings?.laneCollapsed && typeof s.settings.laneCollapsed==='object') ? {...s.settings.laneCollapsed} : {},
       laneLabelWidth: Math.max(22,Math.min(120,Number(s.settings?.laneLabelWidth)||30)),
-      workloadRange: ['week','month','year'].includes(s.settings?.workloadRange) ? s.settings.workloadRange : 'week'
+      workloadRange: ['week','month','year'].includes(s.settings?.workloadRange) ? s.settings.workloadRange : 'week',
+      weekViewMode: s.settings?.weekViewMode==='compact' ? 'compact' : 'detailed'
     }
   };
 }
@@ -1880,6 +1881,7 @@ document.addEventListener('pointerdown',e=>{
   closeEventPopover();
 });
 window.addEventListener('resize',closeEventPopover);
+window.addEventListener('resize',scheduleMultiWeekCellFit,{passive:true});
 const mobileBreakpoint=window.matchMedia('(max-width: 760px)');
 mobileBreakpoint.addEventListener?.('change',()=>render());
 document.addEventListener('scroll',e=>{ if(!$('#eventPopover')?.classList.contains('hidden') && !$('#eventPopover')?.contains(e.target)) closeEventPopover(); },true);
@@ -2264,7 +2266,7 @@ function laneVerticalTitleHtml(text){
 }
 function scheduleLaneHtml(key,title,days,map,cellBuilder,{type='calendar',color='#d9d9d9',subtitle=''}={}){
   const collapsed=laneIsCollapsed(key), h=laneHeight(key,type);
-  const cells=days.map(d=>{ const date=ds(d); return `<div class="scheduleLaneCell" data-dropdate="${date}" ondblclick="window.__newEvent?.('${date}')">${cellBuilder(date,map[date]||[])}</div>`; }).join('');
+  const cells=days.map(d=>{ const date=ds(d); return `<div class="scheduleLaneCell" data-dropdate="${date}">${cellBuilder(date,map[date]||[])}</div>`; }).join('');
   return `<section class="scheduleLane ${collapsed?'collapsed':''}" data-lane-key="${esc(key)}" style="--lane-h:${h}px;--lane-color:${esc(color)}">
     <aside class="scheduleLaneSide" style="--lane-color:${esc(color)}">
       <button type="button" class="scheduleLaneToggle" data-lane-toggle="${esc(key)}" title="구역 접기/펴기">
@@ -2296,9 +2298,32 @@ function scheduleWeekBoard(days,map){
   html+=`<div class="scheduleSummaryGrid"><div class="scheduleSummaryLabel">합계</div>${days.map(d=>{const date=ds(d);return `<div class="scheduleSummaryCell">${daySummaryHtml(date,map[date]||[])}</div>`}).join('')}</div></div>`;
   return html;
 }
+function openEventForSection(date,key){
+  const laneKey=String(key||'');
+  if(laneKey==='common') return openEvent(date,null,{preset:'common'});
+  if(laneKey==='quick') return openEvent(date,null,{preset:'quick'});
+  if(laneKey==='payment') return openEvent(date,null,{preset:'payment'});
+  if(laneKey.startsWith('cal:')){
+    const calId=laneKey.slice(4);
+    return openEvent(date,null,{preset:'event',calId});
+  }
+  return openEvent(date);
+}
+function isBlankSectionDoubleClickTarget(target){
+  return !target?.closest?.('.item,button,input,select,textarea,a,.dragHandle,.laneHeightResizer,.dayLaneHeightResizer');
+}
 function bindScheduleLanes(){
   const main=$('#main');
   if(main) main.style.setProperty('--lane-label-w-user',`${laneLabelWidth()}px`);
+  $$('.scheduleLaneCell').forEach(cell=>{
+    cell.ondblclick=e=>{
+      if(!isBlankSectionDoubleClickTarget(e.target)) return;
+      e.preventDefault(); e.stopPropagation();
+      const date=cell.dataset.dropdate||ds(cursor);
+      const key=cell.closest('.scheduleLane')?.dataset.laneKey||'';
+      openEventForSection(date,key);
+    };
+  });
   $$('[data-lane-label-resize]').forEach(handle=>{
     handle.ondblclick=e=>{ e.preventDefault(); e.stopPropagation(); state.settings.laneLabelWidth=30; if(main) main.style.setProperty('--lane-label-w-user','30px'); save(); };
     handle.onpointerdown=e=>{
@@ -2422,6 +2447,7 @@ function renderMobileSchedule(days,map){
 }
 
 function renderWeek(){
+  if(!isMobileSchedule() && state.settings?.weekViewMode==='compact'){ renderMultiWeek(1); return; }
   const s=startWeek(cursor), days=[0,1,2,3,4,5,6].map(i=>add(s,i)), map=buildOccurrenceMap(ds(s),ds(days[6]),{calendarIds:focusedCalendarIds()});
   setRangeLabel(`${s.getFullYear()}. ${s.getMonth()+1}. ${s.getDate()} - ${days[6].getFullYear()}. ${days[6].getMonth()+1}. ${days[6].getDate()}${focusSuffix()}`,`${s.getMonth()+1}/${s.getDate()}–${days[6].getMonth()+1}/${days[6].getDate()}${compactFocusSuffix()}`);
   if(isMobileSchedule()){ renderMobileSchedule(days,map); return; }
@@ -2450,10 +2476,51 @@ $('#closeDayList').onclick=()=>closeDialog($('#dayListDlg'));
 function multiWeekCellEventsHtml(date, es, weeks){
   const priority=e=>e.kind==='anniversary'?0:e.kind==='appointment'?1:e.kind==='todo'?2:e.kind==='payment'?3:4;
   const ordered=[...(es||[])].sort((a,b)=>priority(a)-priority(b));
-  const limit=weeks===2?11:weeks===3?7:5;
-  const visible=ordered.slice(0,limit);
-  const hidden=Math.max(0,ordered.length-visible.length);
-  return `<div class="multiCompactEvents">${visible.map(e=>eventItemHtml(e,true)).join('')}</div>${hidden?`<button type="button" class="multiCompactMore" data-more-date="${esc(date)}">+${hidden}</button>`:''}`;
+  // v1.82: 일정 개수를 미리 고정 개수로 자르지 않는다.
+  // 셀의 실제 높이를 렌더링 후 측정해서 들어가는 만큼 표시한다.
+  return `<div class="multiCompactEvents">${ordered.map(e=>eventItemHtml(e,true)).join('')}</div><button type="button" class="multiCompactMore" data-more-date="${esc(date)}" hidden></button>`;
+}
+function fitMultiWeekCellEvents(){
+  const root=$('#main');
+  if(!root || !root.classList.contains('multiCompactView')) return;
+  root.querySelectorAll('.multiCompactCell').forEach(cell=>{
+    const box=cell.querySelector('.multiCompactEvents');
+    const more=cell.querySelector('.multiCompactMore');
+    if(!box || !more) return;
+    const items=[...box.children].filter(el=>el.classList.contains('item'));
+    items.forEach(el=>{ el.style.display=''; });
+    more.hidden=true;
+    more.textContent='';
+    if(!items.length) return;
+
+    const cellRect=cell.getBoundingClientRect();
+    const cs=getComputedStyle(cell);
+    const padBottom=parseFloat(cs.paddingBottom)||0;
+    const naturalBottom=cellRect.bottom-padBottom;
+    const lastBottom=items[items.length-1].getBoundingClientRect().bottom;
+    // 전부 들어가면 +N 없이 모두 표시한다.
+    if(lastBottom<=naturalBottom+0.5) return;
+
+    // 넘치는 경우에만 +N 버튼 자리를 남기고 실제로 들어가는 개수를 계산한다.
+    const moreH=14;
+    const fitBottom=cellRect.bottom-Math.max(padBottom,moreH+4);
+    let visibleCount=0;
+    for(const item of items){
+      if(item.getBoundingClientRect().bottom<=fitBottom+0.5) visibleCount++;
+      else break;
+    }
+    items.forEach((item,i)=>{ if(i>=visibleCount) item.style.display='none'; });
+    const hiddenCount=Math.max(0,items.length-visibleCount);
+    if(hiddenCount){
+      more.textContent=`+${hiddenCount}`;
+      more.hidden=false;
+    }
+  });
+}
+let multiWeekFitRaf=0;
+function scheduleMultiWeekCellFit(){
+  cancelAnimationFrame(multiWeekFitRaf);
+  multiWeekFitRaf=requestAnimationFrame(fitMultiWeekCellEvents);
 }
 function renderMultiWeek(weeks=2){
   const s=startWeek(cursor), total=weeks*7, allDays=[...Array(total)].map((_,i)=>add(s,i)), map=buildOccurrenceMap(ds(s),ds(allDays[allDays.length-1]),{calendarIds:focusedCalendarIds()});
@@ -2472,6 +2539,7 @@ function renderMultiWeek(weeks=2){
   $('#main').innerHTML=heads+cells;
   bindItems();
   $$('.multiCompactMore').forEach(btn=>btn.onclick=e=>{e.stopPropagation();openDayList(btn.dataset.moreDate)});
+  scheduleMultiWeekCellFit();
 }
 function renderMonth(){
   const y=cursor.getFullYear(),m=cursor.getMonth(),first=new Date(y,m,1),s=startWeek(first);
@@ -2544,6 +2612,15 @@ function dayViewGroupHtml(date,es){
   return commonTopHtml+quickHtml+paymentHtml+html+`<div class="dayTotal ${overallOver?'overallOver':''}">총 계획 ${fmtH(total)}${capacitySummary}</div>`;
 }
 function bindDayViewResizers(){
+  $$('.dayResizableSection').forEach(section=>{
+    section.ondblclick=e=>{
+      if(!isBlankSectionDoubleClickTarget(e.target)) return;
+      e.preventDefault(); e.stopPropagation();
+      const date=section.closest('.dayResizableBoard')?.dataset.dropdate||ds(cursor);
+      const key=section.dataset.dayLaneKey||'';
+      openEventForSection(date,key);
+    };
+  });
   $$('[data-day-lane-resize]').forEach(handle=>{
     handle.ondblclick=e=>{
       e.preventDefault(); e.stopPropagation();
@@ -2621,6 +2698,13 @@ function render(){
   const keep={sidebarTop:sidebar?.scrollTop||0,sidebarLeft:sidebar?.scrollLeft||0,mainTop:main?.scrollTop||0,mainLeft:main?.scrollLeft||0};
   renderSide();
   $$('.views [data-view]').forEach(b=>b.classList.toggle('on',b.dataset.view===view));
+  const weekBtn=$('.views [data-view="week"]');
+  if(weekBtn){
+    const compact=state.settings?.weekViewMode==='compact';
+    weekBtn.title=view==='week' ? `주 보기 · 다시 누르면 ${compact?'상세 구역형':'간결 달력형'}으로 전환` : `주 보기 (${compact?'간결 달력형':'상세 구역형'})`;
+    weekBtn.setAttribute('aria-label',weekBtn.title);
+    weekBtn.classList.toggle('weekCompactActive',view==='week'&&compact);
+  }
   const viewSwitch=$('#diaryMainShortcut');
   if(viewSwitch){
     const inDiary=view==='diary';
@@ -2802,12 +2886,15 @@ function openEvent(date,id,options={}){
   const e=state.events.find(x=>x.id===id);
   const recurringPreset=!e && options?.preset==='autoRecurring';
   const paymentPreset=!e && options?.preset==='payment';
+  const quickPreset=!e && options?.preset==='quick';
+  const commonPreset=!e && options?.preset==='common';
+  const requestedCalId=!e && typeof options?.calId==='string' && state.calendars.some(c=>c.id===options.calId) ? options.calId : '';
   activeEventOccurrence=e?(date||e.date):(date||ds(cursor));
-  $('#eventTitle').textContent=e?'일정 수정':(paymentPreset?'납부일정 추가':(recurringPreset?'자동반복 업무 추가':'일정 등록'));
-  $('#eid').value=e?.id||''; $('#title').value=e?.title||''; $('#important').checked=!!e?.important; $('#cal').value=e?.calId||cals()[0]?.id||'';
+  $('#eventTitle').textContent=e?'일정 수정':(paymentPreset?'납부일정 추가':(quickPreset?'Quick 추가':(commonPreset?'공통일정 추가':(recurringPreset?'자동반복 업무 추가':'일정 등록'))));
+  $('#eid').value=e?.id||''; $('#title').value=e?.title||''; $('#important').checked=!!e?.important; $('#cal').value=e?.calId||requestedCalId||cals()[0]?.id||'';
   $('#date').value=e?.date||date||ds(cursor); $('#endDate').value=e?.endDate||e?.date||date||ds(cursor);
   $('#allDay').checked=e?.allDay??true; $('#start').value=e?.start||''; $('#end').value=e?.end||''; setDurationInputs(e?.hours??1); $('#noDuration').checked=paymentPreset?true:!!e?.noDuration;
-  $('#kind').value=e?.kind||(paymentPreset?'payment':(recurringPreset?'todo':'event')); $('#place').value=e?.place||''; $('#repeat').value=e?.repeat||(paymentPreset?'monthly':(recurringPreset?'weekly':'none')); $('#memo').value=e?.memo||'';
+  $('#kind').value=e?.kind||(paymentPreset?'payment':(quickPreset?'todo':(commonPreset?'appointment':(recurringPreset?'todo':'event')))); $('#place').value=e?.place||''; $('#repeat').value=e?.repeat||(paymentPreset?'monthly':(recurringPreset?'weekly':'none')); $('#memo').value=e?.memo||'';
   $('#checklistText').value=checklistItems(e||{}).map(x=>x.text).join('\n');
   $('#paymentAmount').value=e?.paymentAmount||''; $('#paymentMethod').value=e?.paymentMethod||'';
   $('#availabilityBlock').checked=!!e?.availabilityBlock;
@@ -3157,7 +3244,16 @@ syncDateNavPlacement();
 window.addEventListener('resize',syncDateNavPlacement,{passive:true});
 $('#jumpDate').onchange=e=>{ if(e.target.value){cursor=parse(e.target.value);render();} };
 $('#diaryMainShortcut').onclick=()=>{ if(view==='diary'){ view=lastScheduleView||'week'; } else { lastScheduleView=view; view='diary'; } render(); };
-$$('.views [data-view]').forEach(b=>b.onclick=()=>{view=b.dataset.view; if(view!=='diary') lastScheduleView=view; render();});
+$$('.views [data-view]').forEach(b=>b.onclick=()=>{
+  const next=b.dataset.view;
+  if(next==='week' && view==='week' && !isMobileSchedule()){
+    state.settings.weekViewMode=state.settings.weekViewMode==='compact'?'detailed':'compact';
+    lastScheduleView='week';
+    save();
+    return;
+  }
+  view=next; if(view!=='diary') lastScheduleView=view; render();
+});
 $('#sidebarToggle').onclick=()=>$('#sidebar').classList.toggle('open');
 $('#main').addEventListener('click',()=>{ if(isMobileSidebar()) $('#sidebar').classList.remove('open'); });
 initSidebarResizer();
@@ -3291,7 +3387,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'1.80',
+    appVersion:'1.83',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
