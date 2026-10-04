@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.83',
+  version: '1.84',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -346,7 +346,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.83',
+    version: '1.84',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -2228,16 +2228,22 @@ function laneCellCommonHtml(es){
 }
 function laneCellQuickHtml(es){ return (es||[]).filter(e=>e.kind==='todo').map(e=>eventItemHtml(e,false)).join(''); }
 function laneCellPaymentHtml(es){ return (es||[]).filter(e=>e.kind==='payment').map(e=>eventItemHtml(e,false)).join(''); }
+function laneOrderedItemsHtml(events,rootId){
+  let previousSubCalId='';
+  return (events||[]).map(e=>{
+    const c=cal(e.calId), isSub=e.calId!==rootId;
+    const showSubTag=isSub && e.calId!==previousSubCalId;
+    previousSubCalId=isSub?e.calId:'';
+    return `<div class="laneOrderedItem ${isSub?'laneOrderedSubItem':'laneOrderedRootItem'} ${isSub&&!showSubTag?'sameSubCalendarContinuation':''}" data-lane-cal-id="${esc(e.calId)}" title="${esc(calendarPath(e.calId))}">${showSubTag?`<span class="laneInlineCalTag" style="--tag-color:${esc(c.color)}">↳ ${esc(c.name)}</span>`:''}${eventItemHtml(e,false)}</div>`;
+  }).join('');
+}
 function rootLaneCellHtml(date,root,es,visibleIds){
   const members=laneCalendarMembers(root,visibleIds), memberIds=new Set(members.map(c=>c.id));
   const normal=(es||[]).filter(e=>memberIds.has(e.calId) && !['anniversary','appointment','todo','payment'].includes(e.kind));
   const allForLoad=(es||[]).filter(e=>memberIds.has(e.calId) && !['anniversary','payment'].includes(e.kind));
   const sum=allForLoad.reduce((a,e)=>a+workloadDuration(e),0), cap=capacityForDate(root,date);
   let body='';
-  body=normal.map(e=>{
-    const c=cal(e.calId), isSub=e.calId!==root.id;
-    return `<div class="laneOrderedItem ${isSub?'laneOrderedSubItem':'laneOrderedRootItem'}" data-lane-cal-id="${esc(e.calId)}" title="${esc(calendarPath(e.calId))}">${isSub?`<span class="laneInlineCalTag" style="--tag-color:${esc(c.color)}">↳ ${esc(c.name)}</span>`:''}${eventItemHtml(e,false)}</div>`;
-  }).join('');
+  body=laneOrderedItemsHtml(normal,root.id);
   const capText=cap.unknown?`${fmtH(sum)} / 미정`:`${fmtH(sum)} / ${fmtH(cap.hours)}`;
   const cls=cap.unknown?'unknown':(Number(cap.hours)>0&&sum>Number(cap.hours)?'over':'ok');
   return `<div class="laneCellLoad ${cls}" title="${esc(root.name)} 가용시간">${capText}${cap.blocked?' · 차단':''}</div>${body}`;
@@ -2597,10 +2603,7 @@ function dayViewGroupHtml(date,es){
     const rootCollapsed=isDayCalCollapsed(date,root.id);
     const blockedTitle=rootCapInfo.blocked?' · 가용시간 차단 일정 있음':'';
     let body=`<div class="group calendarTreeGroup ${rootCollapsed?'collapsed':''}" style="--group-color:${esc(root.color)}"><div class="groupHead" style="background:${esc(root.color)}55" title="${esc(root.name)}${blockedTitle}">${dayCalHeadHtml(date,root,rootSum,rootCapInfo.hours,rootCapInfo.unknown)}</div><div class="dayCalGroupBody laneMergedDayItems">`;
-    body+=groupEvents.map(e=>{
-      const c=cal(e.calId), isSub=e.calId!==root.id;
-      return `<div class="laneOrderedItem ${isSub?'laneOrderedSubItem':'laneOrderedRootItem'}" data-lane-cal-id="${esc(e.calId)}" title="${esc(calendarPath(e.calId))}">${isSub?`<span class="laneInlineCalTag" style="--tag-color:${esc(c.color)}">↳ ${esc(c.name)}</span>`:''}${eventItemHtml(e,false)}</div>`;
-    }).join('');
+    body+=laneOrderedItemsHtml(groupEvents,root.id);
     body+=`</div></div>`;
     html+=dayResizableSectionHtml(`cal:${root.id}`,body,{type:'calendar',color:root.color});
   }
@@ -3387,7 +3390,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'1.83',
+    appVersion:'1.84',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
