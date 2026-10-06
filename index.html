@@ -4,17 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
-  <title>캘린더 v1.92</title>
-  <link rel="manifest" href="manifest.json?v=1.92">
+  <title>캘린더 v1.93</title>
+  <link rel="manifest" href="manifest.json?v=1.93">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="icon-180.png">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css">
-  <link rel="stylesheet" href="style.css?v=1.92">
+  <link rel="stylesheet" href="style.css?v=1.93">
 </head>
 <body>
 <header>
-  <div class="brand"><b>캘린더</b><small> v1.92</small></div>
+  <div class="brand"><b>캘린더</b><small> v1.93</small></div>
   <div id="saveBadge" class="saveBadge loading" title="Firebase 저장 상태"><span class="saveDot"></span><span id="saveBadgeText">Firebase 확인 중</span></div>
   <button id="manualSaveBtn" class="manualSaveBtn" type="button" title="현재 데이터를 Firebase에 즉시 저장"><span class="manualSaveFull">최신자료 저장</span><span class="manualSaveMobile">저장</span></button>
   <button id="sidebarToggle" class="mobileOnly" type="button" aria-label="메뉴">☰</button>
@@ -132,8 +132,9 @@
       <div id="prepDetails" class="prepDetails hidden">
         <div class="row">
           <label>기한 날짜<input type="date" id="prepDeadline"></label>
-          <label>준비 방식<select id="prepMode"><option value="auto">연속 준비일 자동 계산 + 추가 가능</option><option value="custom">날짜·반복만 직접 지정</option></select></label>
+          <label>계획 추가 방식<select id="prepMode"><option value="auto">연속 준비일 자동 계산</option><option value="custom">날짜·반복 직접 지정</option></select></label>
         </div>
+        <label class="check prepAutoEnable"><input type="checkbox" id="prepAutoEnabled"> 연속 준비일 자동 계산 사용</label>
         <div id="prepAutoFields" class="prepAutoFields">
           <div class="row">
             <label>필요 준비일수<input type="number" id="prepDays" min="1" max="365" step="1" value="5"></label>
@@ -145,13 +146,9 @@
           </div>
         </div>
         <div id="prepCalcSummary" class="prepCalcSummary"></div>
-        <div id="prepAutoEditor" class="prepDailyEditor">
-          <div class="prepDailyHead"><b>날짜별 진행 계획</b><small>각 날짜에 무엇을 할지 적어두면 달력에도 그 내용이 표시됩니다.</small></div>
-          <div id="prepDailyRows" class="prepDailyRows"></div>
-        </div>
         <div id="prepCustomFields" class="prepCustomFields hidden">
-          <div class="prepCustomHead"><b id="prepCustomTitle">추가 준비업무 (선택)</b><small>자동 준비기간과 함께 사용할 수 있습니다.</small></div>
-          <div id="prepCustomHelp" class="prepCustomHelp">자동 계산된 준비기간에 더해, 특정 날짜나 반복 준비업무를 추가할 수 있습니다.</div>
+          <div class="prepCustomHead"><b id="prepCustomTitle">날짜·반복 준비업무 추가</b><small>추가한 계획은 아래 준비 진행계획에 계속 누적됩니다.</small></div>
+          <div id="prepCustomHelp" class="prepCustomHelp">특정 날짜 또는 반복 규칙으로 준비업무를 추가하세요. 추가 방식 메뉴를 바꿔도 기존 진행계획은 유지됩니다.</div>
           <div class="prepRuleAdder">
             <b>특정 날짜에 할 일</b>
             <div class="prepRuleInputs"><input type="date" id="prepOneDate"><input id="prepOneText" placeholder="예: 최종 인원 취합"><button type="button" id="addPrepOne">추가</button></div>
@@ -177,7 +174,11 @@
             <div class="prepRepeatAction"><input id="prepRepeatText" placeholder="예: 진행상황 확인"><button type="button" id="addPrepRepeat">추가</button></div>
             <small>예: ‘마감 5일 전부터 · 매일’ 또는 ‘시작일 10/1 · 매주 월·목’처럼 지정할 수 있습니다.</small>
           </div>
-          <div id="prepRuleList" class="prepRuleList"></div>
+          <div id="prepRuleList" class="prepRuleList hidden"></div>
+        </div>
+        <div id="prepAutoEditor" class="prepDailyEditor prepUnifiedPlan">
+          <div class="prepDailyHead"><b>준비 진행계획</b><small>자동계산·특정날짜·반복으로 추가한 모든 계획이 날짜순으로 한곳에 표시됩니다.</small></div>
+          <div id="prepDailyRows" class="prepDailyRows"></div>
         </div>
       </div>
     </div>
@@ -486,6 +487,6 @@
   <div><span class="spinner"></span><b>Firebase 최신 데이터 불러오는 중…</b><small>저장된 최신 일정을 확인하고 있어요.</small></div>
 </div>
 
-<script type="module" src="app.js?v=1.92"></script>
+<script type="module" src="app.js?v=1.93"></script>
 </body>
 </html>

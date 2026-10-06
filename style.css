@@ -2201,3 +2201,24 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 
 /* v1.92: 자동 준비기간 + 추가 날짜/반복 업무 병행 */
 .prepCustomHead{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:2px 0 6px}.prepCustomHead b{font-size:12px}.prepCustomHead small{font-size:9px;color:#7c8798}
+
+/* v1.93: 준비계획 입력 도구와 하단 통합 진행계획 */
+.prepAutoEnable{margin:0 0 3px;font-weight:800;color:#536070}
+.prepUnifiedPlan{margin-top:2px;border-top:1px solid #dfe5ed;padding-top:10px}
+.prepUnifiedPlan .prepDailyHead{margin-bottom:6px}
+.prepUnifiedPlan .prepDailyRows{max-height:300px}
+.prepPlanEditorRow{grid-template-columns:96px minmax(0,1fr) auto!important;align-items:center!important;background:#fff;border:1px solid #e4e8ee;border-radius:7px;padding:5px 6px}
+.prepPlanEditorRow .prepDailyDate{display:grid;gap:1px;font-weight:800}
+.prepPlanEditorRow .prepDailyDate small{font-size:8.5px;color:#8290a2;font-weight:700}
+.prepPlanEditorText{min-width:0;font-size:11px;line-height:1.4;word-break:keep-all}
+.prepEditorRule{display:block;color:#5272a0!important}
+.prepInlineDelete{width:26px;height:26px;align-self:center}
+.prepPlanRow.deadline{border-color:#dfe5ed;background:#f8fafc}
+.prepPlanRow.focused{border-color:#7291bd!important;background:#eef4ff!important;box-shadow:0 0 0 1px rgba(74,111,164,.14)}
+.prepPlanRow.focused .prepPlanDate{color:#315f9f}
+.prepDeadlineMemo{margin-top:5px;padding-top:5px;border-top:1px dashed #d7dde6;font-size:11px;line-height:1.45;white-space:pre-wrap;color:#4f5967}
+.prepDeadlineMemo span{display:inline-block;margin-right:5px;font-size:9px;font-weight:800;color:#7c8796}
+@media(max-width:760px){
+  .prepPlanEditorRow{grid-template-columns:80px minmax(0,1fr) auto!important;gap:5px!important}
+  .prepUnifiedPlan .prepDailyRows{max-height:360px}
+}
