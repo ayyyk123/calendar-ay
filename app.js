@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.98',
+  version: '1.99',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -346,7 +346,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.98',
+    version: '1.99',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -2611,24 +2611,38 @@ function openEventForSection(date,key){
 function isBlankSectionDoubleClickTarget(target){
   return !target?.closest?.('.item,button,input,select,textarea,a,.dragHandle,.laneHeightResizer,.dayLaneHeightResizer');
 }
+function naturalStackHeight(el){
+  if(!el) return 0;
+  const cs=getComputedStyle(el);
+  let total=(parseFloat(cs.paddingTop)||0)+(parseFloat(cs.paddingBottom)||0);
+  const children=[...el.children].filter(ch=>{
+    const st=getComputedStyle(ch);
+    return st.display!=='none' && st.position!=='absolute' && st.position!=='fixed';
+  });
+  for(const ch of children){
+    const st=getComputedStyle(ch);
+    total+=ch.getBoundingClientRect().height+(parseFloat(st.marginTop)||0)+(parseFloat(st.marginBottom)||0);
+  }
+  return Math.ceil(total);
+}
 function fitAllScheduleLaneHeights(){
   if(isMobileSchedule()) return;
   const lanes=$$('.scheduleLane').filter(lane=>!lane.classList.contains('collapsed'));
   if(!lanes.length) return;
   state.settings.laneHeights=state.settings.laneHeights||{};
-  // 기존에 크게 잡힌 높이의 영향을 없애고 실제 내용 높이를 측정한다.
-  lanes.forEach(lane=>lane.style.setProperty('--lane-h','44px'));
-  void ($('#main')?.offsetHeight);
   lanes.forEach(lane=>{
     const key=lane.dataset.laneKey||'';
     const cells=[...lane.querySelectorAll('.scheduleLaneCell')];
-    const contentH=Math.max(44,...cells.map(cell=>Math.ceil(cell.scrollHeight||0)));
-    const h=Math.max(44,Math.min(480,contentH+2));
+    const side=lane.querySelector('.scheduleLaneSide');
+    const cellNeed=Math.max(0,...cells.map(cell=>naturalStackHeight(cell)));
+    const sideNeed=Math.ceil(side?.scrollHeight||0);
+    const h=Math.max(44,Math.min(480,Math.max(cellNeed,sideNeed)+2));
     state.settings.laneHeights[key]=h;
     lane.style.setProperty('--lane-h',`${h}px`);
   });
   save({rerender:false});
 }
+
 
 function bindScheduleLanes(){
   const main=$('#main');
@@ -2892,7 +2906,9 @@ function dayLaneHeight(key,type='calendar'){
 }
 function dayResizableSectionHtml(key,innerHtml,{type='calendar',color='#d9d9d9'}={}){
   const h=dayLaneHeight(key,type);
-  return `<section class="dayResizableSection" data-day-lane-key="${esc(key)}" style="--day-lane-h:${h}px;--day-lane-color:${esc(color)}"><div class="dayResizableContent">${innerHtml}</div><div class="dayLaneHeightResizer" data-day-lane-resize="${esc(key)}" data-day-lane-type="${esc(type)}" title="위아래로 드래그해 구역 높이 조절 · 더블클릭 기본높이"><span></span></div></section>`;
+  state.settings.dayLaneManual=state.settings.dayLaneManual||{};
+  const manual=!!state.settings.dayLaneManual[key];
+  return `<section class="dayResizableSection ${manual?'manualDayHeight':''}" data-day-lane-key="${esc(key)}" style="--day-lane-h:${h}px;--day-lane-color:${esc(color)}"><div class="dayResizableContent">${innerHtml}</div><div class="dayLaneHeightResizer" data-day-lane-resize="${esc(key)}" data-day-lane-type="${esc(type)}" title="위아래로 드래그해 구역 높이 조절 · 더블클릭 자동높이"><span></span></div></section>`;
 }
 function dayViewGroupHtml(date,es){
   const commonTopHtml=dayResizableSectionHtml('common',commonTopLaneHtml(es,false,true),{type:'common',color:'#d9b5cc'});
@@ -2934,19 +2950,22 @@ function fitAllDayLaneHeights(){
   const sections=$$('.dayResizableSection');
   if(!sections.length) return;
   state.settings.dayLaneHeights=state.settings.dayLaneHeights||{};
-  sections.forEach(section=>section.style.setProperty('--day-lane-h','640px'));
-  void ($('#main')?.offsetHeight);
+  state.settings.dayLaneManual=state.settings.dayLaneManual||{};
   sections.forEach(section=>{
     const key=section.dataset.dayLaneKey||'';
     const content=section.querySelector('.dayResizableContent');
     const resizer=section.querySelector('.dayLaneHeightResizer');
     const resizerH=Math.ceil(resizer?.getBoundingClientRect().height||8);
-    const h=Math.max(52,Math.min(640,Math.ceil(content?.scrollHeight||0)+resizerH+1));
+    const natural=naturalStackHeight(content);
+    const h=Math.max(52,Math.min(640,natural+resizerH+2));
     state.settings.dayLaneHeights[key]=h;
+    state.settings.dayLaneManual[key]=true;
+    section.classList.add('manualDayHeight');
     section.style.setProperty('--day-lane-h',`${h}px`);
   });
   save({rerender:false});
 }
+
 
 function bindDayViewResizers(){
   $('[data-auto-fit-day-lanes]')?.addEventListener('click',e=>{ e.preventDefault(); e.stopPropagation(); fitAllDayLaneHeights(); });
@@ -2964,10 +2983,12 @@ function bindDayViewResizers(){
       e.preventDefault(); e.stopPropagation();
       const key=handle.dataset.dayLaneResize;
       state.settings.dayLaneHeights=state.settings.dayLaneHeights||{};
+      state.settings.dayLaneManual=state.settings.dayLaneManual||{};
       delete state.settings.dayLaneHeights[key];
+      delete state.settings.dayLaneManual[key];
       const section=handle.closest('.dayResizableSection');
-      const type=handle.dataset.dayLaneType||'calendar';
-      section?.style.setProperty('--day-lane-h',`${DAY_LANE_HEIGHT_DEFAULTS[type]||176}px`);
+      section?.classList.remove('manualDayHeight');
+      section?.style.removeProperty('--day-lane-h');
       save({rerender:false});
     };
     handle.onpointerdown=e=>{
@@ -2975,8 +2996,11 @@ function bindDayViewResizers(){
       e.preventDefault(); e.stopPropagation();
       const section=handle.closest('.dayResizableSection'), key=handle.dataset.dayLaneResize;
       if(!section) return;
-      const type=handle.dataset.dayLaneType||'calendar';
-      const startY=e.clientY, startH=dayLaneHeight(key,type);
+      state.settings.dayLaneManual=state.settings.dayLaneManual||{};
+      state.settings.dayLaneManual[key]=true;
+      section.classList.add('manualDayHeight');
+      const startY=e.clientY, startH=Math.max(52,Math.round(section.getBoundingClientRect().height||dayLaneHeight(key,handle.dataset.dayLaneType||'calendar')));
+      section.style.setProperty('--day-lane-h',`${startH}px`);
       let currentH=startH;
       handle.setPointerCapture?.(e.pointerId);
       document.body.classList.add('resizingDayLane');
@@ -2998,6 +3022,17 @@ function bindDayViewResizers(){
       handle.addEventListener('pointermove',move);
       handle.addEventListener('pointerup',up,{once:true});
       handle.addEventListener('pointercancel',up,{once:true});
+    };
+    handle.onwheel=e=>{
+      e.preventDefault(); e.stopPropagation();
+      const section=handle.closest('.dayResizableSection'), key=handle.dataset.dayLaneResize;
+      if(!section) return;
+      state.settings.dayLaneHeights=state.settings.dayLaneHeights||{};
+      state.settings.dayLaneManual=state.settings.dayLaneManual||{};
+      state.settings.dayLaneManual[key]=true; section.classList.add('manualDayHeight');
+      const current=Math.max(52,Math.round(section.getBoundingClientRect().height||dayLaneHeight(key,handle.dataset.dayLaneType||'calendar')));
+      const next=Math.max(52,Math.min(640,current+(e.deltaY>0?16:-16)));
+      state.settings.dayLaneHeights[key]=next; section.style.setProperty('--day-lane-h',`${next}px`); save({rerender:false});
     };
   });
 }
@@ -3793,14 +3828,14 @@ function autoFitFromViewButton(next){
     if(view!=='week' || state.settings.weekViewMode==='compact'){
       view='week'; state.settings.weekViewMode='detailed'; lastScheduleView='week';
       render();
-      requestAnimationFrame(()=>fitAllScheduleLaneHeights());
+      requestAnimationFrame(()=>requestAnimationFrame(()=>fitAllScheduleLaneHeights()));
     }else fitAllScheduleLaneHeights();
     return;
   }
   if(next==='day'){
     if(view!=='day'){
       view='day'; lastScheduleView='day'; render();
-      requestAnimationFrame(()=>fitAllDayLaneHeights());
+      requestAnimationFrame(()=>requestAnimationFrame(()=>fitAllDayLaneHeights()));
     }else fitAllDayLaneHeights();
   }
 }
@@ -3811,7 +3846,7 @@ $$('.views [data-view]').forEach(b=>{
       e.preventDefault();
       if(isMobileSchedule()){ activateViewButton(next); return; }
       clearTimeout(b.__singleViewTimer);
-      b.__singleViewTimer=setTimeout(()=>{ b.__singleViewTimer=null; activateViewButton(next); },220);
+      b.__singleViewTimer=setTimeout(()=>{ b.__singleViewTimer=null; activateViewButton(next); },320);
     };
     b.ondblclick=e=>{
       e.preventDefault(); e.stopPropagation();
@@ -3953,7 +3988,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'1.98',
+    appVersion:'1.99',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
