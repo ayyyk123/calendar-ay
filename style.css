@@ -2168,3 +2168,33 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 .prepPlanRow.done .prepPlanText{text-decoration:line-through;color:#7d848c}
 .prepDayItem .prepCheck{flex:0 0 auto;font-size:14px;margin-top:-1px}
 @media(max-width:600px){.prepPlanRow{grid-template-columns:auto 82px minmax(0,1fr)!important;gap:6px!important}}
+
+
+/* v1.91: 준비업무 전용 구역 + 자유 반복 준비업무 */
+.prepLane{margin:0 0 6px;padding:0;border:1px solid #dce5f5;border-radius:6px;background:#f8faff;overflow:hidden}
+.prepLaneHead{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:3px 5px;border-bottom:1px dashed #d6dfef;background:#f1f5fd;color:#49658b;font-size:9.5px;font-weight:800}
+.prepLaneHead small{font-size:8px;color:#8192aa;font-weight:700}
+.prepLaneItems{padding:2px 3px}
+.prepLaneItems .item{margin:1px 0!important}
+.compactPrepLane{margin-bottom:3px}
+.compactPrepLane .prepLaneHead{padding:1px 2px;font-size:7px}
+.compactPrepLane .prepLaneHead small{font-size:6px}
+.compactPrepLane .prepLaneItems{padding:1px}
+.dayResizableSection .prepLane{margin-bottom:0!important;height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important}
+.dayResizableSection .prepLaneItems{height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important;padding:2px 1px!important}
+.dayResizableSection .prepLaneHead{flex:0 0 auto}
+.item.prepDeadlineDayItem{background:#fff4ee!important;box-shadow:inset 0 0 0 1px rgba(222,108,62,.28)!important;border-left-color:#df6a3e!important}
+.item.prepDeadlineDayItem .itemTitle{color:#9b4326!important;font-weight:900!important}
+@media(max-width:760px){.prepLane{margin-bottom:4px}.prepLaneHead{font-size:8px}.prepLaneHead small{font-size:7px}}
+
+
+/* v1.91: 마감 기준 반복 준비업무 자유 설정 */
+.prepRepeatAdder{gap:7px}
+.prepRepeatStartGrid,.prepRepeatRuleGrid{display:grid;grid-template-columns:1fr 1fr;gap:6px;align-items:end}
+.prepRepeatStartGrid label,.prepRepeatRuleGrid label{display:grid;gap:3px;font-size:10px;color:#596678}
+.prepRepeatStartGrid input,.prepRepeatStartGrid select,.prepRepeatRuleGrid input,.prepRepeatRuleGrid select{min-width:0;width:100%;padding:6px 7px}
+.prepInlineNumber{display:grid;grid-template-columns:70px 1fr;gap:5px;align-items:center}.prepInlineNumber span{font-size:10px;color:#6f7b8b}
+.prepRepeatWeekdays{display:grid;gap:4px;padding:6px 7px;border:1px solid #e7ebf0;border-radius:7px;background:#fafbfd}.prepRepeatWeekdays>span{font-size:10px;color:#596678}
+.prepRepeatWeekdays .weekdayChecks{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}.prepRepeatWeekdays .weekdayChecks label{display:flex;align-items:center;justify-content:center;gap:2px;font-size:10px;padding:4px 2px;border:1px solid #e1e6ed;border-radius:6px;background:#fff}
+.prepRepeatDeadlineCheck{font-size:10px;color:#596678}.prepRepeatAction{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px}.prepRepeatAction input{min-width:0;width:100%;padding:6px 7px}.prepRepeatAction button{white-space:nowrap;padding:6px 10px}
+@media(max-width:760px){.prepRepeatStartGrid,.prepRepeatRuleGrid{grid-template-columns:1fr}.prepRepeatWeekdays .weekdayChecks{grid-template-columns:repeat(7,minmax(0,1fr))}}
