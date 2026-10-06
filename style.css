@@ -785,6 +785,10 @@ input,select,textarea{border-color:#d9dee5}.repeatBox,.dataManage,.weekdayCapaci
 .scheduleLaneGrid{height:var(--lane-h,112px);min-height:44px;transition:height .08s linear}
 .scheduleLane.collapsed .scheduleLaneGrid{display:none}.scheduleLane.collapsed .laneHeightResizer{display:none}
 .scheduleLaneCell{position:relative;min-width:0;height:100%;padding:3px 4px;border-right:1px solid #edf0f3;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;background:#fff}
+/* v2.01: 주 더블클릭 자동맞춤에서는 내용 높이대로 레인을 늘리고 내부 스크롤을 만들지 않음 */
+.scheduleLane.autoFitLane .scheduleLaneSide,.scheduleLane.autoFitLane .scheduleLaneGrid{height:auto!important}
+.scheduleLane.autoFitLane .scheduleLaneGrid{min-height:44px}
+.scheduleLane.autoFitLane .scheduleLaneCell{height:auto;min-height:44px;overflow-y:visible!important}
 .scheduleLaneCell.dropReady{outline:2px dashed #4f7cff;outline-offset:-2px;background:#f5f8ff}
 .scheduleLaneCell .item{margin:2px 0!important}
 .scheduleLaneCell .itemTitle{font-size:10.5px!important}

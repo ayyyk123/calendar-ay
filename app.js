@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '2.00',
+  version: '2.01',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -81,7 +81,7 @@ const defaultState = () => ({
   purchases: [],
   diary: {},
   actualWork: {},
-  settings: { hiddenCalendars: [], fixedPanelsCollapsed: { recurring:false, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','dday','diary'], sidebarSectionsCollapsed:{}, laneHeights:{}, laneCollapsed:{}, laneLabelWidth:30, mobileSectionsCollapsed:{}, dayLaneHeights:{}, dayLaneManual:{}, workloadRange:'week', weekViewMode:'detailed', selectedDdayId:'' }
+  settings: { hiddenCalendars: [], fixedPanelsCollapsed: { recurring:false, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','dday','diary'], sidebarSectionsCollapsed:{}, laneHeights:{}, laneAutoFit:{}, laneCollapsed:{}, laneLabelWidth:30, mobileSectionsCollapsed:{}, dayLaneHeights:{}, dayLaneManual:{}, workloadRange:'week', weekViewMode:'detailed', selectedDdayId:'' }
 });
 
 let state = defaultState();
@@ -346,7 +346,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '2.00',
+    version: '2.01',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -429,6 +429,7 @@ function normalizeState(raw){
       mobileSectionsCollapsed: (s.settings?.mobileSectionsCollapsed && typeof s.settings.mobileSectionsCollapsed==='object') ? {...s.settings.mobileSectionsCollapsed} : {},
       dayCalendarGroupsCollapsed: (s.settings?.dayCalendarGroupsCollapsed && typeof s.settings.dayCalendarGroupsCollapsed==='object') ? {...s.settings.dayCalendarGroupsCollapsed} : {},
       laneHeights: (s.settings?.laneHeights && typeof s.settings.laneHeights==='object') ? Object.fromEntries(Object.entries(s.settings.laneHeights).map(([k,v])=>[k,Math.max(44,Math.min(480,Number(v)||0))]).filter(([,v])=>v)) : {},
+      laneAutoFit: (s.settings?.laneAutoFit && typeof s.settings.laneAutoFit==='object') ? Object.fromEntries(Object.entries(s.settings.laneAutoFit).filter(([,v])=>!!v).map(([k])=>[k,true])) : {},
       dayLaneHeights: (s.settings?.dayLaneHeights && typeof s.settings.dayLaneHeights==='object') ? Object.fromEntries(Object.entries(s.settings.dayLaneHeights).map(([k,v])=>[k,Math.max(52,Math.min(640,Number(v)||0))]).filter(([,v])=>v)) : {},
       dayLaneManual: (s.settings?.dayLaneManual && typeof s.settings.dayLaneManual==='object') ? Object.fromEntries(Object.entries(s.settings.dayLaneManual).filter(([,v])=>!!v).map(([k])=>[k,true])) : {},
       laneCollapsed: (s.settings?.laneCollapsed && typeof s.settings.laneCollapsed==='object') ? {...s.settings.laneCollapsed} : {},
@@ -2564,8 +2565,10 @@ function laneVerticalTitleHtml(text){
 }
 function scheduleLaneHtml(key,title,days,map,cellBuilder,{type='calendar',color='#d9d9d9',subtitle=''}={}){
   const collapsed=laneIsCollapsed(key), h=laneHeight(key,type);
+  state.settings.laneAutoFit=state.settings.laneAutoFit||{};
+  const autoFit=!!state.settings.laneAutoFit[key];
   const cells=days.map(d=>{ const date=ds(d); return `<div class="scheduleLaneCell" data-dropdate="${date}">${cellBuilder(date,map[date]||[])}</div>`; }).join('');
-  return `<section class="scheduleLane ${collapsed?'collapsed':''}" data-lane-key="${esc(key)}" style="--lane-h:${h}px;--lane-color:${esc(color)}">
+  return `<section class="scheduleLane ${collapsed?'collapsed':''} ${autoFit?'autoFitLane':''}" data-lane-key="${esc(key)}" style="--lane-h:${h}px;--lane-color:${esc(color)}">
     <aside class="scheduleLaneSide" style="--lane-color:${esc(color)}">
       <button type="button" class="scheduleLaneToggle" data-lane-toggle="${esc(key)}" title="구역 접기/펴기">
         <span class="scheduleLaneDot" style="background:${esc(color)}"></span>
@@ -2666,18 +2669,20 @@ function fitAllScheduleLaneHeights(){
   const lanes=$$('.scheduleLane').filter(lane=>!lane.classList.contains('collapsed'));
   if(!lanes.length) return;
   state.settings.laneHeights=state.settings.laneHeights||{};
+  state.settings.laneAutoFit=state.settings.laneAutoFit||{};
+  const keys=new Set();
   lanes.forEach(lane=>{
     const key=lane.dataset.laneKey||'';
-    const cells=[...lane.querySelectorAll('.scheduleLaneCell')];
-    const side=lane.querySelector('.scheduleLaneSide');
-    const cellNeed=Math.max(0,...cells.map(measureLaneCellContentHeight));
-    const sideNeed=measureLaneSideNaturalHeight(side);
-    const h=Math.max(44,Math.min(480,Math.ceil(Math.max(cellNeed,sideNeed)+4)));
-    state.settings.laneHeights[key]=h;
-    lane.style.setProperty('--lane-h',`${h}px`);
+    if(!key) return;
+    keys.add(key);
+    delete state.settings.laneHeights[key];
+    state.settings.laneAutoFit[key]=true;
+    lane.classList.add('autoFitLane');
+    lane.style.removeProperty('--lane-h');
   });
   save({rerender:false});
 }
+
 function runScheduleAutoFitAfterLayout(){
   const run=()=>fitAllScheduleLaneHeights();
   requestAnimationFrame(()=>requestAnimationFrame(()=>{ run(); setTimeout(run,80); }));
@@ -2713,13 +2718,17 @@ function bindScheduleLanes(){
     e.stopPropagation(); const key=btn.dataset.laneToggle; state.settings.laneCollapsed=state.settings.laneCollapsed||{}; state.settings.laneCollapsed[key]=!state.settings.laneCollapsed[key]; save();
   });
   $$('[data-lane-resize]').forEach(handle=>{
-    handle.ondblclick=e=>{ e.preventDefault(); const key=handle.dataset.laneResize; const type=key==='common'?'common':key==='prep'?'prep':key==='quick'?'quick':key==='payment'?'payment':'calendar'; state.settings.laneHeights=state.settings.laneHeights||{}; delete state.settings.laneHeights[key]; save(); };
+    handle.ondblclick=e=>{ e.preventDefault(); const key=handle.dataset.laneResize; state.settings.laneHeights=state.settings.laneHeights||{}; state.settings.laneAutoFit=state.settings.laneAutoFit||{}; delete state.settings.laneHeights[key]; delete state.settings.laneAutoFit[key]; save(); };
     handle.onpointerdown=e=>{
       if(window.matchMedia('(max-width:760px)').matches) return;
       e.preventDefault(); e.stopPropagation();
       const lane=handle.closest('.scheduleLane'), key=handle.dataset.laneResize; if(!lane) return;
       const grid=lane.querySelector('.scheduleLaneGrid');
       const startY=e.clientY,startH=Math.max(44,Math.round(grid?.getBoundingClientRect().height||laneHeight(key)));
+      state.settings.laneAutoFit=state.settings.laneAutoFit||{};
+      delete state.settings.laneAutoFit[key];
+      lane.classList.remove('autoFitLane');
+      lane.style.setProperty('--lane-h',`${startH}px`);
       handle.setPointerCapture?.(e.pointerId); document.body.classList.add('resizingLane');
       const move=ev=>{ const h=Math.max(44,Math.min(480,startH+(ev.clientY-startY))); lane.style.setProperty('--lane-h',`${Math.round(h)}px`); };
       const up=ev=>{ document.removeEventListener('pointermove',move); document.removeEventListener('pointerup',up); document.body.classList.remove('resizingLane'); const grid=lane.querySelector('.scheduleLaneGrid'); const h=Math.max(44,Math.min(480,Math.round(grid?.getBoundingClientRect().height||startH))); state.settings.laneHeights=state.settings.laneHeights||{}; state.settings.laneHeights[key]=h; save(); };
@@ -4109,7 +4118,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.00',
+    appVersion:'2.01',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
