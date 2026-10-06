@@ -2112,8 +2112,8 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 .prepDailyRow input{min-width:0;width:100%;padding:6px 7px}
 .item.prepDayItem{border-left-width:3px!important;background:#f3f7ff!important;box-shadow:inset 0 0 0 1px rgba(80,120,190,.12)}
 .item.prepDayItem .itemTitle{font-weight:700;color:#36516f}
-.item.prepDeadlineItem{box-shadow:inset 0 0 0 1px rgba(215,74,65,.2)}
-.item.prepDeadlineItem .itemTitle{font-weight:800}
+.item.prepDeadlineItem{box-shadow:inset 0 0 0 1px rgba(80,120,190,.12)}
+.item.prepDeadlineItem .itemTitle{font-weight:700;color:#36516f}
 .prepPlanDlg{width:min(620px,calc(100vw - 24px));max-height:min(760px,calc(100vh - 24px));padding:0}
 .prepPlanDlg form{padding:16px;overflow:auto;max-height:calc(100vh - 28px)}
 .prepPlanHead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px}
@@ -2183,8 +2183,8 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 .dayResizableSection .prepLane{margin-bottom:0!important;height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important}
 .dayResizableSection .prepLaneItems{height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important;padding:2px 1px!important}
 .dayResizableSection .prepLaneHead{flex:0 0 auto}
-.item.prepDeadlineDayItem{background:#fff4ee!important;box-shadow:inset 0 0 0 1px rgba(222,108,62,.28)!important;border-left-color:#df6a3e!important}
-.item.prepDeadlineDayItem .itemTitle{color:#9b4326!important;font-weight:900!important}
+.item.prepDeadlineDayItem{background:#f3f7ff!important;box-shadow:inset 0 0 0 1px rgba(80,120,190,.12)!important;border-left-color:var(--item-color)!important}
+.item.prepDeadlineDayItem .itemTitle{color:#36516f!important;font-weight:700!important}
 @media(max-width:760px){.prepLane{margin-bottom:4px}.prepLaneHead{font-size:8px}.prepLaneHead small{font-size:7px}}
 
 
