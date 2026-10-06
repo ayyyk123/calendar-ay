@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.95',
+  version: '1.96',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -346,7 +346,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.95',
+    version: '1.96',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -2106,6 +2106,12 @@ function openEventPopover(anchor,id,occ){
   meta.push(calendarPath(base.calId));
   if((base.repeat||'none')!=='none') meta.push(repeatRuleLabel(base));
   $('#eventPopoverMeta').textContent=meta.filter(Boolean).join(' · ');
+  const details=$('#eventPopoverDetails');
+  const placeRow=$('#eventPopoverPlace'), memoRow=$('#eventPopoverMemo');
+  const placeText=String(base.place||'').trim(), memoText=String(base.memo||'').trim();
+  if(placeRow){ placeRow.classList.toggle('hidden',!placeText); const span=placeRow.querySelector('span'); if(span) span.textContent=placeText; }
+  if(memoRow){ memoRow.classList.toggle('hidden',!memoText); const span=memoRow.querySelector('span'); if(span) span.textContent=memoText; }
+  if(details) details.classList.toggle('hidden',!(placeText||memoText));
   const planBtn=$('#eventPopoverPlan'); if(planBtn) planBtn.classList.toggle('hidden',!base.prepEnabled);
   const doneWrap=$('#eventPopoverDoneWrap'), done=$('#eventPopoverDone'), doneText=$('#eventPopoverDoneText');
   const canComplete=base.kind!=='anniversary';
@@ -3875,7 +3881,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'1.95',
+    appVersion:'1.96',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
