@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.91',
+  version: '1.92',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -346,7 +346,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.91',
+    version: '1.92',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -925,9 +925,11 @@ function prepTaskEntriesFromValues(deadline,tasks=[]){
 function basePreparationEntries(e){
   if(!e?.prepEnabled || !e.prepDeadline) return [];
   if((e.repeat||'none')!=='none') return [];
-  if(e.prepMode==='custom') return prepTaskEntriesFromValues(e.prepDeadline,e.prepTasks||[]);
-  return preparationDatesFromValues(e.prepDeadline,e.prepDays,e.prepWeekdaysOnly,e.prepIncludeDeadline)
+  const manual=prepTaskEntriesFromValues(e.prepDeadline,e.prepTasks||[]);
+  if(e.prepMode==='custom') return manual;
+  const auto=preparationDatesFromValues(e.prepDeadline,e.prepDays,e.prepWeekdaysOnly,e.prepIncludeDeadline)
     .map(date=>({date,sourceDate:date,text:String(e?.prepDailyNotes?.[date]||'').trim(),ruleId:date,type:'auto',ruleLabel:'자동',key:`auto:${date}`}));
+  return [...auto,...manual].sort((a,b)=>a.date.localeCompare(b.date)||a.type.localeCompare(b.type)||a.text.localeCompare(b.text));
 }
 function preparationEntries(e){
   const moves=(e?.prepMoves&&typeof e.prepMoves==='object')?e.prepMoves:{};
@@ -958,9 +960,9 @@ function preparationSummary(e){
     return `준비일정 ${range} · ${entries.length}건${entries.length!==dates.length?`/${dates.length}일`:''} · 마감 ${e.prepDeadline}`;
   }
   if(!dates.length) return '';
-  const first=dates[0], last=dates[dates.length-1];
-  const range=first===last?first:`${first} ~ ${last}`;
-  return `준비 ${range} · ${dates.length}일${e.prepWeekdaysOnly?'(평일만)':''} · 마감 ${e.prepDeadline}`;
+  const first=dates[0], last=dates[dates.length-1], range=first===last?first:`${first} ~ ${last}`;
+  const extra=(e.prepTasks||[]).length;
+  return `준비 ${range} · ${dates.length}일${e.prepWeekdaysOnly?'(평일만)':''}${extra?` · 추가업무 ${extra}개`:''} · 마감 ${e.prepDeadline}`;
 }
 function preparationNoteForDate(e,date){
   if(e?.prepMode==='custom'){
@@ -975,6 +977,18 @@ function preparationVirtualEvent(e,entry){
   const sourceDate=typeof entry==='string'?entry:String(entry.sourceDate||entry.date||'');
   return {...e,_prepDay:true,_prepDate:date,_renderDate:date,_occurrenceStart:e.date,_occurrenceEnd:e.date,_prepNote:note,_prepKey:key,_prepSourceDate:sourceDate,_prepType:typeof entry==='string'?'auto':String(entry.type||''),_prepRuleId:typeof entry==='string'?'':String(entry.ruleId||''),_prepRuleLabel:typeof entry==='string'?'':String(entry.ruleLabel||'')};
 }
+function isPreparationDeadlineOccurrence(e){
+  if(!e?.prepEnabled || e?._prepDay) return false;
+  const renderDate=e._renderDate||e._occurrenceStart||e.date;
+  return !!renderDate && renderDate===(e.prepDeadline||e.date);
+}
+function hasPreparationEntryOnDeadline(e){
+  if(!e?.prepEnabled || !e.prepDeadline) return false;
+  return preparationEntries(e).some(x=>x.date===e.prepDeadline);
+}
+function isPreparationManagedItem(e){ return !!e?._prepDay || isPreparationDeadlineOccurrence(e); }
+function isPreparationLaneItem(e){ return !!e?._prepDay || (isPreparationDeadlineOccurrence(e) && !hasPreparationEntryOnDeadline(e)); }
+function isPreparationDeadlineDuplicate(e){ return isPreparationDeadlineOccurrence(e) && hasPreparationEntryOnDeadline(e); }
 
 function buildOccurrenceMap(rangeStart, rangeEnd, options={}){
   const map={};
@@ -1142,7 +1156,7 @@ function checklistHtml(e,compact=false){
   }).join('')}</div>`;
 }
 function eventItemHtml(e, compact=false){
-  const c=cal(e.calId), prepDay=!!e._prepDay, prepDeadlineDay=prepDay && (e._renderDate||e._prepDate||e.date)===(e.prepDeadline||e.date), deadlineItem=!!e.prepEnabled && !prepDay && (e._renderDate||e.date)===(e.prepDeadline||e.date);
+  const c=cal(e.calId), prepDay=!!e._prepDay, prepDeadlineDay=prepDay && (e._renderDate||e._prepDate||e.date)===(e.prepDeadline||e.date), deadlineItem=isPreparationDeadlineOccurrence(e);
   const done=prepDay?preparationEntryDone(e,e._prepKey):isDone(e), checkable=e.kind!=='anniversary' && !prepDay;
   const recurring=(e.repeat||'none')!=='none';
   const payment=e.kind==='payment';
@@ -1151,9 +1165,9 @@ function eventItemHtml(e, compact=false){
   const timePrefix=(!prepDay && !e.allDay && e.start)?`${e.start}${e.end?`–${e.end}`:''} `:'';
   const inLabel=prepDay?'':carryoverInLabel(e), outRecord=prepDay?null:carryoverOutRecord(e);
   const renderDate=e._renderDate||e._occurrenceStart||e.date;
-  const drag='true';
+  const drag=deadlineItem?'false':'true';
   const prepNote=prepDay?String(e._prepNote||'').trim():'';
-  const shownTitle=prepDay?`${prepDeadlineDay?'준비마감':'준비'} · ${e.title}${prepNote?` › ${prepNote}`:''}`:(deadlineItem?`마감 · ${e.title}`:e.title);
+  const shownTitle=prepDay?`${prepDeadlineDay?'준비마감':'준비'} · ${e.title}${prepNote?` › ${prepNote}`:''}`:(deadlineItem?`준비마감 · ${e.title}`:e.title);
   const detail=[];
   if(prepDay){ detail.push(preparationSummary(e)); if(prepNote) detail.push(prepNote); }
   else if(!e.allDay && e.start) detail.push(e.start + (e.end?`–${e.end}`:''));
@@ -1169,7 +1183,7 @@ function eventItemHtml(e, compact=false){
   if(outRecord) detail.push(`${outRecord.toDate}로 이월`);
   if(deadlineItem) detail.unshift(preparationSummary(e));
   const tooltip=[shownTitle,...detail].filter(Boolean).join(' · ');
-  const dragHandle=`<span class="dragHandle" title="${prepDay?'드래그: 준비일정을 다른 날짜로 이동':'드래그: 같은 날짜에서는 순서 변경 · 다른 날짜에서는 이동'}" aria-hidden="true">⋮⋮</span>`;
+  const dragHandle=deadlineItem?'':`<span class="dragHandle" title="${prepDay?'드래그: 준비일정을 다른 날짜로 이동':'드래그: 같은 날짜에서는 순서 변경 · 다른 날짜에서는 이동'}" aria-hidden="true">⋮⋮</span>`;
   const mainCheck=prepDay?`<button type="button" class="todoCheck prepCheck" data-action="prep-toggle" title="${done?'완료 해제':'완료 처리'}">${done?'☑':'☐'}</button>`:'';
   const checklistKey=checklistExpandKey(e), expanded=!prepDay&&expandedChecklistKeys.has(checklistKey);
   const checklistButton=checklist.length?`<button type="button" class="checklistToggle ${expanded?'on':''}" data-action="checklist-toggle" title="세부 체크리스트 ${checklistState.done}/${checklistState.total}">☷ ${checklistState.done}/${checklistState.total}</button>`:'';
@@ -1182,23 +1196,23 @@ function eventItemHtml(e, compact=false){
   </div>`;
 }
 function appointmentLaneHtml(es, compact=false){
-  const items=(es||[]).filter(e=>e.kind==='appointment'&&!e._prepDay);
+  const items=(es||[]).filter(e=>e.kind==='appointment'&&!isPreparationManagedItem(e));
   if(!items.length) return '';
   return `<div class="appointmentLane ${compact?'compactAppointmentLane':''}"><div class="appointmentLaneHead"><span>예약 · 약속</span><small>${items.length}건</small></div><div class="appointmentLaneItems">${items.map(e=>eventItemHtml(e,compact)).join('')}</div></div>`;
 }
 function quickLaneHtml(es, compact=false, force=false){
-  const quick=(es||[]).filter(e=>e.kind==='todo'&&!e._prepDay);
+  const quick=(es||[]).filter(e=>e.kind==='todo'&&!isPreparationManagedItem(e));
   if(!quick.length && !force) return '';
   return `<div class="quickLane ${compact?'compactQuickLane':''} ${!quick.length?'emptyLane':''}"><div class="quickLaneHead"><span>Quick</span><small>${quick.length}건</small></div><div class="quickLaneItems">${quick.map(e=>eventItemHtml(e,compact)).join('')}</div></div>`;
 }
 function anniversaryLaneHtml(es, compact=false){
-  const items=(es||[]).filter(e=>e.kind==='anniversary'&&!e._prepDay);
+  const items=(es||[]).filter(e=>e.kind==='anniversary'&&!isPreparationManagedItem(e));
   if(!items.length) return '';
   return `<div class="anniversaryLane ${compact?'compactAnniversaryLane':''}"><div class="anniversaryLaneHead"><span>♥ D-Day · 기념일</span><small>${items.length}건</small></div><div class="anniversaryLaneItems">${items.map(e=>eventItemHtml(e,compact)).join('')}</div></div>`;
 }
 function commonTopLaneHtml(es, compact=false, force=false){
-  const anniversaries=(es||[]).filter(e=>e.kind==='anniversary'&&!e._prepDay);
-  const appointments=(es||[]).filter(e=>e.kind==='appointment'&&!e._prepDay);
+  const anniversaries=(es||[]).filter(e=>e.kind==='anniversary'&&!isPreparationManagedItem(e));
+  const appointments=(es||[]).filter(e=>e.kind==='appointment'&&!isPreparationManagedItem(e));
   const count=anniversaries.length+appointments.length;
   if(!count && !force) return '';
   const anniversaryRows=anniversaries.map(e=>eventItemHtml(e,compact)).join('');
@@ -1209,12 +1223,12 @@ function nonQuickItemsHtml(es, compact=false){
   return (es||[]).filter(e=>e.kind!=='todo' && e.kind!=='appointment' && e.kind!=='anniversary').map(e=>eventItemHtml(e,compact)).join('');
 }
 function paymentLaneHtml(es, compact=false, force=false){
-  const payments=(es||[]).filter(e=>e.kind==='payment'&&!e._prepDay);
+  const payments=(es||[]).filter(e=>e.kind==='payment'&&!isPreparationManagedItem(e));
   if(!payments.length && !force) return '';
   return `<div class="paymentLane ${compact?'compactPaymentLane':''} ${!payments.length?'emptyLane':''}"><div class="paymentLaneHead"><span>₩ 납부</span><small>${payments.length}건</small></div><div class="paymentLaneItems">${payments.map(e=>eventItemHtml(e,compact)).join('')}</div></div>`;
 }
 function prepLaneHtml(es, compact=false, force=false){
-  const items=(es||[]).filter(e=>e._prepDay);
+  const items=(es||[]).filter(e=>isPreparationLaneItem(e));
   if(!items.length && !force) return '';
   return `<div class="prepLane ${compact?'compactPrepLane':''} ${!items.length?'emptyLane':''}"><div class="prepLaneHead"><span>준비일정</span><small>${items.length}건</small></div><div class="prepLaneItems">${items.map(e=>eventItemHtml(e,compact)).join('')}</div></div>`;
 }
@@ -1237,9 +1251,9 @@ function groupHtml(date, es){
   const prepHtml=prepLaneHtml(es,false,true);
   const quickHtml=quickLaneHtml(es,false,true);
   const paymentHtml=paymentLaneHtml(es,false,true);
-  const appointmentEvents=(es||[]).filter(e=>e.kind==='appointment'&&!e._prepDay);
-  const quickEvents=(es||[]).filter(e=>e.kind==='todo'&&!e._prepDay);
-  const workEvents=(es||[]).filter(e=>!e._prepDay && e.kind!=='payment' && e.kind!=='appointment' && e.kind!=='anniversary' && e.kind!=='todo');
+  const appointmentEvents=(es||[]).filter(e=>e.kind==='appointment'&&!isPreparationManagedItem(e));
+  const quickEvents=(es||[]).filter(e=>e.kind==='todo'&&!isPreparationManagedItem(e));
+  const workEvents=(es||[]).filter(e=>!isPreparationManagedItem(e) && e.kind!=='payment' && e.kind!=='appointment' && e.kind!=='anniversary' && e.kind!=='todo');
   let html='';
   const visible=visibleCals(), visibleIds=new Set(visible.map(c=>c.id));
   let total=appointmentEvents.reduce((sum,e)=>sum+workloadDuration(e),0) + quickEvents.reduce((sum,e)=>sum+workloadDuration(e),0), totalCapacity=0, hasUnknownCapacity=false, blockedRootCount=0;
@@ -1249,7 +1263,7 @@ function groupHtml(date, es){
     const memberIds=new Set(members.map(c=>c.id));
     const groupEvents=workEvents.filter(e=>memberIds.has(e.calId));
     if(!groupEvents.length) continue;
-    const rootSum=groupEvents.filter(e=>!e._prepDay).reduce((sum,e)=>sum+workloadDuration(e),0);
+    const rootSum=groupEvents.filter(e=>!isPreparationManagedItem(e)).reduce((sum,e)=>sum+workloadDuration(e),0);
     total+=rootSum;
     const rootCapInfo=capacityForDate(root,date);
     if(rootCapInfo.blocked) blockedRootCount++;
@@ -1658,12 +1672,12 @@ function setActualWorkValue(date,rootId,value){
 function workloadRootMembers(root){ return [root,...descendants(root.id)]; }
 function plannedHoursForRootDate(root,date,map){
   const ids=new Set(workloadRootMembers(root).map(c=>c.id));
-  return (map[date]||[]).filter(e=>ids.has(e.calId)&&!e._prepDay&&!['payment','anniversary'].includes(e.kind)).reduce((a,e)=>a+workloadDuration(e),0);
+  return (map[date]||[]).filter(e=>ids.has(e.calId)&&!isPreparationManagedItem(e)&&!['payment','anniversary'].includes(e.kind)).reduce((a,e)=>a+workloadDuration(e),0);
 }
 function workloadChildBreakdown(root,date,map){
   const out=[];
   for(const c of workloadRootMembers(root)){
-    const sum=(map[date]||[]).filter(e=>e.calId===c.id&&!e._prepDay&&!['payment','anniversary'].includes(e.kind)).reduce((a,e)=>a+workloadDuration(e),0);
+    const sum=(map[date]||[]).filter(e=>e.calId===c.id&&!isPreparationManagedItem(e)&&!['payment','anniversary'].includes(e.kind)).reduce((a,e)=>a+workloadDuration(e),0);
     if(sum>0) out.push({c,sum});
   }
   return out;
@@ -2038,7 +2052,7 @@ function openPreparationPlan(id){
   if(e.memo?.trim()){ memo.textContent=e.memo.trim(); memo.classList.remove('hidden'); } else { memo.textContent=''; memo.classList.add('hidden'); }
   const rows=entries.map(entry=>{
     const note=String(entry.text||'').trim(), done=preparationEntryDone(e,entry.key);
-    const rule=e.prepMode==='custom'&&entry.ruleLabel?`<small class="prepPlanRule">${esc(entry.ruleLabel)}${entry.moved?' · 이동':''}</small>`:(entry.moved?`<small class="prepPlanRule">이동</small>`:'');
+    const rule=entry.ruleLabel&&entry.type!=='auto'?`<small class="prepPlanRule">${esc(entry.ruleLabel)}${entry.moved?' · 이동':''}</small>`:(entry.moved?`<small class="prepPlanRule">이동</small>`:'');
     return `<div class="prepPlanRow ${done?'done':''}"><button type="button" class="prepPlanCheck" data-prep-plan-check="${esc(entry.key)}" title="${done?'완료 해제':'완료 처리'}">${done?'☑':'☐'}</button><div class="prepPlanDate">${esc(preparationDateLabel(entry.date))}<small>${esc(entry.date)}</small>${rule}</div><div class="prepPlanText ${note?'':'muted'}">${esc(note||'계획 미입력')}</div></div>`;
   });
   if(!rows.length) rows.push(`<div class="prepPlanRow"><span class="prepPlanCheckSpacer"></span><div class="prepPlanDate">준비일정</div><div class="prepPlanText muted">등록된 준비 일정이 없습니다.</div></div>`);
@@ -2487,12 +2501,12 @@ function laneCalendarMembers(root,visibleIds){
   return [root,...descendants(root.id)].filter(c=>visibleIds.has(c.id));
 }
 function laneCellCommonHtml(es){
-  const xs=(es||[]).filter(e=>!e._prepDay&&(e.kind==='anniversary'||e.kind==='appointment'));
+  const xs=(es||[]).filter(e=>!isPreparationManagedItem(e)&&(e.kind==='anniversary'||e.kind==='appointment'));
   return xs.map(e=>eventItemHtml(e,false)).join('');
 }
-function laneCellPrepHtml(es){ return (es||[]).filter(e=>e._prepDay).map(e=>eventItemHtml(e,false)).join(''); }
-function laneCellQuickHtml(es){ return (es||[]).filter(e=>!e._prepDay&&e.kind==='todo').map(e=>eventItemHtml(e,false)).join(''); }
-function laneCellPaymentHtml(es){ return (es||[]).filter(e=>!e._prepDay&&e.kind==='payment').map(e=>eventItemHtml(e,false)).join(''); }
+function laneCellPrepHtml(es){ return (es||[]).filter(e=>isPreparationLaneItem(e)).map(e=>eventItemHtml(e,false)).join(''); }
+function laneCellQuickHtml(es){ return (es||[]).filter(e=>!isPreparationManagedItem(e)&&e.kind==='todo').map(e=>eventItemHtml(e,false)).join(''); }
+function laneCellPaymentHtml(es){ return (es||[]).filter(e=>!isPreparationManagedItem(e)&&e.kind==='payment').map(e=>eventItemHtml(e,false)).join(''); }
 function laneOrderedItemsHtml(events,rootId){
   let previousSubCalId='';
   return (events||[]).map(e=>{
@@ -2504,8 +2518,8 @@ function laneOrderedItemsHtml(events,rootId){
 }
 function rootLaneCellHtml(date,root,es,visibleIds){
   const members=laneCalendarMembers(root,visibleIds), memberIds=new Set(members.map(c=>c.id));
-  const normal=(es||[]).filter(e=>!e._prepDay && memberIds.has(e.calId) && !['anniversary','appointment','todo','payment'].includes(e.kind));
-  const allForLoad=(es||[]).filter(e=>memberIds.has(e.calId) && !e._prepDay && !['anniversary','payment'].includes(e.kind));
+  const normal=(es||[]).filter(e=>!isPreparationManagedItem(e) && memberIds.has(e.calId) && !['anniversary','appointment','todo','payment'].includes(e.kind));
+  const allForLoad=(es||[]).filter(e=>memberIds.has(e.calId) && !isPreparationManagedItem(e) && !['anniversary','payment'].includes(e.kind));
   const sum=allForLoad.reduce((a,e)=>a+workloadDuration(e),0), cap=capacityForDate(root,date);
   let body='';
   body=laneOrderedItemsHtml(normal,root.id);
@@ -2519,7 +2533,7 @@ function daySummaryHtml(date,es){
   for(const root of topLevelCals()){
     const members=laneCalendarMembers(root,visibleIds); if(!members.length) continue;
     const ids=new Set(members.map(c=>c.id));
-    total+=(es||[]).filter(e=>ids.has(e.calId)&&!e._prepDay&&!['anniversary','payment'].includes(e.kind)).reduce((a,e)=>a+workloadDuration(e),0);
+    total+=(es||[]).filter(e=>ids.has(e.calId)&&!isPreparationManagedItem(e)&&!['anniversary','payment'].includes(e.kind)).reduce((a,e)=>a+workloadDuration(e),0);
     const ci=capacityForDate(root,date); if(ci.blocked) blocked++; if(ci.unknown) unknown=true; else totalCap+=Number(ci.hours)||0;
   }
   const txt=unknown?`총 ${fmtH(total)} · 일부 미정`:(totalCap?`총 ${fmtH(total)} / ${fmtH(totalCap)}`:`총 ${fmtH(total)}`);
@@ -2639,7 +2653,7 @@ function mobileDayWorkStats(date,es){
   for(const root of topLevelCals()){
     const members=laneCalendarMembers(root,visibleIds); if(!members.length) continue;
     const ids=new Set(members.map(c=>c.id));
-    total+=(es||[]).filter(e=>ids.has(e.calId)&&!e._prepDay&&!['anniversary','payment'].includes(e.kind)).reduce((a,e)=>a+workloadDuration(e),0);
+    total+=(es||[]).filter(e=>ids.has(e.calId)&&!isPreparationManagedItem(e)&&!['anniversary','payment'].includes(e.kind)).reduce((a,e)=>a+workloadDuration(e),0);
     const ci=capacityForDate(root,date); if(ci.blocked) blocked++; if(ci.unknown) unknown=true; else totalCap+=Number(ci.hours)||0;
   }
   return {total,totalCap,unknown,blocked};
@@ -2674,8 +2688,8 @@ function mobileCommonBodyHtml(es){
 }
 function mobileRootSectionHtml(date,root,es,visibleIds){
   const members=laneCalendarMembers(root,visibleIds), ids=new Set(members.map(c=>c.id));
-  const normal=(es||[]).filter(e=>!e._prepDay&&ids.has(e.calId)&&!['anniversary','appointment','todo','payment'].includes(e.kind));
-  const allForLoad=(es||[]).filter(e=>ids.has(e.calId)&&!e._prepDay&&!['anniversary','payment'].includes(e.kind));
+  const normal=(es||[]).filter(e=>!isPreparationManagedItem(e)&&ids.has(e.calId)&&!['anniversary','appointment','todo','payment'].includes(e.kind));
+  const allForLoad=(es||[]).filter(e=>ids.has(e.calId)&&!isPreparationManagedItem(e)&&!['anniversary','payment'].includes(e.kind));
   const sum=allForLoad.reduce((a,e)=>a+workloadDuration(e),0), cap=capacityForDate(root,date);
   const meta=cap.unknown?`${fmtH(sum)} / 미정`:`${fmtH(sum)} / ${fmtH(cap.hours)}${cap.blocked?' · 차단':''}`;
   const body=normal.map(e=>{
@@ -2692,10 +2706,10 @@ function renderMobileSchedule(days,map){
   }
   const selected=mobileSelectedDate, d=parse(selected), es=map[selected]||[], h=holidayLabel(selected), hasDiary=!!state.diary[selected]?.text;
   const visible=visibleCals(), visibleIds=new Set(visible.map(c=>c.id));
-  const common=es.filter(e=>!e._prepDay&&(e.kind==='anniversary'||e.kind==='appointment'));
-  const prep=es.filter(e=>e._prepDay);
-  const quick=es.filter(e=>!e._prepDay&&e.kind==='todo');
-  const payments=es.filter(e=>!e._prepDay&&e.kind==='payment');
+  const common=es.filter(e=>!isPreparationManagedItem(e)&&(e.kind==='anniversary'||e.kind==='appointment'));
+  const prep=es.filter(e=>isPreparationLaneItem(e));
+  const quick=es.filter(e=>!isPreparationManagedItem(e)&&e.kind==='todo');
+  const payments=es.filter(e=>!isPreparationManagedItem(e)&&e.kind==='payment');
   const stats=mobileDayWorkStats(selected,es);
   const dayMeta=stats.unknown?`${fmtH(stats.total)} · 일부 미정`:(stats.totalCap?`${fmtH(stats.total)} / ${fmtH(stats.totalCap)}`:fmtH(stats.total));
   let sections='';
@@ -2733,10 +2747,10 @@ function renderWeek(){
 function monthCellEventsHtml(date, es){
   const limit=4;
   const priority=e=>e.kind==='anniversary'?0:e.kind==='appointment'?1:e.kind==='todo'?2:e.kind==='payment'?3:4;
-  const ordered=[...(es||[])].sort((a,b)=>priority(a)-priority(b));
+  const ordered=[...(es||[])].filter(e=>!isPreparationDeadlineDuplicate(e)).sort((a,b)=>priority(a)-priority(b));
   const visible=ordered.slice(0,limit);
   const hidden=Math.max(0,ordered.length-visible.length);
-  const common=visible.filter(e=>!e._prepDay&&(e.kind==='anniversary' || e.kind==='appointment')), prep=visible.filter(e=>e._prepDay), quick=visible.filter(e=>!e._prepDay&&e.kind==='todo'), payments=visible.filter(e=>!e._prepDay&&e.kind==='payment'), normal=visible.filter(e=>!e._prepDay&&e.kind!=='payment' && e.kind!=='appointment' && e.kind!=='anniversary' && e.kind!=='todo');
+  const common=visible.filter(e=>!isPreparationManagedItem(e)&&(e.kind==='anniversary' || e.kind==='appointment')), prep=visible.filter(e=>isPreparationLaneItem(e)), quick=visible.filter(e=>!isPreparationManagedItem(e)&&e.kind==='todo'), payments=visible.filter(e=>!isPreparationManagedItem(e)&&e.kind==='payment'), normal=visible.filter(e=>!isPreparationManagedItem(e)&&e.kind!=='payment' && e.kind!=='appointment' && e.kind!=='anniversary' && e.kind!=='todo');
   return `${commonTopLaneHtml(common,true)}${prepLaneHtml(prep,true)}${quickLaneHtml(quick,true)}${paymentLaneHtml(payments,true)}${normal.map(e=>eventItemHtml(e,true)).join('')}${hidden?`<button type="button" class="moreEventsBtn" data-more-date="${esc(date)}">+ ${hidden}건</button>`:''}`;
 }
 function openDayList(date){
@@ -2750,7 +2764,7 @@ $('#closeDayList').onclick=()=>closeDialog($('#dayListDlg'));
 
 function multiWeekCellEventsHtml(date, es, weeks){
   const priority=e=>e.kind==='anniversary'?0:e.kind==='appointment'?1:e.kind==='todo'?2:e.kind==='payment'?3:4;
-  const ordered=[...(es||[])].sort((a,b)=>priority(a)-priority(b));
+  const ordered=[...(es||[])].filter(e=>!isPreparationDeadlineDuplicate(e)).sort((a,b)=>priority(a)-priority(b));
   // v1.82: 일정 개수를 미리 고정 개수로 자르지 않는다.
   // 셀의 실제 높이를 렌더링 후 측정해서 들어가는 만큼 표시한다.
   return `<div class="multiCompactEvents">${ordered.map(e=>eventItemHtml(e,true)).join('')}</div><button type="button" class="multiCompactMore" data-more-date="${esc(date)}" hidden></button>`;
@@ -2853,9 +2867,9 @@ function dayViewGroupHtml(date,es){
   const prepHtml=dayResizableSectionHtml('prep',prepLaneHtml(es,false,true),{type:'prep',color:'#b8c8ef'});
   const quickHtml=dayResizableSectionHtml('quick',quickLaneHtml(es,false,true),{type:'quick',color:'#cfd5dc'});
   const paymentHtml=dayResizableSectionHtml('payment',paymentLaneHtml(es,false,true),{type:'payment',color:'#e6d399'});
-  const appointmentEvents=(es||[]).filter(e=>e.kind==='appointment'&&!e._prepDay);
-  const quickEvents=(es||[]).filter(e=>e.kind==='todo'&&!e._prepDay);
-  const workEvents=(es||[]).filter(e=>!e._prepDay && e.kind!=='payment' && e.kind!=='appointment' && e.kind!=='anniversary' && e.kind!=='todo');
+  const appointmentEvents=(es||[]).filter(e=>e.kind==='appointment'&&!isPreparationManagedItem(e));
+  const quickEvents=(es||[]).filter(e=>e.kind==='todo'&&!isPreparationManagedItem(e));
+  const workEvents=(es||[]).filter(e=>!isPreparationManagedItem(e) && e.kind!=='payment' && e.kind!=='appointment' && e.kind!=='anniversary' && e.kind!=='todo');
   let html='';
   const visible=visibleCals(), visibleIds=new Set(visible.map(c=>c.id));
   let total=appointmentEvents.reduce((sum,e)=>sum+workloadDuration(e),0) + quickEvents.reduce((sum,e)=>sum+workloadDuration(e),0), totalCapacity=0, hasUnknownCapacity=false, blockedRootCount=0;
@@ -2865,7 +2879,7 @@ function dayViewGroupHtml(date,es){
     const memberIds=new Set(members.map(c=>c.id));
     const groupEvents=workEvents.filter(e=>memberIds.has(e.calId));
     if(!groupEvents.length) continue;
-    const rootSum=groupEvents.filter(e=>!e._prepDay).reduce((sum,e)=>sum+workloadDuration(e),0);
+    const rootSum=groupEvents.filter(e=>!isPreparationManagedItem(e)).reduce((sum,e)=>sum+workloadDuration(e),0);
     total+=rootSum;
     const rootCapInfo=capacityForDate(root,date);
     if(rootCapInfo.blocked) blockedRootCount++;
@@ -3171,7 +3185,7 @@ function prepRuleDescription(task,deadline){
 function renderPrepTaskRules(){
   const list=$('#prepRuleList'); if(!list) return;
   const deadline=$('#prepDeadline')?.value||$('#date')?.value||'';
-  if(!prepDraftTasks.length){ list.innerHTML='<div class="prepRuleEmpty">아직 준비 일정이 없습니다. 특정 날짜 또는 반복 준비업무를 추가하세요.</div>'; return; }
+  if(!prepDraftTasks.length){ const auto=$('#prepMode')?.value!=='custom'; list.innerHTML=`<div class="prepRuleEmpty">${auto?'추가로 지정한 준비업무가 없습니다. 필요할 때 특정 날짜 또는 반복 준비업무를 더할 수 있습니다.':'아직 준비 일정이 없습니다. 특정 날짜 또는 반복 준비업무를 추가하세요.'}</div>`; return; }
   list.innerHTML=prepDraftTasks.map(task=>`<div class="prepRuleItem" data-prep-rule-id="${esc(task.id)}"><div><b>${task.type==='date'?'특정 날짜':task.type==='weekly'?'기존 매주 반복':'반복 준비업무'}</b><span>${esc(prepRuleDescription(task,deadline))}</span></div><button type="button" class="prepRuleDelete" data-prep-rule-delete="${esc(task.id)}" title="삭제">×</button></div>`).join('');
 }
 function renderPrepDailyRows(){
@@ -3183,7 +3197,9 @@ function renderPrepDailyRows(){
   const mode=$('#prepMode')?.value==='custom'?'custom':'auto';
   $('#prepAutoFields')?.classList.toggle('hidden',mode!=='auto');
   $('#prepAutoEditor')?.classList.toggle('hidden',mode!=='auto');
-  $('#prepCustomFields')?.classList.toggle('hidden',mode!=='custom');
+  $('#prepCustomFields')?.classList.remove('hidden');
+  if($('#prepCustomTitle')) $('#prepCustomTitle').textContent=mode==='auto'?'추가 준비업무 (선택)':'날짜·반복 직접 지정';
+  if($('#prepCustomHelp')) $('#prepCustomHelp').textContent=mode==='auto'?'자동 계산된 준비기간에 더해, 특정 날짜나 반복 준비업무를 추가할 수 있습니다.':'준비일이 연속일 필요가 없습니다. 특정 날짜 또는 반복 규칙만으로 준비업무를 구성할 수 있습니다.';
   const deadline=$('#prepDeadline').value||$('#date').value;
   if(!deadline){ summary.textContent='기한 날짜를 입력하세요.'; summary.classList.add('warn'); wrap.innerHTML=''; renderPrepTaskRules(); return; }
   summary.classList.remove('warn');
@@ -3200,8 +3216,10 @@ function renderPrepDailyRows(){
   const dates=prepFormDates();
   if(!dates.length){ summary.textContent='준비일수를 입력하세요.'; summary.classList.add('warn'); wrap.innerHTML=''; return; }
   const range=dates[0]===dates.at(-1)?dates[0]:`${dates[0]} ~ ${dates.at(-1)}`;
-  summary.textContent=`자동 계산: 준비 ${range} · ${dates.length}일${$('#prepWeekdaysOnly').checked?'(평일만)':''} → 마감 ${deadline}`;
+  const extras=prepCustomEntriesFromForm();
+  summary.textContent=`자동 계산: 준비 ${range} · ${dates.length}일${$('#prepWeekdaysOnly').checked?'(평일만)':''}${extras.length?` + 추가 ${extras.length}건`:''} → 마감 ${deadline}`;
   wrap.innerHTML=dates.map(date=>`<label class="prepDailyRow"><span class="prepDailyDate">${esc(preparationDateLabel(date))}</span><input data-prep-date="${esc(date)}" value="${esc(prepDraftNotes[date]||'')}" placeholder="이날 진행할 내용"></label>`).join('');
+  renderPrepTaskRules();
 }
 function updatePrepUI(){
   const supported=!['anniversary','payment'].includes($('#kind')?.value||'event');
@@ -3363,7 +3381,7 @@ $('#eventForm').onsubmit=e=>{
     start:$('#allDay').checked?'':$('#start').value, end:$('#allDay').checked?'':$('#end').value,
     hours:$('#kind').value==='payment'?0:(timedHoursFromForm()??getDurationInputs()), noDuration:$('#kind').value==='payment'?true:($('#noDuration').checked && timedHoursFromForm()===null), kind:$('#kind').value, place:$('#place').value.trim(),
     paymentAmount:$('#kind').value==='payment'?Math.max(0,Number($('#paymentAmount').value)||0):0, paymentMethod:$('#kind').value==='payment'?$('#paymentMethod').value.trim():'',
-    prepEnabled, prepDeadline:prepEnabled?$('#prepDeadline').value:'', prepMode:prepEnabled&&$('#prepMode').value==='custom'?'custom':'auto', prepDays:prepEnabled?Math.max(1,Number($('#prepDays').value)||1):5, prepWeekdaysOnly:prepEnabled&&!!$('#prepWeekdaysOnly').checked, prepIncludeDeadline:prepEnabled&&!!$('#prepIncludeDeadline').checked, prepDailyNotes:prepEnabled&&$('#prepMode').value!=='custom'?Object.fromEntries(prepFormDates().map(d=>[d,String(prepDraftNotes[d]||'').trim()]).filter(([,v])=>v)):{}, prepTasks:prepEnabled&&$('#prepMode').value==='custom'?prepDraftTasks.map(x=>({...x})):[], prepDone:prepEnabled?{...(old?.prepDone||{})}:{}, prepMoves:prepEnabled?{...(old?.prepMoves||{})}:{},
+    prepEnabled, prepDeadline:prepEnabled?$('#prepDeadline').value:'', prepMode:prepEnabled&&$('#prepMode').value==='custom'?'custom':'auto', prepDays:prepEnabled?Math.max(1,Number($('#prepDays').value)||1):5, prepWeekdaysOnly:prepEnabled&&!!$('#prepWeekdaysOnly').checked, prepIncludeDeadline:prepEnabled&&!!$('#prepIncludeDeadline').checked, prepDailyNotes:prepEnabled&&$('#prepMode').value!=='custom'?Object.fromEntries(prepFormDates().map(d=>[d,String(prepDraftNotes[d]||'').trim()]).filter(([,v])=>v)):{}, prepTasks:prepEnabled?prepDraftTasks.map(x=>({...x})):[], prepDone:prepEnabled?{...(old?.prepDone||{})}:{}, prepMoves:prepEnabled?{...(old?.prepMoves||{})}:{},
     availabilityBlock:!['payment','anniversary'].includes($('#kind').value) && !!$('#availabilityBlock').checked,
     availabilityTargetCalId:(!['payment','anniversary'].includes($('#kind').value) && $('#availabilityBlock').checked)?($('#availabilityTarget').value||defaultAvailabilityTargetForSelectedCalendar()):'',
     repeat, repeatRule:repeat==='none'?null:getRepeatRule(), memo:$('#memo').value,
@@ -3826,7 +3844,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'1.91',
+    appVersion:'1.92',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state

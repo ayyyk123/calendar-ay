@@ -4,17 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
-  <title>캘린더 v1.91</title>
-  <link rel="manifest" href="manifest.json?v=1.91">
+  <title>캘린더 v1.92</title>
+  <link rel="manifest" href="manifest.json?v=1.92">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="icon-180.png">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css">
-  <link rel="stylesheet" href="style.css?v=1.91">
+  <link rel="stylesheet" href="style.css?v=1.92">
 </head>
 <body>
 <header>
-  <div class="brand"><b>캘린더</b><small> v1.91</small></div>
+  <div class="brand"><b>캘린더</b><small> v1.92</small></div>
   <div id="saveBadge" class="saveBadge loading" title="Firebase 저장 상태"><span class="saveDot"></span><span id="saveBadgeText">Firebase 확인 중</span></div>
   <button id="manualSaveBtn" class="manualSaveBtn" type="button" title="현재 데이터를 Firebase에 즉시 저장"><span class="manualSaveFull">최신자료 저장</span><span class="manualSaveMobile">저장</span></button>
   <button id="sidebarToggle" class="mobileOnly" type="button" aria-label="메뉴">☰</button>
@@ -132,7 +132,7 @@
       <div id="prepDetails" class="prepDetails hidden">
         <div class="row">
           <label>기한 날짜<input type="date" id="prepDeadline"></label>
-          <label>준비 방식<select id="prepMode"><option value="auto">연속 준비일 자동 계산</option><option value="custom">날짜·반복 직접 지정</option></select></label>
+          <label>준비 방식<select id="prepMode"><option value="auto">연속 준비일 자동 계산 + 추가 가능</option><option value="custom">날짜·반복만 직접 지정</option></select></label>
         </div>
         <div id="prepAutoFields" class="prepAutoFields">
           <div class="row">
@@ -150,7 +150,8 @@
           <div id="prepDailyRows" class="prepDailyRows"></div>
         </div>
         <div id="prepCustomFields" class="prepCustomFields hidden">
-          <div class="prepCustomHelp">준비일이 연속일 필요가 없습니다. 특정 날짜를 직접 넣거나, 마감일을 기준으로 반복 규칙을 자유롭게 만들어 준비업무를 배치할 수 있습니다.</div>
+          <div class="prepCustomHead"><b id="prepCustomTitle">추가 준비업무 (선택)</b><small>자동 준비기간과 함께 사용할 수 있습니다.</small></div>
+          <div id="prepCustomHelp" class="prepCustomHelp">자동 계산된 준비기간에 더해, 특정 날짜나 반복 준비업무를 추가할 수 있습니다.</div>
           <div class="prepRuleAdder">
             <b>특정 날짜에 할 일</b>
             <div class="prepRuleInputs"><input type="date" id="prepOneDate"><input id="prepOneText" placeholder="예: 최종 인원 취합"><button type="button" id="addPrepOne">추가</button></div>
@@ -485,6 +486,6 @@
   <div><span class="spinner"></span><b>Firebase 최신 데이터 불러오는 중…</b><small>저장된 최신 일정을 확인하고 있어요.</small></div>
 </div>
 
-<script type="module" src="app.js?v=1.91"></script>
+<script type="module" src="app.js?v=1.92"></script>
 </body>
 </html>
