@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.93',
+  version: '1.94',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -346,7 +346,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.93',
+    version: '1.94',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -382,6 +382,8 @@ function normalizeState(raw){
         repeatType:x.type==='repeat'&&['daily','weekly','weekdays','weekends'].includes(x.repeatType)?x.repeatType:'daily',
         interval:x.type==='repeat'?Math.max(1,Math.min(99,Number(x.interval)||1)):1,
         weekdays:x.type==='repeat'&&Array.isArray(x.weekdays)?[...new Set(x.weekdays.map(Number).filter(n=>n>=0&&n<=6))]:[],
+        endType:x.type==='repeat'&&x.endType==='date'?'date':'deadline',
+        endDate:x.type==='repeat'&&x.endType==='date'?String(x.endDate||''):'',
         includeDeadline:x.type==='repeat'?!!x.includeDeadline:false
       })).filter(x=>x.text&&(x.type==='date'?x.date:(x.type==='weekly'?x.startDate:(x.startMode==='before'||x.startDate)))):[],
       excludedDates:Array.isArray(e.excludedDates)?e.excludedDates.map(String):[],
@@ -892,13 +894,17 @@ function prepTaskEntriesFromValues(deadline,tasks=[]){
       const startDate=startMode==='before'?ds(add(deadlineDate,-beforeDays)):String(raw.startDate||'');
       if(!startDate) continue;
       const start=parse(startDate), includeDeadline=!!raw.includeDeadline;
-      if(start>deadlineDate || (!includeDeadline && start.getTime()===deadlineDate.getTime())) continue;
+      const endType=raw.endType==='date'?'date':'deadline';
+      const requestedEnd=endType==='date'&&raw.endDate?parse(String(raw.endDate)):deadlineDate;
+      const effectiveEnd=requestedEnd>deadlineDate?deadlineDate:requestedEnd;
+      if(start>deadlineDate || effectiveEnd<start || (endType==='deadline'&&!includeDeadline&&start.getTime()===deadlineDate.getTime())) continue;
       const repeatType=['daily','weekly','weekdays','weekends'].includes(raw.repeatType)?raw.repeatType:'daily';
       const interval=Math.max(1,Math.min(99,Number(raw.interval)||1));
       const weekdays=[...new Set((Array.isArray(raw.weekdays)?raw.weekdays:[]).map(Number).filter(n=>n>=0&&n<=6))];
       const selectedWeekdays=weekdays.length?weekdays:[start.getDay()];
       let d=new Date(start), guard=0;
-      while((includeDeadline?d<=deadlineDate:d<deadlineDate) && guard++<800){
+      const withinEnd=cur=>endType==='date'?cur<=effectiveEnd:(includeDeadline?cur<=deadlineDate:cur<deadlineDate);
+      while(withinEnd(d) && guard++<800){
         const diff=Math.round((new Date(d.getFullYear(),d.getMonth(),d.getDate())-new Date(start.getFullYear(),start.getMonth(),start.getDate()))/dayMs);
         let match=false;
         if(repeatType==='daily') match=diff%interval===0;
@@ -3181,7 +3187,8 @@ function prepRuleDescription(task,deadline){
   const weekdays=[...new Set((task.weekdays||[]).map(Number).filter(n=>n>=0&&n<=6))];
   let repeatLabel=type==='daily'?(interval===1?'매일':`${interval}일마다`):type==='weekdays'?'평일마다':type==='weekends'?'주말마다':`${interval===1?'매주':`${interval}주마다`} ${(weekdays.length?weekdays:[parse(first||deadline).getDay()]).map(weekdayName).join('·')}`;
   const startLabel=task.startMode==='before'?`마감 ${Math.max(0,Number(task.beforeDays)||0)}일 전부터`:`${task.startDate}부터`;
-  return `${startLabel} · ${repeatLabel} · ${task.includeDeadline?'마감 당일까지':'마감 전까지'} · ${count?`${count}회${first&&last?` (${first}${first!==last?`~${last}`:''})`:''}`:'해당일 없음'} · ${task.text}`;
+  const endLabel=task.endType==='date'&&task.endDate?`${task.endDate}까지`:(task.includeDeadline?'마감 당일까지':'마감 전까지');
+  return `${startLabel} · ${repeatLabel} · ${endLabel} · ${count?`${count}회${first&&last?` (${first}${first!==last?`~${last}`:''})`:''}`:'해당일 없음'} · ${task.text}`;
 }
 function renderPrepTaskRules(){
   const list=$('#prepRuleList'); if(list){ list.innerHTML=''; list.classList.add('hidden'); }
@@ -3241,6 +3248,18 @@ function updatePrepRepeatRuleUI(){
   $('#prepRepeatWeekdays')?.classList.toggle('hidden',type!=='weekly');
   $('#prepRepeatIntervalWrap')?.classList.toggle('hidden',!['daily','weekly'].includes(type));
   if($('#prepRepeatUnit')) $('#prepRepeatUnit').textContent=type==='weekly'?'주마다':'일마다';
+  const endType=$('#prepRepeatEndType')?.value==='date'?'date':'deadline';
+  $('#prepRepeatEndDateWrap')?.classList.toggle('hidden',endType!=='date');
+  $('#prepRepeatIncludeDeadlineWrap')?.classList.toggle('hidden',endType==='date');
+  const deadline=$('#prepDeadline')?.value||'';
+  if($('#prepRepeatEndDate')){
+    const startMin=mode==='date'?($('#prepRepeatStartDate')?.value||''):(deadline?ds(add(parse(deadline),-Math.max(0,Number($('#prepRepeatBeforeDays')?.value)||0))):'');
+    $('#prepRepeatEndDate').min=startMin||'';
+    $('#prepRepeatEndDate').max=deadline||'';
+    if(endType==='date' && deadline && !$('#prepRepeatEndDate').value) $('#prepRepeatEndDate').value=deadline;
+    if(startMin && $('#prepRepeatEndDate').value<startMin) $('#prepRepeatEndDate').value=startMin;
+    if(deadline && $('#prepRepeatEndDate').value>deadline) $('#prepRepeatEndDate').value=deadline;
+  }
 }
 function currentPrepRepeatTaskFromForm(){
   const deadline=$('#prepDeadline')?.value||'';
@@ -3251,8 +3270,10 @@ function currentPrepRepeatTaskFromForm(){
   const interval=Math.max(1,Math.min(99,Number($('#prepRepeatInterval')?.value)||1));
   const weekdays=$$('#prepRepeatWeekdays input[type=checkbox]:checked').map(x=>Number(x.value));
   const text=String($('#prepRepeatText')?.value||'').trim();
-  const includeDeadline=!!$('#prepRepeatIncludeDeadline')?.checked;
-  return {id:uid(),type:'repeat',text,startMode,startDate,beforeDays,repeatType,interval,weekdays,includeDeadline,date:'',weekday:0,deadline};
+  const endType=$('#prepRepeatEndType')?.value==='date'?'date':'deadline';
+  const endDate=endType==='date'?($('#prepRepeatEndDate')?.value||''):'';
+  const includeDeadline=endType==='deadline'&&!!$('#prepRepeatIncludeDeadline')?.checked;
+  return {id:uid(),type:'repeat',text,startMode,startDate,beforeDays,repeatType,interval,weekdays,endType,endDate,includeDeadline,date:'',weekday:0,deadline};
 }
 function addPrepRepeatTask(){
   const deadline=$('#prepDeadline')?.value||'', task=currentPrepRepeatTaskFromForm();
@@ -3260,7 +3281,12 @@ function addPrepRepeatTask(){
   if(!task.text){ alert('반복할 준비업무 내용을 입력하세요.'); return; }
   if(task.startMode==='date' && !task.startDate){ alert('반복 시작일을 선택하세요.'); return; }
   const resolvedStart=prepRepeatResolvedStart(task,deadline);
-  if(resolvedStart>deadline || (!task.includeDeadline && resolvedStart===deadline)){ alert('반복 시작일은 마감일보다 앞이어야 합니다.'); return; }
+  if(task.endType==='date'){
+    if(!task.endDate){ alert('반복 종료일을 선택하세요.'); return; }
+    if(task.endDate>deadline){ alert('반복 종료일은 마감일보다 늦을 수 없습니다.'); return; }
+    if(resolvedStart && task.endDate<resolvedStart){ alert('반복 종료일은 시작일보다 빠를 수 없습니다.'); return; }
+  }
+  if(resolvedStart>deadline || (task.endType==='deadline'&&!task.includeDeadline && resolvedStart===deadline)){ alert('반복 시작일은 마감일보다 앞이어야 합니다.'); return; }
   if(task.repeatType==='weekly' && !task.weekdays.length){ alert('반복할 요일을 하나 이상 선택하세요.'); return; }
   const test=prepTaskEntriesFromValues(deadline,[task]);
   if(!test.length){ alert('현재 반복 조건으로 마감 전에 생성되는 준비일정이 없습니다.'); return; }
@@ -3335,6 +3361,8 @@ function openEvent(date,id,options={}){
   if($('#prepRepeatType')) $('#prepRepeatType').value='daily';
   if($('#prepRepeatInterval')) $('#prepRepeatInterval').value='1';
   $$('#prepRepeatWeekdays input[type=checkbox]').forEach(x=>x.checked=false);
+  if($('#prepRepeatEndType')) $('#prepRepeatEndType').value='deadline';
+  if($('#prepRepeatEndDate')) $('#prepRepeatEndDate').value='';
   if($('#prepRepeatIncludeDeadline')) $('#prepRepeatIncludeDeadline').checked=false;
   if($('#prepRepeatText')) $('#prepRepeatText').value='';
   updatePrepRepeatRuleUI();
@@ -3501,12 +3529,12 @@ $('#cancelPurchase').onclick=()=>closeDialog($('#purchaseDlg'));
 $('#deletePurchase').onclick=()=>{ const id=$('#purchaseId').value; if(id&&confirm('이 구매항목을 삭제할까요?')){ state.purchases=state.purchases.filter(x=>x.id!==id); closeDialog($('#purchaseDlg')); save(); } };
 $('#allDay').onchange=updateAllDayUI; $('#noDuration').onchange=()=>updateDurationMode(); $('#kind').onchange=updateKindUI; $('#availabilityBlock').onchange=updateAvailabilityBlockUI; $('#cal').onchange=()=>{ if($('#availabilityBlock').checked){ const v=defaultAvailabilityTargetForSelectedCalendar(); if([...$('#availabilityTarget').options].some(o=>o.value===v)) $('#availabilityTarget').value=v; } }; $('#start').onchange=updateDurationMode; $('#end').onchange=updateDurationMode; $('#endDate').onchange=updateDurationMode; $('#repeat').onchange=updateRepeatUI;
 $('#prepEnabled').onchange=()=>{ if($('#prepEnabled').checked){ if(!$('#eid').value){ prepDraftNotes={}; prepDraftTasks=[]; prepDraftAutoEnabled=$('#prepMode')?.value!=='custom'; } $('#prepDeadline').value=$('#date').value||ds(cursor); $('#repeat').value='none'; updateRepeatUI(); } updatePrepUI(); };
-$('#prepDeadline').onchange=()=>{ if($('#prepDeadline').value){ $('#date').value=$('#prepDeadline').value; $('#endDate').value=$('#prepDeadline').value; updateDurationMode(); } renderPrepDailyRows(); };
+$('#prepDeadline').onchange=()=>{ if($('#prepDeadline').value){ $('#date').value=$('#prepDeadline').value; $('#endDate').value=$('#prepDeadline').value; updateDurationMode(); } updatePrepRepeatRuleUI(); renderPrepDailyRows(); };
 $('#prepMode').onchange=()=>{ collectPrepDailyNotes(); renderPrepDailyRows(); };
 if($('#prepAutoEnabled')) $('#prepAutoEnabled').onchange=()=>{ collectPrepDailyNotes(); prepDraftAutoEnabled=!!$('#prepAutoEnabled').checked; renderPrepDailyRows(); };
 $('#prepDays').oninput=()=>{ if($('#prepAutoEnabled')?.checked) prepDraftAutoEnabled=true; renderPrepDailyRows(); }; $('#prepWeekdaysOnly').onchange=renderPrepDailyRows; $('#prepIncludeDeadline').onchange=renderPrepDailyRows;
 $('#addPrepOne').onclick=addPrepDateTask; $('#addPrepRepeat').onclick=addPrepRepeatTask;
-$('#prepRepeatStartMode').onchange=updatePrepRepeatRuleUI; $('#prepRepeatType').onchange=updatePrepRepeatRuleUI;
+$('#prepRepeatStartMode').onchange=updatePrepRepeatRuleUI; $('#prepRepeatType').onchange=updatePrepRepeatRuleUI; if($('#prepRepeatEndType')) $('#prepRepeatEndType').onchange=updatePrepRepeatRuleUI; if($('#prepRepeatStartDate')) $('#prepRepeatStartDate').onchange=updatePrepRepeatRuleUI; if($('#prepRepeatBeforeDays')) $('#prepRepeatBeforeDays').oninput=updatePrepRepeatRuleUI;
 if($('#prepRuleList')) $('#prepRuleList').onclick=e=>{ const b=e.target.closest('[data-prep-rule-delete]'); if(!b) return; const id=b.dataset.prepRuleDelete; prepDraftTasks=prepDraftTasks.filter(x=>x.id!==id); renderPrepDailyRows(); };
 if($('#prepDailyRows')) $('#prepDailyRows').onclick=e=>{ const b=e.target.closest('[data-prep-task-delete]'); if(!b) return; e.preventDefault(); const id=b.dataset.prepTaskDelete; prepDraftTasks=prepDraftTasks.filter(x=>String(x.id)!==String(id)); renderPrepDailyRows(); };
 $('#date').onchange=()=>{
@@ -3847,7 +3875,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'1.93',
+    appVersion:'1.94',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state

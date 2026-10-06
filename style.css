@@ -2190,14 +2190,14 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 
 /* v1.92: 마감 기준 반복 준비업무 자유 설정 */
 .prepRepeatAdder{gap:7px}
-.prepRepeatStartGrid,.prepRepeatRuleGrid{display:grid;grid-template-columns:1fr 1fr;gap:6px;align-items:end}
-.prepRepeatStartGrid label,.prepRepeatRuleGrid label{display:grid;gap:3px;font-size:10px;color:#596678}
-.prepRepeatStartGrid input,.prepRepeatStartGrid select,.prepRepeatRuleGrid input,.prepRepeatRuleGrid select{min-width:0;width:100%;padding:6px 7px}
+.prepRepeatStartGrid,.prepRepeatRuleGrid,.prepRepeatEndGrid{display:grid;grid-template-columns:1fr 1fr;gap:6px;align-items:end}
+.prepRepeatStartGrid label,.prepRepeatRuleGrid label,.prepRepeatEndGrid label{display:grid;gap:3px;font-size:10px;color:#596678}
+.prepRepeatStartGrid input,.prepRepeatStartGrid select,.prepRepeatRuleGrid input,.prepRepeatRuleGrid select,.prepRepeatEndGrid input,.prepRepeatEndGrid select{min-width:0;width:100%;padding:6px 7px}
 .prepInlineNumber{display:grid;grid-template-columns:70px 1fr;gap:5px;align-items:center}.prepInlineNumber span{font-size:10px;color:#6f7b8b}
 .prepRepeatWeekdays{display:grid;gap:4px;padding:6px 7px;border:1px solid #e7ebf0;border-radius:7px;background:#fafbfd}.prepRepeatWeekdays>span{font-size:10px;color:#596678}
 .prepRepeatWeekdays .weekdayChecks{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}.prepRepeatWeekdays .weekdayChecks label{display:flex;align-items:center;justify-content:center;gap:2px;font-size:10px;padding:4px 2px;border:1px solid #e1e6ed;border-radius:6px;background:#fff}
 .prepRepeatDeadlineCheck{font-size:10px;color:#596678}.prepRepeatAction{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px}.prepRepeatAction input{min-width:0;width:100%;padding:6px 7px}.prepRepeatAction button{white-space:nowrap;padding:6px 10px}
-@media(max-width:760px){.prepRepeatStartGrid,.prepRepeatRuleGrid{grid-template-columns:1fr}.prepRepeatWeekdays .weekdayChecks{grid-template-columns:repeat(7,minmax(0,1fr))}}
+@media(max-width:760px){.prepRepeatStartGrid,.prepRepeatRuleGrid,.prepRepeatEndGrid{grid-template-columns:1fr}.prepRepeatWeekdays .weekdayChecks{grid-template-columns:repeat(7,minmax(0,1fr))}}
 
 /* v1.92: 자동 준비기간 + 추가 날짜/반복 업무 병행 */
 .prepCustomHead{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:2px 0 6px}.prepCustomHead b{font-size:12px}.prepCustomHead small{font-size:9px;color:#7c8798}
@@ -2222,3 +2222,7 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
   .prepPlanEditorRow{grid-template-columns:80px minmax(0,1fr) auto!important;gap:5px!important}
   .prepUnifiedPlan .prepDailyRows{max-height:360px}
 }
+
+/* v1.94: 반복 준비업무 종료일 직접 지정 */
+.prepRepeatEndGrid{display:grid;grid-template-columns:1fr 1fr;gap:6px;align-items:end}.prepRepeatEndGrid label{display:grid;gap:3px;font-size:10px;color:#596678}.prepRepeatEndGrid input,.prepRepeatEndGrid select{min-width:0;width:100%;padding:6px 7px}
+@media(max-width:760px){.prepRepeatEndGrid{grid-template-columns:1fr}}

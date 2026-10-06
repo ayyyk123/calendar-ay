@@ -4,17 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
-  <title>캘린더 v1.93</title>
-  <link rel="manifest" href="manifest.json?v=1.93">
+  <title>캘린더 v1.94</title>
+  <link rel="manifest" href="manifest.json?v=1.94">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="icon-180.png">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css">
-  <link rel="stylesheet" href="style.css?v=1.93">
+  <link rel="stylesheet" href="style.css?v=1.94">
 </head>
 <body>
 <header>
-  <div class="brand"><b>캘린더</b><small> v1.93</small></div>
+  <div class="brand"><b>캘린더</b><small> v1.94</small></div>
   <div id="saveBadge" class="saveBadge loading" title="Firebase 저장 상태"><span class="saveDot"></span><span id="saveBadgeText">Firebase 확인 중</span></div>
   <button id="manualSaveBtn" class="manualSaveBtn" type="button" title="현재 데이터를 Firebase에 즉시 저장"><span class="manualSaveFull">최신자료 저장</span><span class="manualSaveMobile">저장</span></button>
   <button id="sidebarToggle" class="mobileOnly" type="button" aria-label="메뉴">☰</button>
@@ -170,9 +170,13 @@
                 <label><input type="checkbox" value="1">월</label><label><input type="checkbox" value="2">화</label><label><input type="checkbox" value="3">수</label><label><input type="checkbox" value="4">목</label><label><input type="checkbox" value="5">금</label><label><input type="checkbox" value="6">토</label><label><input type="checkbox" value="0">일</label>
               </div>
             </div>
-            <label class="check prepRepeatDeadlineCheck"><input type="checkbox" id="prepRepeatIncludeDeadline"> 마감 당일까지 반복</label>
+            <div class="prepRepeatEndGrid">
+              <label>반복 종료<select id="prepRepeatEndType"><option value="deadline">마감일까지</option><option value="date">종료일 직접 지정</option></select></label>
+              <label id="prepRepeatEndDateWrap" class="hidden">종료일<input type="date" id="prepRepeatEndDate"></label>
+            </div>
+            <label class="check prepRepeatDeadlineCheck" id="prepRepeatIncludeDeadlineWrap"><input type="checkbox" id="prepRepeatIncludeDeadline"> 마감 당일도 반복</label>
             <div class="prepRepeatAction"><input id="prepRepeatText" placeholder="예: 진행상황 확인"><button type="button" id="addPrepRepeat">추가</button></div>
-            <small>예: ‘마감 5일 전부터 · 매일’ 또는 ‘시작일 10/1 · 매주 월·목’처럼 지정할 수 있습니다.</small>
+            <small>예: ‘마감 5일 전부터 · 매일 · 10/20까지’ 또는 ‘시작일 10/1 · 매주 월·목 · 마감 전까지’처럼 지정할 수 있습니다.</small>
           </div>
           <div id="prepRuleList" class="prepRuleList hidden"></div>
         </div>
@@ -487,6 +491,6 @@
   <div><span class="spinner"></span><b>Firebase 최신 데이터 불러오는 중…</b><small>저장된 최신 일정을 확인하고 있어요.</small></div>
 </div>
 
-<script type="module" src="app.js?v=1.93"></script>
+<script type="module" src="app.js?v=1.94"></script>
 </body>
 </html>
