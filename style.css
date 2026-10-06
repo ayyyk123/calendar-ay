@@ -2131,3 +2131,30 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
   .prepPlanDlg{width:calc(100vw - 12px)}
   .prepPlanDlg form{padding:12px}.prepPlanRow{grid-template-columns:88px minmax(0,1fr);gap:7px}
 }
+
+/* v1.87: 준비카드에 원래 마감 일정명을 함께 표시 */
+.item.prepDayItem .itemTitle{letter-spacing:-.02em}
+
+
+/* v1.88: 기한 준비일정 - 연속 자동 / 날짜·매주 직접 지정 */
+.prepModeHint{align-self:end;padding:0 0 7px;color:#7a8492;font-size:10px;line-height:1.35}
+.prepCustomFields{display:grid;gap:9px;border-top:1px solid #e4e8ee;padding-top:8px}
+.prepCustomHelp{font-size:10px;line-height:1.45;color:#667385;background:#f5f8fc;border-radius:7px;padding:7px 8px}
+.prepRuleAdder{display:grid;gap:5px;padding:8px;border:1px solid #e3e7ed;border-radius:8px;background:#fff}
+.prepRuleAdder>b{font-size:11px}.prepRuleAdder>small{font-size:9px;color:#8a94a3;line-height:1.35}
+.prepRuleInputs{display:grid;grid-template-columns:132px minmax(0,1fr) auto;gap:6px;align-items:center}
+.prepRuleInputs.weekly{grid-template-columns:124px 92px minmax(0,1fr) auto}
+.prepRuleInputs input,.prepRuleInputs select{min-width:0;width:100%;padding:6px 7px}
+.prepRuleInputs button{white-space:nowrap;padding:6px 10px}
+.prepRuleList{display:grid;gap:5px;max-height:220px;overflow:auto}
+.prepRuleEmpty{padding:9px;border:1px dashed #ccd4df;border-radius:7px;color:#8a94a3;font-size:10px;text-align:center}
+.prepRuleItem{display:grid;grid-template-columns:minmax(0,1fr) 28px;gap:6px;align-items:center;padding:7px 8px;border:1px solid #dfe5ed;border-radius:7px;background:#fdfefe}
+.prepRuleItem>div{display:grid;gap:2px;min-width:0}.prepRuleItem b{font-size:10px;color:#536070}.prepRuleItem span{font-size:11px;white-space:normal;word-break:keep-all;line-height:1.4}
+.prepRuleDelete{border:0;background:transparent;font-size:18px;line-height:1;color:#9aa4b1;cursor:pointer}
+.prepPlanRule{margin-top:2px;color:#5272a0!important}
+@media(max-width:760px){
+  .prepRuleInputs,.prepRuleInputs.weekly{grid-template-columns:1fr 1fr}
+  .prepRuleInputs input[id$="Text"]{grid-column:1 / -1}
+  .prepRuleInputs button{grid-column:2;justify-self:end}
+  .prepModeHint{padding-bottom:0}
+}

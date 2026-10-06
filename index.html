@@ -4,17 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
-  <title>캘린더 v1.86</title>
-  <link rel="manifest" href="manifest.json?v=1.86">
+  <title>캘린더 v1.88</title>
+  <link rel="manifest" href="manifest.json?v=1.88">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="icon-180.png">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css">
-  <link rel="stylesheet" href="style.css?v=1.86">
+  <link rel="stylesheet" href="style.css?v=1.88">
 </head>
 <body>
 <header>
-  <div class="brand"><b>캘린더</b><small> v1.86</small></div>
+  <div class="brand"><b>캘린더</b><small> v1.88</small></div>
   <div id="saveBadge" class="saveBadge loading" title="Firebase 저장 상태"><span class="saveDot"></span><span id="saveBadgeText">Firebase 확인 중</span></div>
   <button id="manualSaveBtn" class="manualSaveBtn" type="button" title="현재 데이터를 Firebase에 즉시 저장"><span class="manualSaveFull">최신자료 저장</span><span class="manualSaveMobile">저장</span></button>
   <button id="sidebarToggle" class="mobileOnly" type="button" aria-label="메뉴">☰</button>
@@ -128,20 +128,39 @@
       <label>종료일<input type="date" id="endDate"></label>
     </div>
     <div id="prepFields" class="prepFields">
-      <label class="check prepEnable"><input type="checkbox" id="prepEnabled"> 기한에 맞춘 준비기간 사용</label>
+      <label class="check prepEnable"><input type="checkbox" id="prepEnabled"> 기한에 맞춘 준비일정 사용</label>
       <div id="prepDetails" class="prepDetails hidden">
         <div class="row">
           <label>기한 날짜<input type="date" id="prepDeadline"></label>
-          <label>필요 준비일수<input type="number" id="prepDays" min="1" max="365" step="1" value="5"></label>
+          <label>준비 방식<select id="prepMode"><option value="auto">연속 준비일 자동 계산</option><option value="custom">날짜·반복 직접 지정</option></select></label>
         </div>
-        <div class="prepOptions">
-          <label class="check"><input type="checkbox" id="prepWeekdaysOnly"> 평일만 계산</label>
-          <label class="check"><input type="checkbox" id="prepIncludeDeadline"> 기한 당일도 준비일에 포함</label>
+        <div id="prepAutoFields" class="prepAutoFields">
+          <div class="row">
+            <label>필요 준비일수<input type="number" id="prepDays" min="1" max="365" step="1" value="5"></label>
+            <span class="prepModeHint">마감 직전부터 필요한 일수만큼 자동으로 이어서 배치합니다.</span>
+          </div>
+          <div class="prepOptions">
+            <label class="check"><input type="checkbox" id="prepWeekdaysOnly"> 평일만 계산</label>
+            <label class="check"><input type="checkbox" id="prepIncludeDeadline"> 기한 당일도 준비일에 포함</label>
+          </div>
         </div>
         <div id="prepCalcSummary" class="prepCalcSummary"></div>
-        <div class="prepDailyEditor">
+        <div id="prepAutoEditor" class="prepDailyEditor">
           <div class="prepDailyHead"><b>날짜별 진행 계획</b><small>각 날짜에 무엇을 할지 적어두면 달력에도 그 내용이 표시됩니다.</small></div>
           <div id="prepDailyRows" class="prepDailyRows"></div>
+        </div>
+        <div id="prepCustomFields" class="prepCustomFields hidden">
+          <div class="prepCustomHelp">준비일이 연속일 필요가 없습니다. 특정 날짜를 직접 넣거나, 마감 전까지 매주 반복할 준비업무를 추가할 수 있습니다.</div>
+          <div class="prepRuleAdder">
+            <b>특정 날짜에 할 일</b>
+            <div class="prepRuleInputs"><input type="date" id="prepOneDate"><input id="prepOneText" placeholder="예: 최종 인원 취합"><button type="button" id="addPrepOne">추가</button></div>
+          </div>
+          <div class="prepRuleAdder">
+            <b>마감 전 매주 반복할 일</b>
+            <div class="prepRuleInputs weekly"><input type="date" id="prepWeeklyStart" title="반복을 시작할 기준 날짜"><select id="prepWeeklyWeekday"><option value="1">월요일</option><option value="2">화요일</option><option value="3">수요일</option><option value="4">목요일</option><option value="5">금요일</option><option value="6">토요일</option><option value="0">일요일</option></select><input id="prepWeeklyText" placeholder="예: 진행상황 확인"><button type="button" id="addPrepWeekly">추가</button></div>
+            <small>선택한 시작일 이후 첫 해당 요일부터 기한 전까지 매주 자동 표시됩니다.</small>
+          </div>
+          <div id="prepRuleList" class="prepRuleList"></div>
         </div>
       </div>
     </div>
@@ -450,6 +469,6 @@
   <div><span class="spinner"></span><b>Firebase 최신 데이터 불러오는 중…</b><small>저장된 최신 일정을 확인하고 있어요.</small></div>
 </div>
 
-<script type="module" src="app.js?v=1.86"></script>
+<script type="module" src="app.js?v=1.88"></script>
 </body>
 </html>
