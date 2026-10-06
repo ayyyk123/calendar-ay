@@ -2158,3 +2158,13 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
   .prepRuleInputs button{grid-column:2;justify-self:end}
   .prepModeHint{padding-bottom:0}
 }
+
+/* v1.89 준비일정 완료 체크 */
+.prepPlanRow{grid-template-columns:auto 106px minmax(0,1fr)!important;align-items:center!important}
+.prepPlanCheck,.prepPlanCheckSpacer{width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 24px}
+.prepPlanCheck{border:1px solid #cfd6df;border-radius:6px;background:#fff;padding:0;cursor:pointer;font-size:15px;color:#315f9f}
+.prepPlanCheck:hover{background:#f2f6fb;border-color:#9eb4d2}
+.prepPlanRow.done{opacity:.62;background:#f5f7f9}
+.prepPlanRow.done .prepPlanText{text-decoration:line-through;color:#7d848c}
+.prepDayItem .prepCheck{flex:0 0 auto;font-size:14px;margin-top:-1px}
+@media(max-width:600px){.prepPlanRow{grid-template-columns:auto 82px minmax(0,1fr)!important;gap:6px!important}}

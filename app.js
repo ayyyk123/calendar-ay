@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.88',
+  version: '1.89',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -346,7 +346,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.88',
+    version: '1.89',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -369,6 +369,8 @@ function normalizeState(raw){
       prepWeekdaysOnly:!!e.prepWeekdaysOnly,
       prepIncludeDeadline:!!e.prepIncludeDeadline,
       prepDailyNotes:(e.prepDailyNotes&&typeof e.prepDailyNotes==='object')?Object.fromEntries(Object.entries(e.prepDailyNotes).map(([k,v])=>[String(k),String(v??'')])):{},
+      prepDone:(e.prepDone&&typeof e.prepDone==='object')?Object.fromEntries(Object.entries(e.prepDone).filter(([,v])=>!!v).map(([k])=>[String(k),true])):{},
+      prepMoves:(e.prepMoves&&typeof e.prepMoves==='object')?Object.fromEntries(Object.entries(e.prepMoves).filter(([,v])=>typeof v==='string'&&v).map(([k,v])=>[String(k),String(v)])):{},
       prepTasks:Array.isArray(e.prepTasks)?e.prepTasks.filter(x=>x&&['date','weekly'].includes(x.type)).map((x,i)=>({
         id:String(x.id||`prep-${i}-${uid()}`), type:x.type, text:String(x.text||'').trim(),
         date:x.type==='date'?String(x.date||''):'',
@@ -861,7 +863,7 @@ function prepTaskEntriesFromValues(deadline,tasks=[]){
     const text=String(raw.text||'').trim(), id=String(raw.id||'');
     if(raw.type==='date' && raw.date){
       const date=String(raw.date);
-      if(date<=deadline) out.push({date,text,ruleId:id,type:'date',ruleLabel:'지정'});
+      if(date<=deadline) out.push({date,sourceDate:date,text,ruleId:id,type:'date',ruleLabel:'지정',key:`date:${id}`});
       continue;
     }
     if(raw.type==='weekly' && raw.startDate){
@@ -869,19 +871,33 @@ function prepTaskEntriesFromValues(deadline,tasks=[]){
       let d=parse(raw.startDate), guard=0;
       while(d.getDay()!==weekday && guard++<8) d=add(d,1);
       while(d<deadlineDate && guard++<500){
-        out.push({date:ds(d),text,ruleId:id,type:'weekly',ruleLabel:`매주 ${weekdayName(weekday)}`});
+        const date=ds(d);
+        out.push({date,sourceDate:date,text,ruleId:id,type:'weekly',ruleLabel:`매주 ${weekdayName(weekday)}`,key:`weekly:${id}:${date}`});
         d=add(d,7);
       }
     }
   }
   return out.sort((a,b)=>a.date.localeCompare(b.date)||a.type.localeCompare(b.type)||a.text.localeCompare(b.text));
 }
-function preparationEntries(e){
+function basePreparationEntries(e){
   if(!e?.prepEnabled || !e.prepDeadline) return [];
   if((e.repeat||'none')!=='none') return [];
   if(e.prepMode==='custom') return prepTaskEntriesFromValues(e.prepDeadline,e.prepTasks||[]);
   return preparationDatesFromValues(e.prepDeadline,e.prepDays,e.prepWeekdaysOnly,e.prepIncludeDeadline)
-    .map(date=>({date,text:String(e?.prepDailyNotes?.[date]||'').trim(),ruleId:date,type:'auto',ruleLabel:'자동'}));
+    .map(date=>({date,sourceDate:date,text:String(e?.prepDailyNotes?.[date]||'').trim(),ruleId:date,type:'auto',ruleLabel:'자동',key:`auto:${date}`}));
+}
+function preparationEntries(e){
+  const moves=(e?.prepMoves&&typeof e.prepMoves==='object')?e.prepMoves:{};
+  return basePreparationEntries(e).map(entry=>{
+    const moved=typeof moves[entry.key]==='string'&&moves[entry.key]?moves[entry.key]:'';
+    return moved?{...entry,date:moved,moved:true}:{...entry,moved:false};
+  }).filter(entry=>!e?.prepDeadline || entry.date<=e.prepDeadline)
+    .sort((a,b)=>a.date.localeCompare(b.date)||a.type.localeCompare(b.type)||a.text.localeCompare(b.text));
+}
+function preparationEntryDone(e,key){ return !!(key && e?.prepDone && e.prepDone[key]); }
+function preparationProgress(e){
+  const entries=preparationEntries(e), total=entries.length, done=entries.filter(x=>preparationEntryDone(e,x.key)).length;
+  return {done,total};
 }
 function preparationDates(e){
   return [...new Set(preparationEntries(e).map(x=>x.date))].sort();
@@ -912,7 +928,9 @@ function preparationNoteForDate(e,date){
 function preparationVirtualEvent(e,entry){
   const date=typeof entry==='string'?entry:entry.date;
   const note=typeof entry==='string'?preparationNoteForDate(e,date):String(entry.text||'').trim();
-  return {...e,_prepDay:true,_prepDate:date,_renderDate:date,_occurrenceStart:e.date,_occurrenceEnd:e.date,_prepNote:note,_prepRuleId:typeof entry==='string'?'':String(entry.ruleId||''),_prepRuleLabel:typeof entry==='string'?'':String(entry.ruleLabel||'')};
+  const key=typeof entry==='string'?`auto:${entry}`:String(entry.key||'');
+  const sourceDate=typeof entry==='string'?entry:String(entry.sourceDate||entry.date||'');
+  return {...e,_prepDay:true,_prepDate:date,_renderDate:date,_occurrenceStart:e.date,_occurrenceEnd:e.date,_prepNote:note,_prepKey:key,_prepSourceDate:sourceDate,_prepType:typeof entry==='string'?'auto':String(entry.type||''),_prepRuleId:typeof entry==='string'?'':String(entry.ruleId||''),_prepRuleLabel:typeof entry==='string'?'':String(entry.ruleLabel||'')};
 }
 
 function buildOccurrenceMap(rangeStart, rangeEnd, options={}){
@@ -1082,7 +1100,7 @@ function checklistHtml(e,compact=false){
 }
 function eventItemHtml(e, compact=false){
   const c=cal(e.calId), prepDay=!!e._prepDay, deadlineItem=!!e.prepEnabled && !prepDay && (e._renderDate||e.date)===(e.prepDeadline||e.date);
-  const done=prepDay?false:isDone(e), checkable=e.kind!=='anniversary' && !prepDay;
+  const done=prepDay?preparationEntryDone(e,e._prepKey):isDone(e), checkable=e.kind!=='anniversary' && !prepDay;
   const recurring=(e.repeat||'none')!=='none';
   const payment=e.kind==='payment';
   const checklist=prepDay?[]:checklistItems(e), checklistState=prepDay?{done:0,total:0}:checklistProgress(e);
@@ -1090,7 +1108,7 @@ function eventItemHtml(e, compact=false){
   const timePrefix=(!prepDay && !e.allDay && e.start)?`${e.start}${e.end?`–${e.end}`:''} `:'';
   const inLabel=prepDay?'':carryoverInLabel(e), outRecord=prepDay?null:carryoverOutRecord(e);
   const renderDate=e._renderDate||e._occurrenceStart||e.date;
-  const drag=prepDay?'false':'true';
+  const drag='true';
   const prepNote=prepDay?String(e._prepNote||'').trim():'';
   const shownTitle=prepDay?`준비 · ${e.title}${prepNote?` › ${prepNote}`:''}`:(deadlineItem?`마감 · ${e.title}`:e.title);
   const detail=[];
@@ -1108,14 +1126,14 @@ function eventItemHtml(e, compact=false){
   if(outRecord) detail.push(`${outRecord.toDate}로 이월`);
   if(deadlineItem) detail.unshift(preparationSummary(e));
   const tooltip=[shownTitle,...detail].filter(Boolean).join(' · ');
-  const dragHandle=prepDay?'':`<span class="dragHandle" title="드래그: 같은 날짜에서는 순서 변경 · 다른 날짜에서는 이동" aria-hidden="true">⋮⋮</span>`;
-  const mainCheck='';
+  const dragHandle=`<span class="dragHandle" title="${prepDay?'드래그: 준비일정을 다른 날짜로 이동':'드래그: 같은 날짜에서는 순서 변경 · 다른 날짜에서는 이동'}" aria-hidden="true">⋮⋮</span>`;
+  const mainCheck=prepDay?`<button type="button" class="todoCheck prepCheck" data-action="prep-toggle" title="${done?'완료 해제':'완료 처리'}">${done?'☑':'☐'}</button>`:'';
   const checklistKey=checklistExpandKey(e), expanded=!prepDay&&expandedChecklistKeys.has(checklistKey);
   const checklistButton=checklist.length?`<button type="button" class="checklistToggle ${expanded?'on':''}" data-action="checklist-toggle" title="세부 체크리스트 ${checklistState.done}/${checklistState.total}">☷ ${checklistState.done}/${checklistState.total}</button>`:'';
   const repeatBadge=!prepDay&&recurring?`<span class="repeatMark" title="${esc(repeatRuleLabel(e))}">↻</span>`:'';
   const carryBadge=inLabel?`<span class="carryBadge carryIn" title="${esc(inLabel)}">↪</span>`:'';
   const amountInline=!prepDay&&payment&&Number(e.paymentAmount)>0?`<span class="inlineMeta">₩${Number(e.paymentAmount).toLocaleString('ko-KR')}</span>`:'';
-  return `<div class="item ${done?'done':''} kind-${esc(e.kind||'event')} ${recurring&&!prepDay?'recurringItem':''} ${payment&&!prepDay?'paymentItem':''} ${e.fixedId?'manualPlacedItem':''} ${e.flexibleId?'flexiblePlacedItem':''} ${inLabel?'carriedIn':''} ${outRecord?'carriedOut':''} ${prepDay?'prepDayItem':''} ${deadlineItem?'prepDeadlineItem':''}" draggable="${drag}" data-eid="${esc(e.id)}" data-occurrence="${esc(e._occurrenceStart||e.date)}" data-render-date="${esc(renderDate)}" data-cal-id="${esc(e.calId)}" data-lane="${payment?'payment':'work'}" data-prep-day="${prepDay?'1':''}" data-prep-event="${e.prepEnabled?'1':''}" style="--item-color:${esc(c.color)};border-left-color:${esc(c.color)}">
+  return `<div class="item ${done?'done':''} kind-${esc(e.kind||'event')} ${recurring&&!prepDay?'recurringItem':''} ${payment&&!prepDay?'paymentItem':''} ${e.fixedId?'manualPlacedItem':''} ${e.flexibleId?'flexiblePlacedItem':''} ${inLabel?'carriedIn':''} ${outRecord?'carriedOut':''} ${prepDay?'prepDayItem':''} ${deadlineItem?'prepDeadlineItem':''}" draggable="${drag}" data-eid="${esc(e.id)}" data-occurrence="${esc(e._occurrenceStart||e.date)}" data-render-date="${esc(renderDate)}" data-cal-id="${esc(e.calId)}" data-lane="${payment?'payment':'work'}" data-prep-day="${prepDay?'1':''}" data-prep-key="${prepDay?esc(e._prepKey||''):''}" data-prep-source-date="${prepDay?esc(e._prepSourceDate||''):''}" data-prep-type="${prepDay?esc(e._prepType||''):''}" data-prep-rule-id="${prepDay?esc(e._prepRuleId||''):''}" data-prep-event="${e.prepEnabled?'1':''}" style="--item-color:${esc(c.color)};border-left-color:${esc(c.color)}">
     <div class="itemRow">${dragHandle}${!prepDay&&e.important?`<button type="button" class="importanceBtn on" data-action="importance" aria-label="중요 표시 해제" title="중요 표시 해제">★</button>`:''}${mainCheck}<div class="itemTitle" title="${esc(tooltip)}">${timePrefix}<span class="durationPrefix">${esc(durationPrefix)}</span>${!prepDay&&payment?'₩ ':(!checkable&&!prepDay?kindPrefix(e):'')}${esc(shownTitle)}</div>${amountInline}${repeatBadge}${carryBadge}${checklistButton}</div>
     ${expanded?checklistHtml(e,false):''}
   </div>`;
@@ -1965,17 +1983,19 @@ function openPreparationPlan(id){
   activePrepPlanId=id;
   const entries=preparationEntries(e);
   $('#prepPlanTitle').textContent=e.title;
-  $('#prepPlanSummary').textContent=preparationSummary(e);
+  const prepProgress=preparationProgress(e);
+  $('#prepPlanSummary').textContent=`${preparationSummary(e)}${prepProgress.total?` · 완료 ${prepProgress.done}/${prepProgress.total}`:''}`;
   const memo=$('#prepPlanGeneralMemo');
   if(e.memo?.trim()){ memo.textContent=e.memo.trim(); memo.classList.remove('hidden'); } else { memo.textContent=''; memo.classList.add('hidden'); }
   const rows=entries.map(entry=>{
-    const note=String(entry.text||'').trim();
-    const rule=e.prepMode==='custom'&&entry.ruleLabel?`<small class="prepPlanRule">${esc(entry.ruleLabel)}</small>`:'';
-    return `<div class="prepPlanRow"><div class="prepPlanDate">${esc(preparationDateLabel(entry.date))}<small>${esc(entry.date)}</small>${rule}</div><div class="prepPlanText ${note?'':'muted'}">${esc(note||'계획 미입력')}</div></div>`;
+    const note=String(entry.text||'').trim(), done=preparationEntryDone(e,entry.key);
+    const rule=e.prepMode==='custom'&&entry.ruleLabel?`<small class="prepPlanRule">${esc(entry.ruleLabel)}${entry.moved?' · 이동':''}</small>`:(entry.moved?`<small class="prepPlanRule">이동</small>`:'');
+    return `<div class="prepPlanRow ${done?'done':''}"><button type="button" class="prepPlanCheck" data-prep-plan-check="${esc(entry.key)}" title="${done?'완료 해제':'완료 처리'}">${done?'☑':'☐'}</button><div class="prepPlanDate">${esc(preparationDateLabel(entry.date))}<small>${esc(entry.date)}</small>${rule}</div><div class="prepPlanText ${note?'':'muted'}">${esc(note||'계획 미입력')}</div></div>`;
   });
-  if(!rows.length) rows.push(`<div class="prepPlanRow"><div class="prepPlanDate">준비일정</div><div class="prepPlanText muted">등록된 준비 일정이 없습니다.</div></div>`);
-  rows.push(`<div class="prepPlanRow deadline"><div class="prepPlanDate">마감일<small>${esc(e.prepDeadline||e.date)}</small></div><div class="prepPlanText"><b>${esc(e.title)}</b>${e.place?`<br>${esc(e.place)}`:''}</div></div>`);
+  if(!rows.length) rows.push(`<div class="prepPlanRow"><span class="prepPlanCheckSpacer"></span><div class="prepPlanDate">준비일정</div><div class="prepPlanText muted">등록된 준비 일정이 없습니다.</div></div>`);
+  rows.push(`<div class="prepPlanRow deadline"><span class="prepPlanCheckSpacer"></span><div class="prepPlanDate">마감일<small>${esc(e.prepDeadline||e.date)}</small></div><div class="prepPlanText"><b>${esc(e.title)}</b>${e.place?`<br>${esc(e.place)}`:''}</div></div>`);
   $('#prepPlanList').innerHTML=rows.join('');
+  $('#prepPlanList').onclick=ev=>{ const b=ev.target.closest('[data-prep-plan-check]'); if(!b) return; ev.preventDefault(); ev.stopPropagation(); togglePreparationDone(e.id,b.dataset.prepPlanCheck||''); };
   openDialog($('#prepPlanDlg'));
 }
 $('#closePrepPlan').onclick=()=>closeDialog($('#prepPlanDlg'));
@@ -2103,6 +2123,7 @@ function bindItems(){
       const sub=e.target.closest('[data-action="subtask"]');
       if(sub){ e.stopPropagation(); toggleSubtask(id,occ,sub.dataset.subtaskId); return; }
       if(e.target.closest('[data-action="importance"]')){ e.stopPropagation(); toggleImportant(id); return; }
+      if(e.target.closest('[data-action="prep-toggle"]')){ e.stopPropagation(); togglePreparationDone(id,item.dataset.prepKey||''); return; }
       if(e.target.closest('[data-action="toggle"]')){ e.stopPropagation(); if($('#dayListDlg')?.open) closeDialog($('#dayListDlg')); toggleDone(id,occ); return; }
       if(e.target.closest('[data-action="checklist-toggle"]')){
         e.stopPropagation();
@@ -2120,7 +2141,7 @@ function bindItems(){
     };
     if(item.draggable){
       item.ondragstart=e=>{
-        const payload={type:'event',id:item.dataset.eid,occurrence:item.dataset.occurrence,day:item.dataset.renderDate||'',calId:item.dataset.calId||'',lane:item.dataset.lane||''};
+        const payload={type:'event',id:item.dataset.eid,occurrence:item.dataset.occurrence,day:item.dataset.renderDate||'',calId:item.dataset.calId||'',lane:item.dataset.lane||'',prepKey:item.dataset.prepKey||'',prepSourceDate:item.dataset.prepSourceDate||'',prepType:item.dataset.prepType||'',prepRuleId:item.dataset.prepRuleId||''};
         activeDrag=payload;
         item.classList.add('dragging');
         document.body.classList.add('calendarEventDragging');
@@ -2130,6 +2151,7 @@ function bindItems(){
       };
       item.ondragover=e=>{
         const payload=activeDrag||readDragPayload(e.dataTransfer);
+        if(payload?.prepKey) return;
         const sameDay=payload?.type==='event' && payload.day && payload.day===item.dataset.renderDate;
         const srcEvent=payload?.id?state.events.find(x=>x.id===payload.id):null;
         const targetEvent=state.events.find(x=>x.id===item.dataset.eid);
@@ -2143,6 +2165,7 @@ function bindItems(){
       item.ondragleave=()=>item.classList.remove('orderDropBefore','orderDropAfter');
       item.ondrop=e=>{
         const payload=activeDrag||readDragPayload(e.dataTransfer);
+        if(payload?.prepKey) return;
         const sameDay=payload?.type==='event' && payload.day && payload.day===item.dataset.renderDate;
         const srcEvent=payload?.id?state.events.find(x=>x.id===payload.id):null;
         const targetEvent=state.events.find(x=>x.id===item.dataset.eid);
@@ -2189,6 +2212,7 @@ function bindItems(){
       }
       if(payload.type==='event' && payload.id){
         const dropDay=x.dataset.dropdate;
+        if(payload.prepKey){ movePreparationEntry(payload.id,payload.prepKey,dropDay,payload.prepSourceDate||'',payload.prepType||'',payload.prepRuleId||''); return; }
         // 같은 날짜의 빈 공간/카드 아래쪽에 놓으면 해당 구역의 맨 아래로 보낸다.
         // 카드 자체에 놓은 경우에는 위의 item.ondrop이 먼저 처리한다.
         if(payload.day && payload.day===dropDay){
@@ -2304,6 +2328,32 @@ function moveRecurringWholeSeries(e,newDate,occ){
   }
 }
 function finishRepeatMove(){ pendingRepeatMove=null; closeDialog($('#repeatMoveDlg')); save(); }
+function togglePreparationDone(id,key){
+  const e=state.events.find(x=>x.id===id && x.prepEnabled); if(!e || !key) return;
+  e.prepDone=(e.prepDone&&typeof e.prepDone==='object')?e.prepDone:{};
+  if(e.prepDone[key]) delete e.prepDone[key]; else e.prepDone[key]=true;
+  save();
+  if($('#prepPlanDlg')?.open && activePrepPlanId===id) openPreparationPlan(id);
+}
+function movePreparationEntry(id,key,newDate,sourceDate='',type='',ruleId=''){
+  const e=state.events.find(x=>x.id===id && x.prepEnabled); if(!e || !key || !newDate) return;
+  const current=preparationEntries(e).find(x=>x.key===key);
+  if(current?.date===newDate) return;
+  if(e.prepDeadline && newDate>e.prepDeadline){ alert('준비일정은 마감일 이후로 옮길 수 없습니다.'); return; }
+  const entryType=type||current?.type||'';
+  const rid=ruleId||current?.ruleId||'';
+  if(entryType==='date' && rid){
+    const task=(e.prepTasks||[]).find(x=>String(x.id)===String(rid));
+    if(task){ task.date=newDate; }
+    if(e.prepMoves) delete e.prepMoves[key];
+  }else{
+    const original=sourceDate||current?.sourceDate||'';
+    e.prepMoves=(e.prepMoves&&typeof e.prepMoves==='object')?e.prepMoves:{};
+    if(original && newDate===original) delete e.prepMoves[key]; else e.prepMoves[key]=newDate;
+  }
+  save();
+}
+
 function moveEventToDate(id,newDate,occurrence='',sourceDay=''){
   const e=state.events.find(x=>x.id===id); if(!e) return;
   if(sourceDay && sourceDay===newDate) return;
@@ -3216,7 +3266,7 @@ $('#eventForm').onsubmit=e=>{
     start:$('#allDay').checked?'':$('#start').value, end:$('#allDay').checked?'':$('#end').value,
     hours:$('#kind').value==='payment'?0:(timedHoursFromForm()??getDurationInputs()), noDuration:$('#kind').value==='payment'?true:($('#noDuration').checked && timedHoursFromForm()===null), kind:$('#kind').value, place:$('#place').value.trim(),
     paymentAmount:$('#kind').value==='payment'?Math.max(0,Number($('#paymentAmount').value)||0):0, paymentMethod:$('#kind').value==='payment'?$('#paymentMethod').value.trim():'',
-    prepEnabled, prepDeadline:prepEnabled?$('#prepDeadline').value:'', prepMode:prepEnabled&&$('#prepMode').value==='custom'?'custom':'auto', prepDays:prepEnabled?Math.max(1,Number($('#prepDays').value)||1):5, prepWeekdaysOnly:prepEnabled&&!!$('#prepWeekdaysOnly').checked, prepIncludeDeadline:prepEnabled&&!!$('#prepIncludeDeadline').checked, prepDailyNotes:prepEnabled&&$('#prepMode').value!=='custom'?Object.fromEntries(prepFormDates().map(d=>[d,String(prepDraftNotes[d]||'').trim()]).filter(([,v])=>v)):{}, prepTasks:prepEnabled&&$('#prepMode').value==='custom'?prepDraftTasks.map(x=>({...x})):[],
+    prepEnabled, prepDeadline:prepEnabled?$('#prepDeadline').value:'', prepMode:prepEnabled&&$('#prepMode').value==='custom'?'custom':'auto', prepDays:prepEnabled?Math.max(1,Number($('#prepDays').value)||1):5, prepWeekdaysOnly:prepEnabled&&!!$('#prepWeekdaysOnly').checked, prepIncludeDeadline:prepEnabled&&!!$('#prepIncludeDeadline').checked, prepDailyNotes:prepEnabled&&$('#prepMode').value!=='custom'?Object.fromEntries(prepFormDates().map(d=>[d,String(prepDraftNotes[d]||'').trim()]).filter(([,v])=>v)):{}, prepTasks:prepEnabled&&$('#prepMode').value==='custom'?prepDraftTasks.map(x=>({...x})):[], prepDone:prepEnabled?{...(old?.prepDone||{})}:{}, prepMoves:prepEnabled?{...(old?.prepMoves||{})}:{},
     availabilityBlock:!['payment','anniversary'].includes($('#kind').value) && !!$('#availabilityBlock').checked,
     availabilityTargetCalId:(!['payment','anniversary'].includes($('#kind').value) && $('#availabilityBlock').checked)?($('#availabilityTarget').value||defaultAvailabilityTargetForSelectedCalendar()):'',
     repeat, repeatRule:repeat==='none'?null:getRepeatRule(), memo:$('#memo').value,
@@ -3678,7 +3728,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'1.88',
+    appVersion:'1.89',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
