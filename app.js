@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.84',
+  version: '1.86',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -81,7 +81,7 @@ const defaultState = () => ({
   purchases: [],
   diary: {},
   actualWork: {},
-  settings: { hiddenCalendars: [], fixedPanelsCollapsed: { recurring:false, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','dday','diary'], sidebarSectionsCollapsed:{}, laneHeights:{}, laneCollapsed:{}, laneLabelWidth:30, mobileSectionsCollapsed:{}, dayLaneHeights:{}, workloadRange:'week', weekViewMode:'detailed' }
+  settings: { hiddenCalendars: [], fixedPanelsCollapsed: { recurring:false, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','dday','diary'], sidebarSectionsCollapsed:{}, laneHeights:{}, laneCollapsed:{}, laneLabelWidth:30, mobileSectionsCollapsed:{}, dayLaneHeights:{}, workloadRange:'week', weekViewMode:'detailed', selectedDdayId:'' }
 });
 
 let state = defaultState();
@@ -346,7 +346,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.84',
+    version: '1.86',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -362,6 +362,12 @@ function normalizeState(raw){
       repeatRule:e.repeatRule||null,
       paymentAmount:Math.max(0,Number(e.paymentAmount)||0),
       paymentMethod:typeof e.paymentMethod==='string'?e.paymentMethod:'',
+      prepEnabled:!!e.prepEnabled,
+      prepDeadline:typeof e.prepDeadline==='string'&&e.prepDeadline?e.prepDeadline:(e.date||''),
+      prepDays:Math.max(1,Number(e.prepDays)||5),
+      prepWeekdaysOnly:!!e.prepWeekdaysOnly,
+      prepIncludeDeadline:!!e.prepIncludeDeadline,
+      prepDailyNotes:(e.prepDailyNotes&&typeof e.prepDailyNotes==='object')?Object.fromEntries(Object.entries(e.prepDailyNotes).map(([k,v])=>[String(k),String(v??'')])):{},
       excludedDates:Array.isArray(e.excludedDates)?e.excludedDates.map(String):[],
       done:!!e.done,
       doneDates:Array.isArray(e.doneDates)?e.doneDates:[],
@@ -409,7 +415,8 @@ function normalizeState(raw){
       laneCollapsed: (s.settings?.laneCollapsed && typeof s.settings.laneCollapsed==='object') ? {...s.settings.laneCollapsed} : {},
       laneLabelWidth: Math.max(22,Math.min(120,Number(s.settings?.laneLabelWidth)||30)),
       workloadRange: ['week','month','year'].includes(s.settings?.workloadRange) ? s.settings.workloadRange : 'week',
-      weekViewMode: s.settings?.weekViewMode==='compact' ? 'compact' : 'detailed'
+      weekViewMode: s.settings?.weekViewMode==='compact' ? 'compact' : 'detailed',
+      selectedDdayId: typeof s.settings?.selectedDdayId==='string' ? s.settings.selectedDdayId : ''
     }
   };
 }
@@ -824,15 +831,58 @@ function generateOccurrenceStarts(e, rangeStart, rangeEnd){
   return out;
 }
 
+
+function preparationDatesFromValues(deadline,days,weekdaysOnly=false,includeDeadline=false){
+  if(!deadline) return [];
+  const count=Math.max(1,Math.min(365,Number(days)||1));
+  let d=parse(deadline);
+  if(!includeDeadline) d=add(d,-1);
+  const out=[];
+  let guard=0;
+  while(out.length<count && guard++<800){
+    const dow=d.getDay();
+    if(!weekdaysOnly || (dow!==0 && dow!==6)) out.push(ds(d));
+    d=add(d,-1);
+  }
+  return out.reverse();
+}
+function preparationDates(e){
+  if(!e?.prepEnabled || !e.prepDeadline) return [];
+  if((e.repeat||'none')!=='none') return [];
+  return preparationDatesFromValues(e.prepDeadline,e.prepDays,e.prepWeekdaysOnly,e.prepIncludeDeadline);
+}
+function preparationDateLabel(date){
+  if(!date) return '';
+  const d=parse(date);
+  return `${d.getMonth()+1}/${d.getDate()} ${weekdayName(d.getDay())}`;
+}
+function preparationSummary(e){
+  const dates=preparationDates(e);
+  if(!dates.length) return '';
+  const first=dates[0], last=dates[dates.length-1];
+  const range=first===last?first:`${first} ~ ${last}`;
+  return `준비 ${range} · ${dates.length}일${e.prepWeekdaysOnly?'(평일만)':''} · 마감 ${e.prepDeadline}`;
+}
+function preparationNoteForDate(e,date){
+  return String(e?.prepDailyNotes?.[date]||'').trim();
+}
+function preparationVirtualEvent(e,date){
+  return {...e,_prepDay:true,_prepDate:date,_renderDate:date,_occurrenceStart:e.date,_occurrenceEnd:e.date,_prepNote:preparationNoteForDate(e,date)};
+}
+
 function buildOccurrenceMap(rangeStart, rangeEnd, options={}){
   const map={};
   for(let d=parse(rangeStart), end=parse(rangeEnd); d<=end; d=add(d,1)) map[ds(d)]=[];
   const hidden = new Set(state.settings.hiddenCalendars||[]);
   const includeHidden=!!options.includeHidden;
+  const includePreparations=options.includePreparations!==false;
   const calendarIds=options.calendarIds instanceof Set ? options.calendarIds : null;
   for(const e of state.events){
     if(calendarIds && !calendarIds.has(e.calId)) continue;
     if(!includeHidden && isCalendarHidden(e.calId)) continue;
+    if(includePreparations) for(const prepDate of preparationDates(e)){
+      if(prepDate>=rangeStart && prepDate<=rangeEnd && map[prepDate]) map[prepDate].push(preparationVirtualEvent(e,prepDate));
+    }
     const span=Math.max(0,diffDays(e.date,e.endDate||e.date));
     const starts=generateOccurrenceStarts(e, ds(add(parse(rangeStart),-span)), rangeEnd);
     for(const start of starts){
@@ -859,6 +909,7 @@ function buildOccurrenceMap(rangeStart, rangeEnd, options={}){
         if(arh&&brh&&ar!==br) return ar-br;
         if(arh!==brh) return arh?-1:1;
       }
+      if(!!a._prepDay!==!!b._prepDay) return a._prepDay?-1:1;
       const calOrder=cal(a.calId).order-cal(b.calId).order;
       if(calOrder) return calOrder;
       return ((a.allDay===b.allDay)?0:(a.allDay?-1:1)) || (a.start||'').localeCompare(b.start||'') || a.title.localeCompare(b.title,'ko');
@@ -984,37 +1035,42 @@ function checklistHtml(e,compact=false){
   }).join('')}</div>`;
 }
 function eventItemHtml(e, compact=false){
-  const c=cal(e.calId), done=isDone(e), checkable=e.kind!=='anniversary';
+  const c=cal(e.calId), prepDay=!!e._prepDay, deadlineItem=!!e.prepEnabled && !prepDay && (e._renderDate||e.date)===(e.prepDeadline||e.date);
+  const done=prepDay?false:isDone(e), checkable=e.kind!=='anniversary' && !prepDay;
   const recurring=(e.repeat||'none')!=='none';
   const payment=e.kind==='payment';
-  const checklist=checklistItems(e), checklistState=checklistProgress(e);
-  const durationPrefix=(!payment && !e.noDuration && duration(e)>0)?`(${fmtH(duration(e))}) `:'';
-  const timePrefix=(!e.allDay && e.start)?`${e.start}${e.end?`–${e.end}`:''} `:'';
-  const inLabel=carryoverInLabel(e), outRecord=carryoverOutRecord(e);
+  const checklist=prepDay?[]:checklistItems(e), checklistState=prepDay?{done:0,total:0}:checklistProgress(e);
+  const durationPrefix=(!prepDay && !payment && !e.noDuration && duration(e)>0)?`(${fmtH(duration(e))}) `:'';
+  const timePrefix=(!prepDay && !e.allDay && e.start)?`${e.start}${e.end?`–${e.end}`:''} `:'';
+  const inLabel=prepDay?'':carryoverInLabel(e), outRecord=prepDay?null:carryoverOutRecord(e);
   const renderDate=e._renderDate||e._occurrenceStart||e.date;
-  const drag='true';
+  const drag=prepDay?'false':'true';
+  const prepNote=prepDay?String(e._prepNote||'').trim():'';
+  const shownTitle=prepDay?`준비 · ${prepNote||e.title}`:(deadlineItem?`마감 · ${e.title}`:e.title);
   const detail=[];
-  if(!e.allDay && e.start) detail.push(e.start + (e.end?`–${e.end}`:''));
-  if(payment){
+  if(prepDay){ detail.push(preparationSummary(e)); if(prepNote) detail.push(prepNote); }
+  else if(!e.allDay && e.start) detail.push(e.start + (e.end?`–${e.end}`:''));
+  if(!prepDay && payment){
     if(Number(e.paymentAmount)>0) detail.push(`₩${Number(e.paymentAmount).toLocaleString('ko-KR')}`);
     if(e.paymentMethod) detail.push(e.paymentMethod);
-  }else if(e.noDuration) detail.push('소요시간 미체크');
-  else if(duration(e)) detail.push(fmtH(duration(e)));
-  if(e.place) detail.push(e.place);
-  if(recurring) detail.push(repeatRuleLabel(e));
-  if(checklist.length) detail.push(`체크리스트 ${checklistState.done}/${checklistState.total}`);
+  }else if(!prepDay && e.noDuration) detail.push('소요시간 미체크');
+  else if(!prepDay && duration(e)) detail.push(fmtH(duration(e)));
+  if(!prepDay && e.place) detail.push(e.place);
+  if(!prepDay && recurring) detail.push(repeatRuleLabel(e));
+  if(!prepDay && checklist.length) detail.push(`체크리스트 ${checklistState.done}/${checklistState.total}`);
   if(inLabel) detail.push(inLabel);
   if(outRecord) detail.push(`${outRecord.toDate}로 이월`);
-  const tooltip=[e.title,...detail].filter(Boolean).join(' · ');
-  const dragHandle=`<span class="dragHandle" title="드래그: 같은 날짜에서는 순서 변경 · 다른 날짜에서는 이동" aria-hidden="true">⋮⋮</span>`;
+  if(deadlineItem) detail.unshift(preparationSummary(e));
+  const tooltip=[shownTitle,...detail].filter(Boolean).join(' · ');
+  const dragHandle=prepDay?'':`<span class="dragHandle" title="드래그: 같은 날짜에서는 순서 변경 · 다른 날짜에서는 이동" aria-hidden="true">⋮⋮</span>`;
   const mainCheck='';
-  const checklistKey=checklistExpandKey(e), expanded=expandedChecklistKeys.has(checklistKey);
+  const checklistKey=checklistExpandKey(e), expanded=!prepDay&&expandedChecklistKeys.has(checklistKey);
   const checklistButton=checklist.length?`<button type="button" class="checklistToggle ${expanded?'on':''}" data-action="checklist-toggle" title="세부 체크리스트 ${checklistState.done}/${checklistState.total}">☷ ${checklistState.done}/${checklistState.total}</button>`:'';
-  const repeatBadge=recurring?`<span class="repeatMark" title="${esc(repeatRuleLabel(e))}">↻</span>`:'';
+  const repeatBadge=!prepDay&&recurring?`<span class="repeatMark" title="${esc(repeatRuleLabel(e))}">↻</span>`:'';
   const carryBadge=inLabel?`<span class="carryBadge carryIn" title="${esc(inLabel)}">↪</span>`:'';
-  const amountInline=payment&&Number(e.paymentAmount)>0?`<span class="inlineMeta">₩${Number(e.paymentAmount).toLocaleString('ko-KR')}</span>`:'';
-  return `<div class="item ${done?'done':''} kind-${esc(e.kind||'event')} ${recurring?'recurringItem':''} ${payment?'paymentItem':''} ${e.fixedId?'manualPlacedItem':''} ${e.flexibleId?'flexiblePlacedItem':''} ${inLabel?'carriedIn':''} ${outRecord?'carriedOut':''}" draggable="${drag}" data-eid="${esc(e.id)}" data-occurrence="${esc(e._occurrenceStart||e.date)}" data-render-date="${esc(renderDate)}" data-cal-id="${esc(e.calId)}" data-lane="${payment?'payment':'work'}" style="--item-color:${esc(c.color)};border-left-color:${esc(c.color)}">
-    <div class="itemRow">${dragHandle}${e.important?`<button type="button" class="importanceBtn on" data-action="importance" aria-label="중요 표시 해제" title="중요 표시 해제">★</button>`:''}${mainCheck}<div class="itemTitle" title="${esc(tooltip)}">${timePrefix}<span class="durationPrefix">${esc(durationPrefix)}</span>${payment?'₩ ':(!checkable?kindPrefix(e):'')}${esc(e.title)}</div>${amountInline}${repeatBadge}${carryBadge}${checklistButton}</div>
+  const amountInline=!prepDay&&payment&&Number(e.paymentAmount)>0?`<span class="inlineMeta">₩${Number(e.paymentAmount).toLocaleString('ko-KR')}</span>`:'';
+  return `<div class="item ${done?'done':''} kind-${esc(e.kind||'event')} ${recurring&&!prepDay?'recurringItem':''} ${payment&&!prepDay?'paymentItem':''} ${e.fixedId?'manualPlacedItem':''} ${e.flexibleId?'flexiblePlacedItem':''} ${inLabel?'carriedIn':''} ${outRecord?'carriedOut':''} ${prepDay?'prepDayItem':''} ${deadlineItem?'prepDeadlineItem':''}" draggable="${drag}" data-eid="${esc(e.id)}" data-occurrence="${esc(e._occurrenceStart||e.date)}" data-render-date="${esc(renderDate)}" data-cal-id="${esc(e.calId)}" data-lane="${payment?'payment':'work'}" data-prep-day="${prepDay?'1':''}" data-prep-event="${e.prepEnabled?'1':''}" style="--item-color:${esc(c.color)};border-left-color:${esc(c.color)}">
+    <div class="itemRow">${dragHandle}${!prepDay&&e.important?`<button type="button" class="importanceBtn on" data-action="importance" aria-label="중요 표시 해제" title="중요 표시 해제">★</button>`:''}${mainCheck}<div class="itemTitle" title="${esc(tooltip)}">${timePrefix}<span class="durationPrefix">${esc(durationPrefix)}</span>${!prepDay&&payment?'₩ ':(!checkable&&!prepDay?kindPrefix(e):'')}${esc(shownTitle)}</div>${amountInline}${repeatBadge}${carryBadge}${checklistButton}</div>
     ${expanded?checklistHtml(e,false):''}
   </div>`;
 }
@@ -1068,8 +1124,8 @@ function groupHtml(date, es){
   const commonTopHtml=commonTopLaneHtml(es,false,true);
   const quickHtml=quickLaneHtml(es,false,true);
   const paymentHtml=paymentLaneHtml(es,false,true);
-  const appointmentEvents=(es||[]).filter(e=>e.kind==='appointment');
-  const quickEvents=(es||[]).filter(e=>e.kind==='todo');
+  const appointmentEvents=(es||[]).filter(e=>e.kind==='appointment'&&!e._prepDay);
+  const quickEvents=(es||[]).filter(e=>e.kind==='todo'&&!e._prepDay);
   const workEvents=(es||[]).filter(e=>e.kind!=='payment' && e.kind!=='appointment' && e.kind!=='anniversary' && e.kind!=='todo');
   let html='';
   const visible=visibleCals(), visibleIds=new Set(visible.map(c=>c.id));
@@ -1080,7 +1136,7 @@ function groupHtml(date, es){
     const memberIds=new Set(members.map(c=>c.id));
     const groupEvents=workEvents.filter(e=>memberIds.has(e.calId));
     if(!groupEvents.length) continue;
-    const rootSum=groupEvents.reduce((sum,e)=>sum+workloadDuration(e),0);
+    const rootSum=groupEvents.filter(e=>!e._prepDay).reduce((sum,e)=>sum+workloadDuration(e),0);
     total+=rootSum;
     const rootCapInfo=capacityForDate(root,date);
     if(rootCapInfo.blocked) blockedRootCount++;
@@ -1489,12 +1545,12 @@ function setActualWorkValue(date,rootId,value){
 function workloadRootMembers(root){ return [root,...descendants(root.id)]; }
 function plannedHoursForRootDate(root,date,map){
   const ids=new Set(workloadRootMembers(root).map(c=>c.id));
-  return (map[date]||[]).filter(e=>ids.has(e.calId)&&!['payment','anniversary'].includes(e.kind)).reduce((a,e)=>a+workloadDuration(e),0);
+  return (map[date]||[]).filter(e=>ids.has(e.calId)&&!e._prepDay&&!['payment','anniversary'].includes(e.kind)).reduce((a,e)=>a+workloadDuration(e),0);
 }
 function workloadChildBreakdown(root,date,map){
   const out=[];
   for(const c of workloadRootMembers(root)){
-    const sum=(map[date]||[]).filter(e=>e.calId===c.id&&!['payment','anniversary'].includes(e.kind)).reduce((a,e)=>a+workloadDuration(e),0);
+    const sum=(map[date]||[]).filter(e=>e.calId===c.id&&!e._prepDay&&!['payment','anniversary'].includes(e.kind)).reduce((a,e)=>a+workloadDuration(e),0);
     if(sum>0) out.push({c,sum});
   }
   return out;
@@ -1529,7 +1585,7 @@ function diffHoursHtml(diff){
 function renderLoad(){
   const mode=['week','month','year'].includes(state.settings?.workloadRange)?state.settings.workloadRange:'week';
   const {start,end}=workloadPeriodBounds(mode), startS=ds(start), endS=ds(end);
-  const map=buildOccurrenceMap(startS,endS);
+  const map=buildOccurrenceMap(startS,endS,{includePreparations:false});
   const roots=topLevelCals();
   const periodLabel=workloadPeriodLabel(mode,start,end);
   const modeButtons=`<div class="workloadTabs"><button type="button" data-workload-range="week" class="${mode==='week'?'on':''}">주</button><button type="button" data-workload-range="month" class="${mode==='month'?'on':''}">월</button><button type="button" data-workload-range="year" class="${mode==='year'?'on':''}">연</button></div>`;
@@ -1582,8 +1638,30 @@ function nextOccurrenceFor(e, from=ds(new Date()), horizonDays=740){
   const starts=generateOccurrenceStarts(e,from,ends).filter(d=>ds(d)>=from);
   return starts.length?ds(starts[0]):null;
 }
+function selectedDdayInfo(){
+  const id=String(state.settings?.selectedDdayId||'');
+  if(!id) return null;
+  const e=state.events.find(x=>x.id===id && x.kind==='anniversary');
+  if(!e) return null;
+  const today=ds(new Date());
+  const target=(e.repeat||'none')==='none' ? e.date : nextOccurrenceFor(e,today,740);
+  return target ? {e,target} : null;
+}
+function selectedDdayOffset(date){
+  const info=selectedDdayInfo();
+  if(!info || !date) return '';
+  const diff=diffDays(date,info.target);
+  return diff===0?'D-Day':diff>0?`D-${diff}`:`D+${Math.abs(diff)}`;
+}
+function selectedDdayMarkerHtml(date, extraClass=''){
+  const info=selectedDdayInfo();
+  if(!info) return '';
+  const label=selectedDdayOffset(date);
+  return `<span class="selectedDdayMarker ${esc(extraClass)}" title="${esc(info.e.title)} · ${esc(info.target)} 기준">${esc(label)}</span>`;
+}
 function renderDdays(){
   const today=ds(new Date());
+  const selectedId=String(state.settings?.selectedDdayId||'');
   const rows=state.events.filter(e=>e.kind==='anniversary').map(e=>{
     let target;
     if((e.repeat||'none')==='none') target=e.date;
@@ -1591,8 +1669,21 @@ function renderDdays(){
     if(!target) return null;
     return {e,target,diff:diffDays(today,target)};
   }).filter(Boolean).sort((a,b)=>Math.abs(a.diff)-Math.abs(b.diff)).slice(0,8);
-  $('#ddayList').innerHTML=rows.map(({e,target,diff})=>`<div class="ddayRow" data-eid="${esc(e.id)}"><div>${esc(e.title)}<small>${target}</small></div><b>${diff===0?'D-Day':diff>0?`D-${diff}`:`D+${Math.abs(diff)}`}</b></div>`).join('')||'<div class="empty">등록된 기념일이 없습니다.</div>';
-  $$('.ddayRow').forEach(x=>x.onclick=()=>openEvent(null,x.dataset.eid));
+  $('#ddayList').innerHTML=rows.map(({e,target,diff})=>{
+    const selected=e.id===selectedId;
+    const ddayText=diff===0?'D-Day':diff>0?`D-${diff}`:`D+${Math.abs(diff)}`;
+    return `<div class="ddayRow ${selected?'selectedDday':''}" data-eid="${esc(e.id)}" role="button" tabindex="0" title="클릭: 달력 D-Day 기준 ${selected?'해제':'선택'}"><div class="ddayInfo">${esc(e.title)}<small>${target}</small>${selected?'<em class="ddaySelectedTag">기준</em>':''}</div><div class="ddayActions"><b>${ddayText}</b><button type="button" class="ddayEditBtn" data-dday-edit="${esc(e.id)}" title="D-Day 수정" aria-label="D-Day 수정">✎</button></div></div>`;
+  }).join('')||'<div class="empty">등록된 기념일이 없습니다.</div>';
+  $$('.ddayRow').forEach(x=>{
+    const toggle=()=>{
+      const id=x.dataset.eid||'';
+      state.settings.selectedDdayId=state.settings.selectedDdayId===id?'':id;
+      save();
+    };
+    x.onclick=e=>{ if(e.target.closest('.ddayEditBtn')) return; toggle(); };
+    x.onkeydown=e=>{ if((e.key==='Enter'||e.key===' ') && !e.target.closest('.ddayEditBtn')){ e.preventDefault(); toggle(); } };
+  });
+  $$('.ddayEditBtn').forEach(btn=>btn.onclick=e=>{ e.preventDefault(); e.stopPropagation(); openEvent(null,btn.dataset.ddayEdit); });
 }
 
 function diaryEntries(){
@@ -1732,7 +1823,7 @@ function reorderDropBefore(payload,targetItem){
   }
 
   // DOM 판정이 불가능한 경우에만 데이터 순서로 보정한다.
-  const map=buildOccurrenceMap(day,day,{calendarIds:focusedCalendarIds()});
+  const map=buildOccurrenceMap(day,day,{calendarIds:focusedCalendarIds(),includePreparations:false});
   const list=[]; const seen=new Set();
   for(const e of (map[day]||[])){
     if(eventOrderGroupKey(e)!==sourceGroup) continue;
@@ -1752,7 +1843,7 @@ function buildReorderContext(payload,targetItem,before=true){
   if(!src||!target||src.id===target.id&&String(payload.occurrence||'')===String(targetItem.dataset.occurrence||'')) return null;
   const sourceGroup=eventOrderGroupKey(src), targetGroup=eventOrderGroupKey(target);
   if(!sourceGroup || sourceGroup!==targetGroup) return null;
-  const map=buildOccurrenceMap(day,day,{calendarIds:focusedCalendarIds()});
+  const map=buildOccurrenceMap(day,day,{calendarIds:focusedCalendarIds(),includePreparations:false});
   const list=[]; const seen=new Set();
   for(const e of (map[day]||[])){
     if(eventOrderGroupKey(e)!==sourceGroup) continue;
@@ -1773,7 +1864,7 @@ function buildReorderToEndContext(payload,day){
   if(!payload?.id || !day || payload.day!==day) return null;
   const src=state.events.find(x=>x.id===payload.id); if(!src) return null;
   const sourceGroup=eventOrderGroupKey(src); if(!sourceGroup) return null;
-  const map=buildOccurrenceMap(day,day,{calendarIds:focusedCalendarIds()});
+  const map=buildOccurrenceMap(day,day,{calendarIds:focusedCalendarIds(),includePreparations:false});
   const list=[]; const seen=new Set();
   for(const e of (map[day]||[])){
     if(eventOrderGroupKey(e)!==sourceGroup) continue;
@@ -1821,6 +1912,28 @@ $('#cancelRepeatOrder').onclick=()=>{ pendingRepeatOrder=null; closeDialog($('#r
 
 
 let eventPopoverState={id:'',occ:''};
+
+let activePrepPlanId='';
+function openPreparationPlan(id){
+  const e=state.events.find(x=>x.id===id && x.prepEnabled); if(!e) return;
+  activePrepPlanId=id;
+  const dates=preparationDates(e);
+  $('#prepPlanTitle').textContent=e.title;
+  $('#prepPlanSummary').textContent=preparationSummary(e);
+  const memo=$('#prepPlanGeneralMemo');
+  if(e.memo?.trim()){ memo.textContent=e.memo.trim(); memo.classList.remove('hidden'); } else { memo.textContent=''; memo.classList.add('hidden'); }
+  const rows=dates.map(date=>{
+    const note=preparationNoteForDate(e,date);
+    return `<div class="prepPlanRow"><div class="prepPlanDate">${esc(preparationDateLabel(date))}<small>${esc(date)}</small></div><div class="prepPlanText ${note?'':'muted'}">${esc(note||'계획 미입력')}</div></div>`;
+  });
+  rows.push(`<div class="prepPlanRow deadline"><div class="prepPlanDate">마감일<small>${esc(e.prepDeadline||e.date)}</small></div><div class="prepPlanText"><b>${esc(e.title)}</b>${e.place?`<br>${esc(e.place)}`:''}</div></div>`);
+  $('#prepPlanList').innerHTML=rows.join('');
+  openDialog($('#prepPlanDlg'));
+}
+$('#closePrepPlan').onclick=()=>closeDialog($('#prepPlanDlg'));
+$('#closePrepPlanBottom').onclick=()=>closeDialog($('#prepPlanDlg'));
+$('#editPrepPlan').onclick=()=>{ const id=activePrepPlanId; closeDialog($('#prepPlanDlg')); if(id) openEvent(null,id); };
+
 function closeEventPopover(){
   const p=$('#eventPopover'); if(p) p.classList.add('hidden');
   eventPopoverState={id:'',occ:''};
@@ -1856,6 +1969,7 @@ function openEventPopover(anchor,id,occ){
   meta.push(calendarPath(base.calId));
   if((base.repeat||'none')!=='none') meta.push(repeatRuleLabel(base));
   $('#eventPopoverMeta').textContent=meta.filter(Boolean).join(' · ');
+  const planBtn=$('#eventPopoverPlan'); if(planBtn) planBtn.classList.toggle('hidden',!base.prepEnabled);
   const doneWrap=$('#eventPopoverDoneWrap'), done=$('#eventPopoverDone'), doneText=$('#eventPopoverDoneText');
   const canComplete=base.kind!=='anniversary';
   doneWrap.classList.toggle('hidden',!canComplete);
@@ -1867,6 +1981,7 @@ $('#eventPopoverEdit').onclick=()=>{
   const {id,occ}=eventPopoverState; if(!id) return;
   closeEventPopover(); openEvent(occ,id);
 };
+$('#eventPopoverPlan').onclick=()=>{ const {id}=eventPopoverState; if(!id) return; closeEventPopover(); openPreparationPlan(id); };
 $('#eventPopoverDone').onchange=()=>{
   const {id,occ}=eventPopoverState; if(!id) return;
   const ev=state.events.find(x=>x.id===id); if(!ev || ev.kind==='anniversary') return;
@@ -1951,6 +2066,8 @@ function bindItems(){
       }
       e.stopPropagation();
       if($('#dayListDlg')?.open) closeDialog($('#dayListDlg'));
+      const baseEvent=state.events.find(x=>x.id===id);
+      if(baseEvent?.prepEnabled){ openPreparationPlan(id); return; }
       openEventPopover(item,id,occ);
     };
     if(item.draggable){
@@ -2240,7 +2357,7 @@ function laneOrderedItemsHtml(events,rootId){
 function rootLaneCellHtml(date,root,es,visibleIds){
   const members=laneCalendarMembers(root,visibleIds), memberIds=new Set(members.map(c=>c.id));
   const normal=(es||[]).filter(e=>memberIds.has(e.calId) && !['anniversary','appointment','todo','payment'].includes(e.kind));
-  const allForLoad=(es||[]).filter(e=>memberIds.has(e.calId) && !['anniversary','payment'].includes(e.kind));
+  const allForLoad=(es||[]).filter(e=>memberIds.has(e.calId) && !e._prepDay && !['anniversary','payment'].includes(e.kind));
   const sum=allForLoad.reduce((a,e)=>a+workloadDuration(e),0), cap=capacityForDate(root,date);
   let body='';
   body=laneOrderedItemsHtml(normal,root.id);
@@ -2254,7 +2371,7 @@ function daySummaryHtml(date,es){
   for(const root of topLevelCals()){
     const members=laneCalendarMembers(root,visibleIds); if(!members.length) continue;
     const ids=new Set(members.map(c=>c.id));
-    total+=(es||[]).filter(e=>ids.has(e.calId)&&!['anniversary','payment'].includes(e.kind)).reduce((a,e)=>a+workloadDuration(e),0);
+    total+=(es||[]).filter(e=>ids.has(e.calId)&&!e._prepDay&&!['anniversary','payment'].includes(e.kind)).reduce((a,e)=>a+workloadDuration(e),0);
     const ci=capacityForDate(root,date); if(ci.blocked) blocked++; if(ci.unknown) unknown=true; else totalCap+=Number(ci.hours)||0;
   }
   const txt=unknown?`총 ${fmtH(total)} · 일부 미정`:(totalCap?`총 ${fmtH(total)} / ${fmtH(totalCap)}`:`총 ${fmtH(total)}`);
@@ -2288,7 +2405,7 @@ function scheduleLaneHtml(key,title,days,map,cellBuilder,{type='calendar',color=
 function scheduleDateHeader(days){
   // 날짜 헤더 전체도 드롭 영역으로 사용합니다. 2주/3주 보기에서 다른 주로 옮길 때
   // 좁은 일정 칸을 정확히 찾지 않아도 날짜 머리글에 놓으면 해당 날짜로 이동합니다.
-  return `<div class="scheduleDateGrid"><div class="scheduleDateCorner">구역</div>${days.map(d=>{const key=ds(d),hasDiary=!!state.diary[key]?.text,h=holidayLabel(key),dow=d.getDay(),dayClass=[key===ds(new Date())?'today':'',holidayClass(key),dow===0?'sunday':'',dow===6?'saturday':''].filter(Boolean).join(' ');return `<div class="scheduleDateHead ${dayClass}" data-dropdate="${key}" data-date-drop-head="1" title="${key} · 일정을 여기에 놓아 이동"><div class="dayTopLine"><span class="weekdayLabel">${['일','월','화','수','목','금','토'][dow]}</span><span class="dateNum">${d.getDate()}</span><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}" aria-label="${hasDiary?'다이어리 작성됨':'다이어리 미작성'}">${diaryIconHtml(hasDiary)}</button></div><div class="holidayName ${h?'':'holidayEmpty'}" title="${h?esc(h):''}">${h?esc(h):'&nbsp;'}</div></div>`}).join('')}</div>`;
+  return `<div class="scheduleDateGrid"><div class="scheduleDateCorner">구역</div>${days.map(d=>{const key=ds(d),hasDiary=!!state.diary[key]?.text,h=holidayLabel(key),dow=d.getDay(),dmark=selectedDdayMarkerHtml(key),dayClass=[key===ds(new Date())?'today':'',holidayClass(key),dow===0?'sunday':'',dow===6?'saturday':'',dmark?'ddayTracked':''].filter(Boolean).join(' ');return `<div class="scheduleDateHead ${dayClass}" data-dropdate="${key}" data-date-drop-head="1" title="${key} · 일정을 여기에 놓아 이동"><div class="dayTopLine"><span class="weekdayLabel">${['일','월','화','수','목','금','토'][dow]}</span><span class="dateNum">${d.getDate()}</span><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}" aria-label="${hasDiary?'다이어리 작성됨':'다이어리 미작성'}">${diaryIconHtml(hasDiary)}</button></div><div class="holidayName ${h?'':'holidayEmpty'}" title="${h?esc(h):''}">${h?esc(h):'&nbsp;'}</div>${dmark}</div>`}).join('')}</div>`;
 }
 function scheduleWeekBoard(days,map){
   const visible=visibleCals(),visibleIds=new Set(visible.map(c=>c.id));
@@ -2372,7 +2489,7 @@ function mobileDayWorkStats(date,es){
   for(const root of topLevelCals()){
     const members=laneCalendarMembers(root,visibleIds); if(!members.length) continue;
     const ids=new Set(members.map(c=>c.id));
-    total+=(es||[]).filter(e=>ids.has(e.calId)&&!['anniversary','payment'].includes(e.kind)).reduce((a,e)=>a+workloadDuration(e),0);
+    total+=(es||[]).filter(e=>ids.has(e.calId)&&!e._prepDay&&!['anniversary','payment'].includes(e.kind)).reduce((a,e)=>a+workloadDuration(e),0);
     const ci=capacityForDate(root,date); if(ci.blocked) blocked++; if(ci.unknown) unknown=true; else totalCap+=Number(ci.hours)||0;
   }
   return {total,totalCap,unknown,blocked};
@@ -2388,9 +2505,9 @@ function mobileDayDotsHtml(es){
 }
 function mobileWeekStripHtml(days,map){
   return `<div class="mobileWeekStripWrap"><div class="mobileWeekStrip" style="--mobile-day-count:${days.length}">${days.map(d=>{
-    const key=ds(d), es=map[key]||[], st=mobileDayWorkStats(key,es), dow=d.getDay(), h=holidayLabel(key), hasDiary=!!state.diary[key]?.text;
-    const cls=[key===mobileSelectedDate?'selected':'',key===ds(new Date())?'today':'',dow===0?'sunday':'',dow===6?'saturday':'',h?'holiday':'',hasDiary?'hasDiary':''].filter(Boolean).join(' ');
-    return `<button type="button" class="mobileDayTab ${cls}" data-mobile-date="${key}" title="${esc([h,hasDiary?'다이어리 작성됨':'다이어리 미작성'].filter(Boolean).join(' · '))}"><span class="mobileDayDow">${['일','월','화','수','목','금','토'][dow]}</span><b>${d.getDate()}</b><small>${fmtH(st.total)}</small><span class="mobileDiaryState" aria-hidden="true">${diaryIconHtml(hasDiary)}</span><span class="mobileDayDots">${mobileDayDotsHtml(es)}</span></button>`;
+    const key=ds(d), es=map[key]||[], st=mobileDayWorkStats(key,es), dow=d.getDay(), h=holidayLabel(key), hasDiary=!!state.diary[key]?.text, dmark=selectedDdayMarkerHtml(key,'mobileDdayOffset');
+    const cls=[key===mobileSelectedDate?'selected':'',key===ds(new Date())?'today':'',dow===0?'sunday':'',dow===6?'saturday':'',h?'holiday':'',hasDiary?'hasDiary':'',dmark?'ddayTracked':''].filter(Boolean).join(' ');
+    return `<button type="button" class="mobileDayTab ${cls}" data-mobile-date="${key}" title="${esc([h,hasDiary?'다이어리 작성됨':'다이어리 미작성'].filter(Boolean).join(' · '))}"><span class="mobileDayDow">${['일','월','화','수','목','금','토'][dow]}</span><b>${d.getDate()}</b>${dmark}<small>${fmtH(st.total)}</small><span class="mobileDiaryState" aria-hidden="true">${diaryIconHtml(hasDiary)}</span><span class="mobileDayDots">${mobileDayDotsHtml(es)}</span></button>`;
   }).join('')}</div></div>`;
 }
 function mobileSectionHtml(key,title,color,body,meta=''){
@@ -2408,7 +2525,7 @@ function mobileCommonBodyHtml(es){
 function mobileRootSectionHtml(date,root,es,visibleIds){
   const members=laneCalendarMembers(root,visibleIds), ids=new Set(members.map(c=>c.id));
   const normal=(es||[]).filter(e=>ids.has(e.calId)&&!['anniversary','appointment','todo','payment'].includes(e.kind));
-  const allForLoad=(es||[]).filter(e=>ids.has(e.calId)&&!['anniversary','payment'].includes(e.kind));
+  const allForLoad=(es||[]).filter(e=>ids.has(e.calId)&&!e._prepDay&&!['anniversary','payment'].includes(e.kind));
   const sum=allForLoad.reduce((a,e)=>a+workloadDuration(e),0), cap=capacityForDate(root,date);
   const meta=cap.unknown?`${fmtH(sum)} / 미정`:`${fmtH(sum)} / ${fmtH(cap.hours)}${cap.blocked?' · 차단':''}`;
   const body=normal.map(e=>{
@@ -2437,7 +2554,7 @@ function renderMobileSchedule(days,map){
   for(const root of topLevelCals()) if(laneCalendarMembers(root,visibleIds).length) sections+=mobileRootSectionHtml(selected,root,es,visibleIds);
   const dow=d.getDay();
   $('#main').className='mobileScheduleView';
-  $('#main').innerHTML=`${mobileWeekStripHtml(days,map)}<div class="mobileSelectedDayHead"><div><b>${d.getMonth()+1}월 ${d.getDate()}일 ${['일','월','화','수','목','금','토'][dow]}요일</b>${h?`<small class="${holidayClass(selected)}">${esc(h)}</small>`:''}</div><span class="mobileDayTotal">${esc(dayMeta)}</span><button type="button" class="mobileDiaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${selected}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}" aria-label="${hasDiary?'다이어리 작성됨':'다이어리 미작성'}">${diaryIconHtml(hasDiary)}</button><button type="button" class="mobileAddEvent" data-mobile-add="${selected}" aria-label="일정 추가">＋</button></div><div class="mobileAgenda" data-mobile-day-detail="1">${sections}</div>`;
+  $('#main').innerHTML=`${mobileWeekStripHtml(days,map)}<div class="mobileSelectedDayHead"><div><b>${d.getMonth()+1}월 ${d.getDate()}일 ${['일','월','화','수','목','금','토'][dow]}요일</b>${h?`<small class="${holidayClass(selected)}">${esc(h)}</small>`:''}${selectedDdayMarkerHtml(selected,'mobileSelectedDday')}</div><span class="mobileDayTotal">${esc(dayMeta)}</span><button type="button" class="mobileDiaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${selected}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}" aria-label="${hasDiary?'다이어리 작성됨':'다이어리 미작성'}">${diaryIconHtml(hasDiary)}</button><button type="button" class="mobileAddEvent" data-mobile-add="${selected}" aria-label="일정 추가">＋</button></div><div class="mobileAgenda" data-mobile-day-detail="1">${sections}</div>`;
   bindItems();
   $$('.mobileDayTab').forEach(btn=>btn.onclick=()=>{ mobileSelectedDate=btn.dataset.mobileDate; render(); });
   $$('.mobileAgendaHead').forEach(btn=>btn.onclick=()=>{ const key=btn.dataset.mobileSectionToggle; state.settings.mobileSectionsCollapsed=state.settings.mobileSectionsCollapsed||{}; state.settings.mobileSectionsCollapsed[key]=!mobileSectionIsCollapsed(key); save(); });
@@ -2540,7 +2657,7 @@ function renderMultiWeek(weeks=2){
   const cells=allDays.map(d=>{
     const key=ds(d), es=map[key]||[], h=holidayLabel(key), dow=d.getDay();
     const cls=[key===today?'today':'',holidayClass(key),dow===0?'sunday':'',dow===6?'saturday':''].filter(Boolean).join(' ');
-    return `<div class="multiCompactCell ${cls}" data-dropdate="${key}" ondblclick="window.__newEvent?.('${key}')"><div class="multiCompactDate"><span>${d.getDate()}</span><b title="${h?esc(h):''}">${h?esc(h):''}</b></div>${multiWeekCellEventsHtml(key,es,weeks)}</div>`;
+    return `<div class="multiCompactCell ${cls}" data-dropdate="${key}" ondblclick="window.__newEvent?.('${key}')"><div class="multiCompactDate"><span>${d.getDate()}</span><b title="${h?esc(h):''}">${h?esc(h):''}</b></div>${selectedDdayMarkerHtml(key,'multiDdayOffset')}${multiWeekCellEventsHtml(key,es,weeks)}</div>`;
   }).join('');
   $('#main').innerHTML=heads+cells;
   bindItems();
@@ -2564,7 +2681,7 @@ function renderMonth(){
     const d=add(s,i),key=ds(d),es=map[key]||[],hasDiary=!!state.diary[key]?.text,h=holidayLabel(key),dow=d.getDay();
     const cellClass=[d.getMonth()!==m?'other':'',holidayClass(key),dow===0?'sunday':'',dow===6?'saturday':''].filter(Boolean).join(' ');
     const holidayText=h?esc(h):'&nbsp;';
-    return `<div class="cell ${cellClass}" data-dropdate="${key}" ondblclick="window.__newEvent?.('${key}')"><div class="mhead"><span>${d.getDate()}</span><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}" aria-label="${hasDiary?'다이어리 작성됨':'다이어리 미작성'}">${diaryIconHtml(hasDiary)}</button></div><div class="holidayName ${h?'':'holidayEmpty'}" title="${h?esc(h):''}">${holidayText}</div>${monthCellEventsHtml(key,es)}</div>`;
+    return `<div class="cell ${cellClass}" data-dropdate="${key}" ondblclick="window.__newEvent?.('${key}')"><div class="mhead"><span>${d.getDate()}</span><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}" aria-label="${hasDiary?'다이어리 작성됨':'다이어리 미작성'}">${diaryIconHtml(hasDiary)}</button></div><div class="holidayName ${h?'':'holidayEmpty'}" title="${h?esc(h):''}">${holidayText}</div>${selectedDdayMarkerHtml(key,'monthDdayOffset')}${monthCellEventsHtml(key,es)}</div>`;
   }).join('');
   $('#main').innerHTML=heads+cells; bindItems();
 }
@@ -2583,8 +2700,8 @@ function dayViewGroupHtml(date,es){
   const commonTopHtml=dayResizableSectionHtml('common',commonTopLaneHtml(es,false,true),{type:'common',color:'#d9b5cc'});
   const quickHtml=dayResizableSectionHtml('quick',quickLaneHtml(es,false,true),{type:'quick',color:'#cfd5dc'});
   const paymentHtml=dayResizableSectionHtml('payment',paymentLaneHtml(es,false,true),{type:'payment',color:'#e6d399'});
-  const appointmentEvents=(es||[]).filter(e=>e.kind==='appointment');
-  const quickEvents=(es||[]).filter(e=>e.kind==='todo');
+  const appointmentEvents=(es||[]).filter(e=>e.kind==='appointment'&&!e._prepDay);
+  const quickEvents=(es||[]).filter(e=>e.kind==='todo'&&!e._prepDay);
   const workEvents=(es||[]).filter(e=>e.kind!=='payment' && e.kind!=='appointment' && e.kind!=='anniversary' && e.kind!=='todo');
   let html='';
   const visible=visibleCals(), visibleIds=new Set(visible.map(c=>c.id));
@@ -2595,7 +2712,7 @@ function dayViewGroupHtml(date,es){
     const memberIds=new Set(members.map(c=>c.id));
     const groupEvents=workEvents.filter(e=>memberIds.has(e.calId));
     if(!groupEvents.length) continue;
-    const rootSum=groupEvents.reduce((sum,e)=>sum+workloadDuration(e),0);
+    const rootSum=groupEvents.filter(e=>!e._prepDay).reduce((sum,e)=>sum+workloadDuration(e),0);
     total+=rootSum;
     const rootCapInfo=capacityForDate(root,date);
     if(rootCapInfo.blocked) blockedRootCount++;
@@ -2670,7 +2787,7 @@ function bindDayViewResizers(){
 function renderDay(){
   const d=ds(cursor),map=buildOccurrenceMap(d,d,{calendarIds:focusedCalendarIds()}),hasDiary=!!state.diary[d]?.text;
   const h=holidayLabel(d); setRangeLabel(`${d}${focusSuffix()}`,`${d.slice(5).replace('-', '/')}${compactFocusSuffix()}`); $('#main').className='daySingle';
-  $('#main').innerHTML=`${h?`<div class="dayHolidayBanner">${esc(h)}</div>`:''}<div class="diaryStrip"><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${d}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}">${diaryIconHtml(hasDiary)} ${hasDiary?'다이어리 보기':'다이어리 작성'}</button></div><div class="dayResizableBoard" data-dropdate="${d}" ondblclick="window.__newEvent?.('${d}')">${dayViewGroupHtml(d,map[d]||[])}</div>`; bindItems(); bindDayViewResizers();
+  $('#main').innerHTML=`${h?`<div class="dayHolidayBanner">${esc(h)}</div>`:''}${selectedDdayMarkerHtml(d,'dayViewDdayOffset')}<div class="diaryStrip"><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${d}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}">${diaryIconHtml(hasDiary)} ${hasDiary?'다이어리 보기':'다이어리 작성'}</button></div><div class="dayResizableBoard" data-dropdate="${d}" ondblclick="window.__newEvent?.('${d}')">${dayViewGroupHtml(d,map[d]||[])}</div>`; bindItems(); bindDayViewResizers();
 }
 function renderList(){
   const start=ds(add(new Date(),-30)),end=ds(add(new Date(),365));
@@ -2764,6 +2881,7 @@ function updateKindUI(){
   $('#carryEvent').classList.toggle('paymentHidden',payment);
   updateAvailabilityBlockUI();
   updateDurationMode();
+  if($('#prepFields')) updatePrepUI();
 }
 function updateAllDayUI(){ $('#timeFields').classList.toggle('hidden',$('#allDay').checked); updateDurationMode(); }
 function updateMonthlyRepeatUI(){
@@ -2864,6 +2982,38 @@ function setRepeatRule(e){
   $('#repeatCount').value=rule.count||10;
   updateRepeatUI();
 }
+
+let prepDraftNotes={};
+function collectPrepDailyNotes(){
+  const next={...prepDraftNotes};
+  $$('#prepDailyRows [data-prep-date]').forEach(inp=>{ next[inp.dataset.prepDate]=inp.value; });
+  prepDraftNotes=next;
+  return next;
+}
+function prepFormDates(){
+  return preparationDatesFromValues($('#prepDeadline')?.value||$('#date')?.value,Number($('#prepDays')?.value)||5,!!$('#prepWeekdaysOnly')?.checked,!!$('#prepIncludeDeadline')?.checked);
+}
+function renderPrepDailyRows(){
+  const wrap=$('#prepDailyRows'), summary=$('#prepCalcSummary'); if(!wrap||!summary) return;
+  collectPrepDailyNotes();
+  const enabled=!!$('#prepEnabled')?.checked;
+  $('#prepDetails')?.classList.toggle('hidden',!enabled);
+  if(!enabled){ wrap.innerHTML=''; summary.textContent=''; return; }
+  const deadline=$('#prepDeadline').value||$('#date').value;
+  const dates=prepFormDates();
+  if(!deadline || !dates.length){ summary.textContent='기한 날짜와 준비일수를 입력하세요.'; summary.classList.add('warn'); wrap.innerHTML=''; return; }
+  summary.classList.remove('warn');
+  const range=dates[0]===dates.at(-1)?dates[0]:`${dates[0]} ~ ${dates.at(-1)}`;
+  summary.textContent=`자동 계산: 준비 ${range} · ${dates.length}일${$('#prepWeekdaysOnly').checked?'(평일만)':''} → 마감 ${deadline}`;
+  wrap.innerHTML=dates.map(date=>`<label class="prepDailyRow"><span class="prepDailyDate">${esc(preparationDateLabel(date))}</span><input data-prep-date="${esc(date)}" value="${esc(prepDraftNotes[date]||'')}" placeholder="이날 진행할 내용"></label>`).join('');
+}
+function updatePrepUI(){
+  const supported=!['anniversary','payment'].includes($('#kind')?.value||'event');
+  $('#prepFields')?.classList.toggle('hidden',!supported);
+  if(!supported && $('#prepEnabled')) $('#prepEnabled').checked=false;
+  renderPrepDailyRows();
+}
+
 function checklistFromText(text, oldItems=[]){
   const lines=String(text||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
   const used=new Set();
@@ -2898,6 +3048,8 @@ function openEvent(date,id,options={}){
   $('#date').value=e?.date||date||ds(cursor); $('#endDate').value=e?.endDate||e?.date||date||ds(cursor);
   $('#allDay').checked=e?.allDay??true; $('#start').value=e?.start||''; $('#end').value=e?.end||''; setDurationInputs(e?.hours??1); $('#noDuration').checked=paymentPreset?true:!!e?.noDuration;
   $('#kind').value=e?.kind||(paymentPreset?'payment':(quickPreset?'todo':(commonPreset?'appointment':(recurringPreset?'todo':'event')))); $('#place').value=e?.place||''; $('#repeat').value=e?.repeat||(paymentPreset?'monthly':(recurringPreset?'weekly':'none')); $('#memo').value=e?.memo||'';
+  prepDraftNotes={...(e?.prepDailyNotes||{})};
+  $('#prepEnabled').checked=!!e?.prepEnabled; $('#prepDeadline').value=e?.prepDeadline||e?.date||date||ds(cursor); $('#prepDays').value=Math.max(1,Number(e?.prepDays)||5); $('#prepWeekdaysOnly').checked=!!e?.prepWeekdaysOnly; $('#prepIncludeDeadline').checked=!!e?.prepIncludeDeadline;
   $('#checklistText').value=checklistItems(e||{}).map(x=>x.text).join('\n');
   $('#paymentAmount').value=e?.paymentAmount||''; $('#paymentMethod').value=e?.paymentMethod||'';
   $('#availabilityBlock').checked=!!e?.availabilityBlock;
@@ -2913,7 +3065,7 @@ function openEvent(date,id,options={}){
     if(canComplete){ doneInput.checked=!!isDone(occurrenceView); doneText.textContent=e.kind==='payment'?'납부완료':'완료'; }
   }
   $('#carryEvent').classList.toggle('hidden',!e || e.kind==='anniversary' || e.kind==='payment' || (occurrenceView&&isDone(occurrenceView)));
-  updateAllDayUI(); updateKindUI(); setRepeatRule(e||{date:$('#date').value,repeat:$('#repeat').value,repeatRule:null}); updateDurationMode();
+  updateAllDayUI(); updateKindUI(); setRepeatRule(e||{date:$('#date').value,repeat:$('#repeat').value,repeatRule:null}); updateDurationMode(); updatePrepUI();
   openDialog($('#eventDlg'));
 }
 window.__newEvent=openEvent;
@@ -2928,6 +3080,11 @@ $('#eventForm').onsubmit=e=>{
   if($('#repeat').value!=='none' && $('#repeatEndType').value==='date' && !$('#repeatEndDate').value){ alert('반복 종료 날짜를 선택하세요.'); return; }
   if($('#repeat').value!=='none' && $('#repeatEndType').value==='date' && $('#repeatEndDate').value<$('#date').value){ alert('반복 종료 날짜는 시작 날짜보다 빠를 수 없습니다.'); return; }
   if($('#repeat').value==='yearly' && $('#yearlyCalendar').value==='lunar' && !lunarFormatter){ alert('현재 브라우저에서는 음력 날짜 변환을 지원하지 않습니다.'); return; }
+  const prepEnabled=!!$('#prepEnabled').checked && !['anniversary','payment'].includes($('#kind').value);
+  if(prepEnabled && $('#repeat').value!=='none'){ alert('준비기간이 있는 기한 일정은 반복 없음으로 등록해 주세요.'); return; }
+  if(prepEnabled && !$('#prepDeadline').value){ alert('기한 날짜를 선택하세요.'); return; }
+  if(prepEnabled){ $('#date').value=$('#prepDeadline').value; $('#endDate').value=$('#prepDeadline').value; }
+  collectPrepDailyNotes();
   const repeat=$('#repeat').value;
   const checklist=checklistFromText($('#checklistText').value,checklistItems(old||{}));
   const checklistDoneByDate=cleanedChecklistDoneMap(old?.checklistDoneByDate||{},checklist);
@@ -2937,6 +3094,7 @@ $('#eventForm').onsubmit=e=>{
     start:$('#allDay').checked?'':$('#start').value, end:$('#allDay').checked?'':$('#end').value,
     hours:$('#kind').value==='payment'?0:(timedHoursFromForm()??getDurationInputs()), noDuration:$('#kind').value==='payment'?true:($('#noDuration').checked && timedHoursFromForm()===null), kind:$('#kind').value, place:$('#place').value.trim(),
     paymentAmount:$('#kind').value==='payment'?Math.max(0,Number($('#paymentAmount').value)||0):0, paymentMethod:$('#kind').value==='payment'?$('#paymentMethod').value.trim():'',
+    prepEnabled, prepDeadline:prepEnabled?$('#prepDeadline').value:'', prepDays:prepEnabled?Math.max(1,Number($('#prepDays').value)||1):5, prepWeekdaysOnly:prepEnabled&&!!$('#prepWeekdaysOnly').checked, prepIncludeDeadline:prepEnabled&&!!$('#prepIncludeDeadline').checked, prepDailyNotes:prepEnabled?Object.fromEntries(prepFormDates().map(d=>[d,String(prepDraftNotes[d]||'').trim()]).filter(([,v])=>v)):{},
     availabilityBlock:!['payment','anniversary'].includes($('#kind').value) && !!$('#availabilityBlock').checked,
     availabilityTargetCalId:(!['payment','anniversary'].includes($('#kind').value) && $('#availabilityBlock').checked)?($('#availabilityTarget').value||defaultAvailabilityTargetForSelectedCalendar()):'',
     repeat, repeatRule:repeat==='none'?null:getRepeatRule(), memo:$('#memo').value,
@@ -3053,7 +3211,12 @@ $('#togglePurchase').onclick=()=>{ state.settings.fixedPanelsCollapsed.purchase=
 $('#purchaseForm').onsubmit=e=>{ e.preventDefault(); const id=$('#purchaseId').value, old=state.purchases.find(x=>x.id===id), maxOrder=(state.purchases||[]).reduce((m,p)=>Math.max(m,Number(p.order)||0),-1), obj={id:id||uid(),name:$('#purchaseName').value.trim(),qty:Math.max(1,Number($('#purchaseQty').value)||1),memo:$('#purchaseMemo').value,done:$('#purchaseDone').checked,createdAt:old?.createdAt||new Date().toISOString(),order:old?.order??(maxOrder+1)}; if(!obj.name) return; if(id) state.purchases[state.purchases.findIndex(x=>x.id===id)]=obj; else state.purchases.push(obj); closeDialog($('#purchaseDlg')); save(); };
 $('#cancelPurchase').onclick=()=>closeDialog($('#purchaseDlg'));
 $('#deletePurchase').onclick=()=>{ const id=$('#purchaseId').value; if(id&&confirm('이 구매항목을 삭제할까요?')){ state.purchases=state.purchases.filter(x=>x.id!==id); closeDialog($('#purchaseDlg')); save(); } };
-$('#allDay').onchange=updateAllDayUI; $('#noDuration').onchange=()=>updateDurationMode(); $('#kind').onchange=updateKindUI; $('#availabilityBlock').onchange=updateAvailabilityBlockUI; $('#cal').onchange=()=>{ if($('#availabilityBlock').checked){ const v=defaultAvailabilityTargetForSelectedCalendar(); if([...$('#availabilityTarget').options].some(o=>o.value===v)) $('#availabilityTarget').value=v; } }; $('#start').onchange=updateDurationMode; $('#end').onchange=updateDurationMode; $('#endDate').onchange=updateDurationMode; $('#repeat').onchange=updateRepeatUI; $('#date').onchange=()=>{
+$('#allDay').onchange=updateAllDayUI; $('#noDuration').onchange=()=>updateDurationMode(); $('#kind').onchange=updateKindUI; $('#availabilityBlock').onchange=updateAvailabilityBlockUI; $('#cal').onchange=()=>{ if($('#availabilityBlock').checked){ const v=defaultAvailabilityTargetForSelectedCalendar(); if([...$('#availabilityTarget').options].some(o=>o.value===v)) $('#availabilityTarget').value=v; } }; $('#start').onchange=updateDurationMode; $('#end').onchange=updateDurationMode; $('#endDate').onchange=updateDurationMode; $('#repeat').onchange=updateRepeatUI;
+$('#prepEnabled').onchange=()=>{ if($('#prepEnabled').checked){ $('#prepDeadline').value=$('#date').value||ds(cursor); $('#repeat').value='none'; updateRepeatUI(); } updatePrepUI(); };
+$('#prepDeadline').onchange=()=>{ if($('#prepDeadline').value){ $('#date').value=$('#prepDeadline').value; $('#endDate').value=$('#prepDeadline').value; updateDurationMode(); } renderPrepDailyRows(); };
+$('#prepDays').oninput=renderPrepDailyRows; $('#prepWeekdaysOnly').onchange=renderPrepDailyRows; $('#prepIncludeDeadline').onchange=renderPrepDailyRows;
+$('#date').onchange=()=>{
+  if($('#prepEnabled').checked){ $('#prepDeadline').value=$('#date').value; $('#endDate').value=$('#date').value; renderPrepDailyRows(); }
   if(!$('#endDate').value || $('#endDate').value<$('#date').value) $('#endDate').value=$('#date').value;
   const d=parse($('#date').value), lp=lunarPartsFromSolar(d);
   $('#yearlyMonth').value=d.getMonth()+1; $('#yearlyDay').value=d.getDate();
@@ -3197,7 +3360,7 @@ $('#deleteDiary').onclick=()=>{ const date=$('#diaryDate').value; if(state.diary
 function renderSearch(){
   const q=$('#searchInput').value.trim().toLowerCase(); if(!q){$('#searchResults').innerHTML='<div class="empty">검색어를 입력하세요.</div>';return;}
   const results=[];
-  for(const e of state.events){ const hay=[e.title,e.memo,e.place,cal(e.calId).name,...checklistItems(e).map(x=>x.text)].join(' ').toLowerCase(); if(hay.includes(q)) results.push({type:'event',id:e.id,title:e.title,meta:`${e.date} · ${cal(e.calId).name}`}); }
+  for(const e of state.events){ const hay=[e.title,e.memo,e.place,cal(e.calId).name,...checklistItems(e).map(x=>x.text),...Object.values(e.prepDailyNotes||{})].join(' ').toLowerCase(); if(hay.includes(q)) results.push({type:'event',id:e.id,title:e.title,meta:`${e.date} · ${cal(e.calId).name}${e.prepEnabled?' · '+preparationSummary(e):''}`}); }
   for(const f of state.fixed){ const hay=[f.name,f.memo,cal(f.calId).name,...(f.checklist||[]).map(x=>x.text)].join(' ').toLowerCase(); if(hay.includes(q)) results.push({type:'fixed',id:f.id,title:f.name,meta:`고정업무 · ${cal(f.calId).name}`}); }
   for(const f of (state.flexible||[])){ const hay=[f.name,f.memo,cal(f.calId).name,...(f.checklist||[]).map(x=>x.text)].join(' ').toLowerCase(); if(hay.includes(q)) results.push({type:'flexible',id:f.id,title:f.name,meta:`시간날때 업무 · ${cal(f.calId).name}`}); }
   for(const [date,d] of Object.entries(state.diary)){ if((d.text||'').toLowerCase().includes(q)) results.push({type:'diary',id:date,title:`다이어리 ${date}`,meta:d.text.slice(0,60)}); }
@@ -3390,7 +3553,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'1.84',
+    appVersion:'1.86',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state

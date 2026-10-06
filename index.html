@@ -4,17 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
-  <title>캘린더 v1.84</title>
-  <link rel="manifest" href="manifest.json?v=1.84">
+  <title>캘린더 v1.86</title>
+  <link rel="manifest" href="manifest.json?v=1.86">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="icon-180.png">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css">
-  <link rel="stylesheet" href="style.css?v=1.84">
+  <link rel="stylesheet" href="style.css?v=1.86">
 </head>
 <body>
 <header>
-  <div class="brand"><b>캘린더</b><small> v1.84</small></div>
+  <div class="brand"><b>캘린더</b><small> v1.86</small></div>
   <div id="saveBadge" class="saveBadge loading" title="Firebase 저장 상태"><span class="saveDot"></span><span id="saveBadgeText">Firebase 확인 중</span></div>
   <button id="manualSaveBtn" class="manualSaveBtn" type="button" title="현재 데이터를 Firebase에 즉시 저장"><span class="manualSaveFull">최신자료 저장</span><span class="manualSaveMobile">저장</span></button>
   <button id="sidebarToggle" class="mobileOnly" type="button" aria-label="메뉴">☰</button>
@@ -87,8 +87,17 @@
   <div class="eventPopoverHead"><div><b id="eventPopoverTitle"></b><small id="eventPopoverKind"></small></div><button id="eventPopoverClose" type="button" title="닫기">×</button></div>
   <div id="eventPopoverMeta" class="eventPopoverMeta"></div>
   <label id="eventPopoverDoneWrap" class="eventPopoverDone"><input id="eventPopoverDone" type="checkbox"><span id="eventPopoverDoneText">완료</span></label>
-  <div class="eventPopoverActions"><button id="eventPopoverEdit" type="button">✎ 수정</button></div>
+  <div class="eventPopoverActions"><button id="eventPopoverPlan" type="button" class="hidden">준비계획 보기</button><button id="eventPopoverEdit" type="button">✎ 수정</button></div>
 </div>
+
+<dialog id="prepPlanDlg" class="prepPlanDlg">
+  <form method="dialog">
+    <div class="prepPlanHead"><div><h3 id="prepPlanTitle">준비계획</h3><p id="prepPlanSummary"></p></div><button type="button" id="closePrepPlan" class="dialogX" aria-label="닫기">×</button></div>
+    <div id="prepPlanGeneralMemo" class="prepPlanGeneralMemo hidden"></div>
+    <div id="prepPlanList" class="prepPlanList"></div>
+    <menu><button type="button" id="editPrepPlan">✎ 일정 수정</button><span></span><button type="button" id="closePrepPlanBottom">닫기</button></menu>
+  </form>
+</dialog>
 
 <dialog id="authDlg" class="smallDlg">
   <form id="authForm">
@@ -117,6 +126,24 @@
     <div class="row">
       <label>날짜<input type="date" id="date" required></label>
       <label>종료일<input type="date" id="endDate"></label>
+    </div>
+    <div id="prepFields" class="prepFields">
+      <label class="check prepEnable"><input type="checkbox" id="prepEnabled"> 기한에 맞춘 준비기간 사용</label>
+      <div id="prepDetails" class="prepDetails hidden">
+        <div class="row">
+          <label>기한 날짜<input type="date" id="prepDeadline"></label>
+          <label>필요 준비일수<input type="number" id="prepDays" min="1" max="365" step="1" value="5"></label>
+        </div>
+        <div class="prepOptions">
+          <label class="check"><input type="checkbox" id="prepWeekdaysOnly"> 평일만 계산</label>
+          <label class="check"><input type="checkbox" id="prepIncludeDeadline"> 기한 당일도 준비일에 포함</label>
+        </div>
+        <div id="prepCalcSummary" class="prepCalcSummary"></div>
+        <div class="prepDailyEditor">
+          <div class="prepDailyHead"><b>날짜별 진행 계획</b><small>각 날짜에 무엇을 할지 적어두면 달력에도 그 내용이 표시됩니다.</small></div>
+          <div id="prepDailyRows" class="prepDailyRows"></div>
+        </div>
+      </div>
     </div>
     <label class="check"><input type="checkbox" id="allDay" checked> 종일 일정</label>
     <div class="row timeRow" id="timeFields">
@@ -423,6 +450,6 @@
   <div><span class="spinner"></span><b>Firebase 최신 데이터 불러오는 중…</b><small>저장된 최신 일정을 확인하고 있어요.</small></div>
 </div>
 
-<script type="module" src="app.js?v=1.84"></script>
+<script type="module" src="app.js?v=1.86"></script>
 </body>
 </html>

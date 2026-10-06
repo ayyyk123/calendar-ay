@@ -2066,3 +2066,68 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
   header .views{gap:3px!important}
   header .views>button{padding-left:7px!important;padding-right:7px!important;font-size:10.5px!important}
 }
+
+
+/* v1.85: 선택한 D-Day를 모든 달력 날짜에 D-/D+ 기준으로 표시 */
+.ddayRow{cursor:pointer;align-items:center;border-radius:5px;padding-left:5px;padding-right:3px}
+.ddayRow:hover{background:#f6f8fb}
+.ddayRow.selectedDday{background:#eef5ff;box-shadow:inset 3px 0 0 #4f7cff}
+.ddayInfo{min-width:0;flex:1;position:relative}
+.ddayInfo small{margin-left:2px}
+.ddaySelectedTag{display:inline-block;margin-left:5px;padding:1px 4px;border-radius:8px;background:#4f7cff;color:#fff;font-size:8px;font-style:normal;font-weight:700;vertical-align:1px}
+.ddayActions{display:flex;align-items:center;gap:4px;flex:0 0 auto}
+.ddayEditBtn{width:20px;height:20px;min-width:20px;padding:0!important;border:0!important;background:transparent!important;color:#87909d!important;font-size:11px!important;line-height:20px!important;border-radius:4px!important}
+.ddayEditBtn:hover{background:#e5e9ef!important;color:#303846!important}
+.selectedDdayMarker{display:block;min-width:0;color:#4f7cff;font-size:9px;font-weight:800;line-height:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
+.scheduleDateHead.ddayTracked{height:66px}
+.scheduleDateHead .selectedDdayMarker{margin-top:1px}
+.multiCompactCell .selectedDdayMarker{height:12px;margin:-1px 0 1px;text-align:left;padding-left:1px;font-size:8px;line-height:12px}
+.month .selectedDdayMarker{height:12px;margin:0 0 2px;text-align:left;padding-left:1px;font-size:8px;line-height:12px}
+.dayViewDdayOffset{display:inline-block;margin:0 0 8px;padding:3px 7px;border-radius:10px;background:#eef5ff;color:#3769bb;font-size:11px;line-height:15px}
+@media(max-width:760px){
+  .mobileDayTab.ddayTracked{height:64px}
+  .mobileDayTab .mobileDdayOffset{height:9px;margin:0;font-size:7px;line-height:9px;text-align:center}
+  .mobileSelectedDayHead .mobileSelectedDday{display:inline-block;margin-left:2px;padding:1px 5px;border-radius:8px;background:#eef5ff;font-size:9px;line-height:13px;overflow:visible}
+  .scheduleDateHead.ddayTracked{height:55px}
+}
+@media(max-width:470px){
+  .mobileDayTab.ddayTracked{height:61px}
+  .selectedDdayMarker{font-size:7px}
+}
+
+/* v1.86: 마감일 역산 준비기간 + 날짜별 계획 */
+.prepFields{margin:2px 0 8px;padding:9px 10px;border:1px solid #e1e6ed;border-radius:8px;background:#fbfcfe}
+.prepFields .prepEnable{font-weight:800;margin:0}
+.prepDetails{display:grid;gap:8px;margin-top:8px}
+.prepOptions{display:flex;gap:14px;flex-wrap:wrap}
+.prepOptions .check{margin:0}
+.prepCalcSummary{padding:7px 9px;border-radius:7px;background:#eef4ff;color:#36516f;font-size:11px;font-weight:700;line-height:1.45}
+.prepCalcSummary.warn{background:#fff3e8;color:#9a4f19}
+.prepDailyEditor{border-top:1px solid #e4e8ee;padding-top:8px}
+.prepDailyHead{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin-bottom:6px}
+.prepDailyHead b{font-size:12px}.prepDailyHead small{font-size:10px;color:#7a8492;text-align:right}
+.prepDailyRows{display:grid;gap:5px;max-height:240px;overflow:auto;padding-right:2px}
+.prepDailyRow{display:grid;grid-template-columns:92px minmax(0,1fr);gap:7px;align-items:center}
+.prepDailyDate{font-size:11px;font-weight:800;color:#536070;white-space:nowrap}
+.prepDailyRow input{min-width:0;width:100%;padding:6px 7px}
+.item.prepDayItem{border-left-width:3px!important;background:#f3f7ff!important;box-shadow:inset 0 0 0 1px rgba(80,120,190,.12)}
+.item.prepDayItem .itemTitle{font-weight:700;color:#36516f}
+.item.prepDeadlineItem{box-shadow:inset 0 0 0 1px rgba(215,74,65,.2)}
+.item.prepDeadlineItem .itemTitle{font-weight:800}
+.prepPlanDlg{width:min(620px,calc(100vw - 24px));max-height:min(760px,calc(100vh - 24px));padding:0}
+.prepPlanDlg form{padding:16px;overflow:auto;max-height:calc(100vh - 28px)}
+.prepPlanHead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px}
+.prepPlanHead h3{margin:0 0 3px;font-size:17px}.prepPlanHead p{margin:0;color:#637083;font-size:11px}
+.prepPlanGeneralMemo{padding:9px 10px;margin-bottom:10px;border-radius:7px;background:#f6f7f9;white-space:pre-wrap;font-size:11px;line-height:1.5}
+.prepPlanList{display:grid;gap:6px}
+.prepPlanRow{display:grid;grid-template-columns:106px minmax(0,1fr);gap:10px;align-items:start;padding:8px 9px;border:1px solid #e3e7ed;border-radius:8px;background:#fff}
+.prepPlanRow.deadline{border-color:#efb8b3;background:#fff7f6}
+.prepPlanDate{font-weight:800;font-size:11px;color:#4e5b6d}.prepPlanDate small{display:block;font-weight:600;color:#8a94a3;margin-top:2px}
+.prepPlanText{font-size:12px;line-height:1.45;white-space:pre-wrap;word-break:keep-all}.prepPlanText.muted{color:#929aa7}
+#eventPopoverPlan.hidden{display:none!important}
+@media(max-width:760px){
+  .prepDailyHead{display:grid;gap:2px}.prepDailyHead small{text-align:left}
+  .prepDailyRow{grid-template-columns:78px minmax(0,1fr)}
+  .prepPlanDlg{width:calc(100vw - 12px)}
+  .prepPlanDlg form{padding:12px}.prepPlanRow{grid-template-columns:88px minmax(0,1fr);gap:7px}
+}
