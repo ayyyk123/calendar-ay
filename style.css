@@ -2231,3 +2231,16 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 /* v1.94: 반복 준비업무 종료일 직접 지정 */
 .prepRepeatEndGrid{display:grid;grid-template-columns:1fr 1fr;gap:6px;align-items:end}.prepRepeatEndGrid label{display:grid;gap:3px;font-size:10px;color:#596678}.prepRepeatEndGrid input,.prepRepeatEndGrid select{min-width:0;width:100%;padding:6px 7px}
 @media(max-width:760px){.prepRepeatEndGrid{grid-template-columns:1fr}}
+
+/* v1.97: 모든 캘린더 구역 높이를 실제 일정 양에 맞춰 한 번에 정리 */
+.scheduleDateCorner{align-items:center!important;justify-content:center!important;padding:0!important}
+.laneAutoFitBtn{
+  width:20px;height:20px;min-width:20px;padding:0;border:1px solid #d8dde5;border-radius:5px;
+  background:#fff;color:#667085;font-size:12px;line-height:18px;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 1px 2px #00000008;cursor:pointer;
+}
+.laneAutoFitBtn:hover{border-color:#aeb8c6;background:#f7f9fc;color:#344054}
+.daySingle .diaryStrip{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.dayAutoFitBtn{padding:5px 9px;border:1px solid #d8dde5;border-radius:7px;background:#fff;color:#586474;font-size:11px;font-weight:700;white-space:nowrap}
+.dayAutoFitBtn:hover{background:#f7f9fc;border-color:#aeb8c6}
+@media(max-width:760px){.laneAutoFitBtn,.dayAutoFitBtn{display:none!important}}

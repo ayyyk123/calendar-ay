@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '1.96',
+  version: '1.97',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -346,7 +346,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '1.96',
+    version: '1.97',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -2579,7 +2579,7 @@ function scheduleLaneHtml(key,title,days,map,cellBuilder,{type='calendar',color=
 function scheduleDateHeader(days){
   // 날짜 헤더 전체도 드롭 영역으로 사용합니다. 2주/3주 보기에서 다른 주로 옮길 때
   // 좁은 일정 칸을 정확히 찾지 않아도 날짜 머리글에 놓으면 해당 날짜로 이동합니다.
-  return `<div class="scheduleDateGrid"><div class="scheduleDateCorner">구역</div>${days.map(d=>{const key=ds(d),hasDiary=!!state.diary[key]?.text,h=holidayLabel(key),dow=d.getDay(),dmark=selectedDdayMarkerHtml(key),dayClass=[key===ds(new Date())?'today':'',holidayClass(key),dow===0?'sunday':'',dow===6?'saturday':'',dmark?'ddayTracked':''].filter(Boolean).join(' ');return `<div class="scheduleDateHead ${dayClass}" data-dropdate="${key}" data-date-drop-head="1" title="${key} · 일정을 여기에 놓아 이동"><div class="dayTopLine"><span class="weekdayLabel">${['일','월','화','수','목','금','토'][dow]}</span><span class="dateNum">${d.getDate()}</span><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}" aria-label="${hasDiary?'다이어리 작성됨':'다이어리 미작성'}">${diaryIconHtml(hasDiary)}</button></div><div class="holidayName ${h?'':'holidayEmpty'}" title="${h?esc(h):''}">${h?esc(h):'&nbsp;'}</div>${dmark}</div>`}).join('')}</div>`;
+  return `<div class="scheduleDateGrid"><div class="scheduleDateCorner"><button type="button" class="laneAutoFitBtn" data-auto-fit-lanes="1" title="전체 구역 높이를 일정에 딱 맞춤" aria-label="전체 구역 높이 자동 맞춤">↕</button></div>${days.map(d=>{const key=ds(d),hasDiary=!!state.diary[key]?.text,h=holidayLabel(key),dow=d.getDay(),dmark=selectedDdayMarkerHtml(key),dayClass=[key===ds(new Date())?'today':'',holidayClass(key),dow===0?'sunday':'',dow===6?'saturday':'',dmark?'ddayTracked':''].filter(Boolean).join(' ');return `<div class="scheduleDateHead ${dayClass}" data-dropdate="${key}" data-date-drop-head="1" title="${key} · 일정을 여기에 놓아 이동"><div class="dayTopLine"><span class="weekdayLabel">${['일','월','화','수','목','금','토'][dow]}</span><span class="dateNum">${d.getDate()}</span><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}" aria-label="${hasDiary?'다이어리 작성됨':'다이어리 미작성'}">${diaryIconHtml(hasDiary)}</button></div><div class="holidayName ${h?'':'holidayEmpty'}" title="${h?esc(h):''}">${h?esc(h):'&nbsp;'}</div>${dmark}</div>`}).join('')}</div>`;
 }
 function scheduleWeekBoard(days,map){
   const visible=visibleCals(),visibleIds=new Set(visible.map(c=>c.id));
@@ -2611,9 +2611,29 @@ function openEventForSection(date,key){
 function isBlankSectionDoubleClickTarget(target){
   return !target?.closest?.('.item,button,input,select,textarea,a,.dragHandle,.laneHeightResizer,.dayLaneHeightResizer');
 }
+function fitAllScheduleLaneHeights(){
+  if(isMobileSchedule()) return;
+  const lanes=$$('.scheduleLane').filter(lane=>!lane.classList.contains('collapsed'));
+  if(!lanes.length) return;
+  state.settings.laneHeights=state.settings.laneHeights||{};
+  // 기존에 크게 잡힌 높이의 영향을 없애고 실제 내용 높이를 측정한다.
+  lanes.forEach(lane=>lane.style.setProperty('--lane-h','44px'));
+  void ($('#main')?.offsetHeight);
+  lanes.forEach(lane=>{
+    const key=lane.dataset.laneKey||'';
+    const cells=[...lane.querySelectorAll('.scheduleLaneCell')];
+    const contentH=Math.max(44,...cells.map(cell=>Math.ceil(cell.scrollHeight||0)));
+    const h=Math.max(44,Math.min(480,contentH+2));
+    state.settings.laneHeights[key]=h;
+    lane.style.setProperty('--lane-h',`${h}px`);
+  });
+  save({rerender:false});
+}
+
 function bindScheduleLanes(){
   const main=$('#main');
   if(main) main.style.setProperty('--lane-label-w-user',`${laneLabelWidth()}px`);
+  $('[data-auto-fit-lanes]')?.addEventListener('click',e=>{ e.preventDefault(); e.stopPropagation(); fitAllScheduleLaneHeights(); });
   $$('.scheduleLaneCell').forEach(cell=>{
     cell.ondblclick=e=>{
       if(!isBlankSectionDoubleClickTarget(e.target)) return;
@@ -2910,7 +2930,26 @@ function dayViewGroupHtml(date,es){
   if(blockedRootCount) capacitySummary+=` · 가용차단 ${blockedRootCount}개`;
   return commonTopHtml+prepHtml+quickHtml+paymentHtml+html+`<div class="dayTotal ${overallOver?'overallOver':''}">총 계획 ${fmtH(total)}${capacitySummary}</div>`;
 }
+function fitAllDayLaneHeights(){
+  const sections=$$('.dayResizableSection');
+  if(!sections.length) return;
+  state.settings.dayLaneHeights=state.settings.dayLaneHeights||{};
+  sections.forEach(section=>section.style.setProperty('--day-lane-h','640px'));
+  void ($('#main')?.offsetHeight);
+  sections.forEach(section=>{
+    const key=section.dataset.dayLaneKey||'';
+    const content=section.querySelector('.dayResizableContent');
+    const resizer=section.querySelector('.dayLaneHeightResizer');
+    const resizerH=Math.ceil(resizer?.getBoundingClientRect().height||8);
+    const h=Math.max(52,Math.min(640,Math.ceil(content?.scrollHeight||0)+resizerH+1));
+    state.settings.dayLaneHeights[key]=h;
+    section.style.setProperty('--day-lane-h',`${h}px`);
+  });
+  save({rerender:false});
+}
+
 function bindDayViewResizers(){
+  $('[data-auto-fit-day-lanes]')?.addEventListener('click',e=>{ e.preventDefault(); e.stopPropagation(); fitAllDayLaneHeights(); });
   $$('.dayResizableSection').forEach(section=>{
     section.ondblclick=e=>{
       if(!isBlankSectionDoubleClickTarget(e.target)) return;
@@ -2966,7 +3005,7 @@ function bindDayViewResizers(){
 function renderDay(){
   const d=ds(cursor),map=buildOccurrenceMap(d,d,{calendarIds:focusedCalendarIds()}),hasDiary=!!state.diary[d]?.text;
   const h=holidayLabel(d); setRangeLabel(`${d}${focusSuffix()}`,`${d.slice(5).replace('-', '/')}${compactFocusSuffix()}`); $('#main').className='daySingle';
-  $('#main').innerHTML=`${h?`<div class="dayHolidayBanner">${esc(h)}</div>`:''}${selectedDdayMarkerHtml(d,'dayViewDdayOffset')}<div class="diaryStrip"><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${d}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}">${diaryIconHtml(hasDiary)} ${hasDiary?'다이어리 보기':'다이어리 작성'}</button></div><div class="dayResizableBoard" data-dropdate="${d}" ondblclick="window.__newEvent?.('${d}')">${dayViewGroupHtml(d,map[d]||[])}</div>`; bindItems(); bindDayViewResizers();
+  $('#main').innerHTML=`${h?`<div class="dayHolidayBanner">${esc(h)}</div>`:''}${selectedDdayMarkerHtml(d,'dayViewDdayOffset')}<div class="diaryStrip"><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${d}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}">${diaryIconHtml(hasDiary)} ${hasDiary?'다이어리 보기':'다이어리 작성'}</button><button type="button" class="dayAutoFitBtn" data-auto-fit-day-lanes="1" title="전체 구역 높이를 일정에 딱 맞춤">↕ 구역 높이 맞춤</button></div><div class="dayResizableBoard" data-dropdate="${d}" ondblclick="window.__newEvent?.('${d}')">${dayViewGroupHtml(d,map[d]||[])}</div>`; bindItems(); bindDayViewResizers();
 }
 function renderList(){
   const start=ds(add(new Date(),-30)),end=ds(add(new Date(),365));
@@ -3881,7 +3920,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'1.96',
+    appVersion:'1.97',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
