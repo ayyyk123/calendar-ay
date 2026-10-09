@@ -2276,3 +2276,20 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
   .currentViewMenu{left:auto;right:0}
   #range{font-size:13px}
 }
+
+
+/* v2.02: 저장상태/저장버튼 위치 안정화 + 현재보기 더블클릭 유지 */
+@media(min-width:761px){
+  header .views > #saveBadge{
+    grid-area:auto!important;
+    width:158px!important;min-width:158px!important;max-width:158px!important;flex:0 0 158px!important;
+    height:30px!important;padding:4px 8px!important;margin:0 2px 0 0!important;
+    font-size:10px!important;justify-content:flex-start!important;
+  }
+  header .views > #saveBadge #saveBadgeText{min-width:0!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important}
+  header .views > #manualSaveBtn{
+    grid-area:auto!important;
+    width:34px!important;min-width:34px!important;max-width:34px!important;flex:0 0 34px!important;
+    height:34px!important;padding:0!important;margin:0 5px 0 0!important;font-size:15px!important;
+  }
+}

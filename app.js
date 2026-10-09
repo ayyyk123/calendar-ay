@@ -3924,8 +3924,28 @@ function syncDateNavPlacement(){
     nav.insertBefore(group,jump||nav.firstChild);
   }
 }
-syncDateNavPlacement();
-window.addEventListener('resize',syncDateNavPlacement,{passive:true});
+function syncSaveControlsPlacement(){
+  const header=document.querySelector('header');
+  const views=document.querySelector('header .views');
+  const badge=$('#saveBadge');
+  const saveBtn=$('#manualSaveBtn');
+  const naver=$('#naverMailShortcut');
+  const menu=$('#sidebarToggle');
+  if(!header||!views||!badge||!saveBtn) return;
+  if(window.matchMedia('(max-width:760px)').matches){
+    if(badge.parentElement!==header) header.insertBefore(badge,menu||header.children[1]||null);
+    if(saveBtn.parentElement!==header) header.insertBefore(saveBtn,menu||header.children[1]||null);
+  }else if(naver){
+    if(badge.parentElement!==views) views.insertBefore(badge,naver);
+    if(saveBtn.parentElement!==views) views.insertBefore(saveBtn,naver);
+  }
+}
+function syncHeaderResponsivePlacement(){
+  syncDateNavPlacement();
+  syncSaveControlsPlacement();
+}
+syncHeaderResponsivePlacement();
+window.addEventListener('resize',syncHeaderResponsivePlacement,{passive:true});
 $('#jumpDate').onchange=e=>{ if(e.target.value){cursor=parse(e.target.value);render();} };
 $('#jumpDateBtn')?.addEventListener('click',()=>{ const input=$('#jumpDate'); if(!input) return; input.value=ds(cursor||new Date()); if(typeof input.showPicker==='function') input.showPicker(); else input.click(); });
 $('#diaryMainShortcut').onclick=()=>{ if(view==='diary'){ view=lastScheduleView||'week'; } else { lastScheduleView=view; view='diary'; } render(); };
@@ -3934,7 +3954,7 @@ function setCurrentViewButtonLabel(){
   const btn=$('#currentViewBtn'); if(!btn) return;
   const label=VIEW_LABELS[view]||VIEW_LABELS[lastScheduleView]||'주';
   btn.textContent=label;
-  btn.title=view==='diary'?'다이어리 화면 · 오른쪽 클릭으로 다른 보기 선택':'현재 보기 · 오른쪽 클릭으로 다른 보기 선택';
+  btn.title=(view==='week'||view==='day')?'더블클릭: 구역 높이 자동맞춤 · 오른쪽 클릭: 다른 보기 선택':'현재 보기 · 오른쪽 클릭으로 다른 보기 선택';
   btn.setAttribute('aria-label',btn.title);
 }
 function setCurrentViewMenu(open){
@@ -3951,10 +3971,21 @@ function toggleCurrentViewMenu(force){
 $('#currentViewBtn')?.addEventListener('contextmenu',e=>{ e.preventDefault(); toggleCurrentViewMenu(); });
 $('#currentViewBtn')?.addEventListener('click',e=>{
   e.preventDefault();
-  if(view==='week' || view==='day') activateViewButton(view); else if(view && view!=='diary') activateViewButton(view);
+  const btn=e.currentTarget;
+  if(isMobileSchedule()) return;
+  if(e.detail>1) return;
+  if(view!=='week' && view!=='day') return;
+  const next=view;
+  clearTimeout(btn.__singleViewTimer);
+  btn.__singleViewTimer=setTimeout(()=>{
+    btn.__singleViewTimer=null;
+    activateViewButton(next);
+  },460);
 });
 $('#currentViewBtn')?.addEventListener('dblclick',e=>{
-  e.preventDefault();
+  e.preventDefault(); e.stopPropagation();
+  const btn=e.currentTarget;
+  clearTimeout(btn.__singleViewTimer); btn.__singleViewTimer=null;
   if(view==='week'||view==='day') autoFitFromViewButton(view);
 });
 document.addEventListener('click',e=>{ if(!e.target.closest('#currentViewWrap')) setCurrentViewMenu(false); });
@@ -3993,21 +4024,7 @@ function autoFitFromViewButton(next){
   }
 }
 $$('#currentViewMenu [data-view]').forEach(b=>{
-  const next=b.dataset.view;
-  if(next==='week'||next==='day'){
-    b.onclick=e=>{
-      e.preventDefault();
-      if(isMobileSchedule()){ activateViewButton(next); return; }
-      if(e.detail>1) return;
-      clearTimeout(b.__singleViewTimer);
-      b.__singleViewTimer=setTimeout(()=>{ b.__singleViewTimer=null; activateViewButton(next); },460);
-    };
-    b.ondblclick=e=>{
-      e.preventDefault(); e.stopPropagation();
-      clearTimeout(b.__singleViewTimer); b.__singleViewTimer=null;
-      autoFitFromViewButton(next);
-    };
-  }else b.onclick=()=>activateViewButton(next);
+  b.onclick=e=>{ e.preventDefault(); activateViewButton(b.dataset.view); };
 });
 $('#sidebarToggle').onclick=()=>$('#sidebar').classList.toggle('open');
 $('#main').addEventListener('click',()=>{ if(isMobileSidebar()) $('#sidebar').classList.remove('open'); });
@@ -4142,7 +4159,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.01',
+    appVersion:'2.02',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
