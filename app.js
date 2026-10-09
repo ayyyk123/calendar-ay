@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '2.01',
+  version: '2.00',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -81,7 +81,7 @@ const defaultState = () => ({
   purchases: [],
   diary: {},
   actualWork: {},
-  settings: { hiddenCalendars: [], fixedPanelsCollapsed: { recurring:false, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','dday','diary'], sidebarSectionsCollapsed:{}, laneHeights:{}, laneAutoFit:{}, laneCollapsed:{}, laneLabelWidth:30, mobileSectionsCollapsed:{}, dayLaneHeights:{}, dayLaneManual:{}, workloadRange:'week', weekViewMode:'detailed', selectedDdayId:'' }
+  settings: { hiddenCalendars: [], fixedPanelsCollapsed: { recurring:false, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','dday','diary'], sidebarSectionsCollapsed:{}, laneHeights:{}, laneCollapsed:{}, laneLabelWidth:30, mobileSectionsCollapsed:{}, dayLaneHeights:{}, dayLaneManual:{}, workloadRange:'week', weekViewMode:'detailed', selectedDdayId:'' }
 });
 
 let state = defaultState();
@@ -346,7 +346,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '2.01',
+    version: '2.00',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -429,7 +429,6 @@ function normalizeState(raw){
       mobileSectionsCollapsed: (s.settings?.mobileSectionsCollapsed && typeof s.settings.mobileSectionsCollapsed==='object') ? {...s.settings.mobileSectionsCollapsed} : {},
       dayCalendarGroupsCollapsed: (s.settings?.dayCalendarGroupsCollapsed && typeof s.settings.dayCalendarGroupsCollapsed==='object') ? {...s.settings.dayCalendarGroupsCollapsed} : {},
       laneHeights: (s.settings?.laneHeights && typeof s.settings.laneHeights==='object') ? Object.fromEntries(Object.entries(s.settings.laneHeights).map(([k,v])=>[k,Math.max(44,Math.min(480,Number(v)||0))]).filter(([,v])=>v)) : {},
-      laneAutoFit: (s.settings?.laneAutoFit && typeof s.settings.laneAutoFit==='object') ? Object.fromEntries(Object.entries(s.settings.laneAutoFit).filter(([,v])=>!!v).map(([k])=>[k,true])) : {},
       dayLaneHeights: (s.settings?.dayLaneHeights && typeof s.settings.dayLaneHeights==='object') ? Object.fromEntries(Object.entries(s.settings.dayLaneHeights).map(([k,v])=>[k,Math.max(52,Math.min(640,Number(v)||0))]).filter(([,v])=>v)) : {},
       dayLaneManual: (s.settings?.dayLaneManual && typeof s.settings.dayLaneManual==='object') ? Object.fromEntries(Object.entries(s.settings.dayLaneManual).filter(([,v])=>!!v).map(([k])=>[k,true])) : {},
       laneCollapsed: (s.settings?.laneCollapsed && typeof s.settings.laneCollapsed==='object') ? {...s.settings.laneCollapsed} : {},
@@ -2565,10 +2564,8 @@ function laneVerticalTitleHtml(text){
 }
 function scheduleLaneHtml(key,title,days,map,cellBuilder,{type='calendar',color='#d9d9d9',subtitle=''}={}){
   const collapsed=laneIsCollapsed(key), h=laneHeight(key,type);
-  state.settings.laneAutoFit=state.settings.laneAutoFit||{};
-  const autoFit=!!state.settings.laneAutoFit[key];
   const cells=days.map(d=>{ const date=ds(d); return `<div class="scheduleLaneCell" data-dropdate="${date}">${cellBuilder(date,map[date]||[])}</div>`; }).join('');
-  return `<section class="scheduleLane ${collapsed?'collapsed':''} ${autoFit?'autoFitLane':''}" data-lane-key="${esc(key)}" style="--lane-h:${h}px;--lane-color:${esc(color)}">
+  return `<section class="scheduleLane ${collapsed?'collapsed':''}" data-lane-key="${esc(key)}" style="--lane-h:${h}px;--lane-color:${esc(color)}">
     <aside class="scheduleLaneSide" style="--lane-color:${esc(color)}">
       <button type="button" class="scheduleLaneToggle" data-lane-toggle="${esc(key)}" title="구역 접기/펴기">
         <span class="scheduleLaneDot" style="background:${esc(color)}"></span>
@@ -2669,20 +2666,18 @@ function fitAllScheduleLaneHeights(){
   const lanes=$$('.scheduleLane').filter(lane=>!lane.classList.contains('collapsed'));
   if(!lanes.length) return;
   state.settings.laneHeights=state.settings.laneHeights||{};
-  state.settings.laneAutoFit=state.settings.laneAutoFit||{};
-  const keys=new Set();
   lanes.forEach(lane=>{
     const key=lane.dataset.laneKey||'';
-    if(!key) return;
-    keys.add(key);
-    delete state.settings.laneHeights[key];
-    state.settings.laneAutoFit[key]=true;
-    lane.classList.add('autoFitLane');
-    lane.style.removeProperty('--lane-h');
+    const cells=[...lane.querySelectorAll('.scheduleLaneCell')];
+    const side=lane.querySelector('.scheduleLaneSide');
+    const cellNeed=Math.max(0,...cells.map(measureLaneCellContentHeight));
+    const sideNeed=measureLaneSideNaturalHeight(side);
+    const h=Math.max(44,Math.min(480,Math.ceil(Math.max(cellNeed,sideNeed)+4)));
+    state.settings.laneHeights[key]=h;
+    lane.style.setProperty('--lane-h',`${h}px`);
   });
   save({rerender:false});
 }
-
 function runScheduleAutoFitAfterLayout(){
   const run=()=>fitAllScheduleLaneHeights();
   requestAnimationFrame(()=>requestAnimationFrame(()=>{ run(); setTimeout(run,80); }));
@@ -2718,17 +2713,13 @@ function bindScheduleLanes(){
     e.stopPropagation(); const key=btn.dataset.laneToggle; state.settings.laneCollapsed=state.settings.laneCollapsed||{}; state.settings.laneCollapsed[key]=!state.settings.laneCollapsed[key]; save();
   });
   $$('[data-lane-resize]').forEach(handle=>{
-    handle.ondblclick=e=>{ e.preventDefault(); const key=handle.dataset.laneResize; state.settings.laneHeights=state.settings.laneHeights||{}; state.settings.laneAutoFit=state.settings.laneAutoFit||{}; delete state.settings.laneHeights[key]; delete state.settings.laneAutoFit[key]; save(); };
+    handle.ondblclick=e=>{ e.preventDefault(); const key=handle.dataset.laneResize; const type=key==='common'?'common':key==='prep'?'prep':key==='quick'?'quick':key==='payment'?'payment':'calendar'; state.settings.laneHeights=state.settings.laneHeights||{}; delete state.settings.laneHeights[key]; save(); };
     handle.onpointerdown=e=>{
       if(window.matchMedia('(max-width:760px)').matches) return;
       e.preventDefault(); e.stopPropagation();
       const lane=handle.closest('.scheduleLane'), key=handle.dataset.laneResize; if(!lane) return;
       const grid=lane.querySelector('.scheduleLaneGrid');
       const startY=e.clientY,startH=Math.max(44,Math.round(grid?.getBoundingClientRect().height||laneHeight(key)));
-      state.settings.laneAutoFit=state.settings.laneAutoFit||{};
-      delete state.settings.laneAutoFit[key];
-      lane.classList.remove('autoFitLane');
-      lane.style.setProperty('--lane-h',`${startH}px`);
       handle.setPointerCapture?.(e.pointerId); document.body.classList.add('resizingLane');
       const move=ev=>{ const h=Math.max(44,Math.min(480,startH+(ev.clientY-startY))); lane.style.setProperty('--lane-h',`${Math.round(h)}px`); };
       const up=ev=>{ document.removeEventListener('pointermove',move); document.removeEventListener('pointerup',up); document.body.classList.remove('resizingLane'); const grid=lane.querySelector('.scheduleLaneGrid'); const h=Math.max(44,Math.min(480,Math.round(grid?.getBoundingClientRect().height||startH))); state.settings.laneHeights=state.settings.laneHeights||{}; state.settings.laneHeights[key]=h; save(); };
@@ -3119,8 +3110,9 @@ function render(){
   const sidebar=$('#sidebar'), main=$('#main');
   const keep={sidebarTop:sidebar?.scrollTop||0,sidebarLeft:sidebar?.scrollLeft||0,mainTop:main?.scrollTop||0,mainLeft:main?.scrollLeft||0};
   renderSide();
-  $$('.views [data-view]').forEach(b=>b.classList.toggle('on',b.dataset.view===view));
-  const weekBtn=$('.views [data-view="week"]');
+  $$('#currentViewMenu [data-view]').forEach(b=>b.classList.toggle('on',b.dataset.view===view));
+  setCurrentViewButtonLabel();
+  const weekBtn=$('#currentViewMenu [data-view="week"]');
   if(weekBtn){
     const compact=state.settings?.weekViewMode==='compact';
     weekBtn.title=view==='week' ? `주 보기 · 다시 누르면 ${compact?'상세 구역형':'간결 달력형'}으로 전환` : `주 보기 (${compact?'간결 달력형':'상세 구역형'})`;
@@ -3935,8 +3927,40 @@ function syncDateNavPlacement(){
 syncDateNavPlacement();
 window.addEventListener('resize',syncDateNavPlacement,{passive:true});
 $('#jumpDate').onchange=e=>{ if(e.target.value){cursor=parse(e.target.value);render();} };
+$('#jumpDateBtn')?.addEventListener('click',()=>{ const input=$('#jumpDate'); if(!input) return; input.value=ds(cursor||new Date()); if(typeof input.showPicker==='function') input.showPicker(); else input.click(); });
 $('#diaryMainShortcut').onclick=()=>{ if(view==='diary'){ view=lastScheduleView||'week'; } else { lastScheduleView=view; view='diary'; } render(); };
+const VIEW_LABELS={week:'주','2week':'2주','3week':'3주','4week':'4주',month:'월',day:'일',list:'목록',diary:'다이어리'};
+function setCurrentViewButtonLabel(){
+  const btn=$('#currentViewBtn'); if(!btn) return;
+  const label=VIEW_LABELS[view]||VIEW_LABELS[lastScheduleView]||'주';
+  btn.textContent=label;
+  btn.title=view==='diary'?'다이어리 화면 · 오른쪽 클릭으로 다른 보기 선택':'현재 보기 · 오른쪽 클릭으로 다른 보기 선택';
+  btn.setAttribute('aria-label',btn.title);
+}
+function setCurrentViewMenu(open){
+  const menu=$('#currentViewMenu'), btn=$('#currentViewBtn');
+  if(!menu||!btn) return;
+  menu.classList.toggle('hidden',!open);
+  btn.setAttribute('aria-expanded', open?'true':'false');
+}
+function toggleCurrentViewMenu(force){
+  const menu=$('#currentViewMenu'); if(!menu) return;
+  const open=(typeof force==='boolean')?force:menu.classList.contains('hidden');
+  setCurrentViewMenu(open);
+}
+$('#currentViewBtn')?.addEventListener('contextmenu',e=>{ e.preventDefault(); toggleCurrentViewMenu(); });
+$('#currentViewBtn')?.addEventListener('click',e=>{
+  e.preventDefault();
+  if(view==='week' || view==='day') activateViewButton(view); else if(view && view!=='diary') activateViewButton(view);
+});
+$('#currentViewBtn')?.addEventListener('dblclick',e=>{
+  e.preventDefault();
+  if(view==='week'||view==='day') autoFitFromViewButton(view);
+});
+document.addEventListener('click',e=>{ if(!e.target.closest('#currentViewWrap')) setCurrentViewMenu(false); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') setCurrentViewMenu(false); });
 function activateViewButton(next){
+  setCurrentViewMenu(false);
   if(next==='week' && view==='week' && !isMobileSchedule()){
     state.settings.weekViewMode=state.settings.weekViewMode==='compact'?'detailed':'compact';
     lastScheduleView='week';
@@ -3968,7 +3992,7 @@ function autoFitFromViewButton(next){
     }
   }
 }
-$$('.views [data-view]').forEach(b=>{
+$$('#currentViewMenu [data-view]').forEach(b=>{
   const next=b.dataset.view;
   if(next==='week'||next==='day'){
     b.onclick=e=>{
@@ -4096,19 +4120,19 @@ onAuthStateChanged(auth,async user=>{
 async function manualSaveNow(){
   if(!currentUser){ alert('먼저 로그인하세요.'); return; }
   saveLocal();
-  const btn=$('#manualSaveBtn'), original=btn.textContent;
-  btn.disabled=true; btn.textContent='저장 중…';
+  const btn=$('#manualSaveBtn'), original=btn.innerHTML;
+  btn.disabled=true; btn.textContent='…';
   try{
     if(!navigator.onLine){ setSyncStatus('오프라인 · 기기 저장완료','offline'); alert('인터넷 연결이 없어 기기에만 저장했습니다. 온라인이 된 뒤 다시 최신자료 저장을 눌러주세요.'); return; }
     if(!remoteRef){ alert('Firebase 연결이 아직 준비되지 않았습니다. 잠시 후 다시 눌러주세요.'); return; }
     const wasReady=syncReady; syncReady=true;
     const ok=await writeRemoteNow('manual');
     syncReady=wasReady || ok;
-    if(ok){ btn.textContent='저장완료 ✓'; setTimeout(()=>{btn.textContent=original;},1200); }
+    if(ok){ btn.textContent='✓'; setTimeout(()=>{btn.innerHTML=original;},1200); }
     else alert('Firebase 저장에 실패했습니다. 인터넷 연결과 로그인 상태를 확인하세요.');
   }finally{
     btn.disabled=false;
-    if(btn.textContent==='저장 중…') btn.textContent=original;
+    if(btn.textContent==='…') btn.innerHTML=original;
   }
 }
 $('#manualSaveBtn').onclick=manualSaveNow;
