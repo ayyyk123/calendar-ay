@@ -428,7 +428,7 @@ function normalizeState(raw){
       sidebarSectionsCollapsed: (s.settings?.sidebarSectionsCollapsed && typeof s.settings.sidebarSectionsCollapsed==='object') ? {...s.settings.sidebarSectionsCollapsed} : {},
       mobileSectionsCollapsed: (s.settings?.mobileSectionsCollapsed && typeof s.settings.mobileSectionsCollapsed==='object') ? {...s.settings.mobileSectionsCollapsed} : {},
       dayCalendarGroupsCollapsed: (s.settings?.dayCalendarGroupsCollapsed && typeof s.settings.dayCalendarGroupsCollapsed==='object') ? {...s.settings.dayCalendarGroupsCollapsed} : {},
-      laneHeights: (s.settings?.laneHeights && typeof s.settings.laneHeights==='object') ? Object.fromEntries(Object.entries(s.settings.laneHeights).map(([k,v])=>[k,Math.max(44,Math.min(480,Number(v)||0))]).filter(([,v])=>v)) : {},
+      laneHeights: (s.settings?.laneHeights && typeof s.settings.laneHeights==='object') ? Object.fromEntries(Object.entries(s.settings.laneHeights).map(([k,v])=>[k,Math.max(44,Math.min(2400,Number(v)||0))]).filter(([,v])=>v)) : {},
       dayLaneHeights: (s.settings?.dayLaneHeights && typeof s.settings.dayLaneHeights==='object') ? Object.fromEntries(Object.entries(s.settings.dayLaneHeights).map(([k,v])=>[k,Math.max(52,Math.min(640,Number(v)||0))]).filter(([,v])=>v)) : {},
       dayLaneManual: (s.settings?.dayLaneManual && typeof s.settings.dayLaneManual==='object') ? Object.fromEntries(Object.entries(s.settings.dayLaneManual).filter(([,v])=>!!v).map(([k])=>[k,true])) : {},
       laneCollapsed: (s.settings?.laneCollapsed && typeof s.settings.laneCollapsed==='object') ? {...s.settings.laneCollapsed} : {},
@@ -2504,7 +2504,7 @@ const LANE_HEIGHT_DEFAULTS={common:72,prep:84,quick:64,payment:64,calendar:112};
 function laneHeight(key,type='calendar'){
   state.settings.laneHeights=state.settings.laneHeights||{};
   const stored=Number(state.settings.laneHeights[key]);
-  return stored?Math.max(44,Math.min(480,stored)):(LANE_HEIGHT_DEFAULTS[type]||112);
+  return stored?Math.max(44,Math.min(2400,stored)):(LANE_HEIGHT_DEFAULTS[type]||112);
 }
 function laneIsCollapsed(key){
   state.settings.laneCollapsed=state.settings.laneCollapsed||{};
@@ -2629,18 +2629,23 @@ function naturalStackHeight(el){
 function measureLaneCellContentHeight(cell){
   if(!cell) return 0;
   const cs=getComputedStyle(cell);
-  const pad=(parseFloat(cs.paddingTop)||0)+(parseFloat(cs.paddingBottom)||0);
-  const children=[...cell.children].filter(ch=>{
-    const st=getComputedStyle(ch);
-    return st.display!=='none' && st.position!=='absolute' && st.position!=='fixed';
+  const padBottom=parseFloat(cs.paddingBottom)||0;
+  const rect=cell.getBoundingClientRect();
+  let need=Math.max(0,cell.scrollHeight||0);
+  // 캘린더 레인은 .laneOrderedItem 안쪽 item의 margin이 부모 높이에 합쳐지지 않아
+  // 단순 자식 높이 합산 시 일정 수가 많을수록 자동맞춤이 부족해졌다.
+  // 실제 화면에 그려진 항목의 마지막 위치까지 직접 재서 누락되는 여백까지 포함한다.
+  const rendered=[...cell.querySelectorAll('.laneCellLoad,.laneInlineCalTag,.item')].filter(el=>{
+    const st=getComputedStyle(el);
+    return st.display!=='none' && st.visibility!=='hidden' && st.position!=='absolute' && st.position!=='fixed';
   });
-  let total=pad;
-  for(const ch of children){
-    const st=getComputedStyle(ch);
-    const rect=ch.getBoundingClientRect();
-    total+=Math.max(rect.height,ch.scrollHeight||0)+(parseFloat(st.marginTop)||0)+(parseFloat(st.marginBottom)||0);
+  for(const el of rendered){
+    const er=el.getBoundingClientRect();
+    const st=getComputedStyle(el);
+    const mb=parseFloat(st.marginBottom)||0;
+    need=Math.max(need, er.bottom-rect.top+mb+padBottom);
   }
-  return Math.ceil(total);
+  return Math.ceil(need);
 }
 function measureLaneSideNaturalHeight(side){
   const toggle=side?.querySelector('.scheduleLaneToggle'); if(!toggle) return 0;
@@ -2670,9 +2675,16 @@ function fitAllScheduleLaneHeights(){
     const key=lane.dataset.laneKey||'';
     const cells=[...lane.querySelectorAll('.scheduleLaneCell')];
     const side=lane.querySelector('.scheduleLaneSide');
+
+    // 현재 수동 높이가 넓은 경우 scrollHeight가 그 높이 자체를 반환해 줄어들지 않을 수 있다.
+    // 먼저 최소 높이로 잠깐 렌더링한 뒤 실제 overflow 높이를 재면 '내용만큼' 정확히 계산할 수 있다.
+    lane.style.setProperty('--lane-h','44px');
+    void lane.offsetHeight;
+
     const cellNeed=Math.max(0,...cells.map(measureLaneCellContentHeight));
     const sideNeed=measureLaneSideNaturalHeight(side);
-    const h=Math.max(44,Math.min(480,Math.ceil(Math.max(cellNeed,sideNeed)+4)));
+    // 스크롤바 경계에서 1~2px 부족해지는 브라우저 반올림까지 여유를 둔다.
+    const h=Math.max(44,Math.min(2400,Math.ceil(Math.max(cellNeed,sideNeed)+6)));
     state.settings.laneHeights[key]=h;
     lane.style.setProperty('--lane-h',`${h}px`);
   });
@@ -2680,7 +2692,7 @@ function fitAllScheduleLaneHeights(){
 }
 function runScheduleAutoFitAfterLayout(){
   const run=()=>fitAllScheduleLaneHeights();
-  requestAnimationFrame(()=>requestAnimationFrame(()=>{ run(); setTimeout(run,80); }));
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{ run(); setTimeout(run,90); setTimeout(run,220); }));
 }
 
 
@@ -4009,7 +4021,8 @@ function autoFitFromViewButton(next){
       runScheduleAutoFitAfterLayout();
     }else{
       fitAllScheduleLaneHeights();
-      setTimeout(()=>fitAllScheduleLaneHeights(),80);
+      setTimeout(()=>fitAllScheduleLaneHeights(),90);
+      setTimeout(()=>fitAllScheduleLaneHeights(),220);
     }
     return;
   }
@@ -4159,7 +4172,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.02',
+    appVersion:'2.03',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
