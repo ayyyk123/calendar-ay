@@ -2300,3 +2300,9 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 .prepInlineEdit{font-size:13px;color:#536274}
 .prepInlineEdit:hover{background:#f1f5f9;color:#111}
 .prepInlineDatePicker{position:absolute;right:0;bottom:0;width:1px!important;height:1px!important;min-width:0!important;padding:0!important;border:0!important;opacity:.01;pointer-events:none}
+
+
+/* v2.07: preparation task source-level editing */
+.prepRuleAdder.prepTaskEditing{border-color:#8caee6;background:#f7faff;box-shadow:0 0 0 2px #e7f0ff inset}
+.prepEditingSave{font-weight:800;border-color:#8caee6;background:#eef5ff}
+.prepEditingSave:hover{background:#e5efff}
