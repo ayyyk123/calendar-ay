@@ -2293,3 +2293,10 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
     height:34px!important;padding:0!important;margin:0 5px 0 0!important;font-size:15px!important;
   }
 }
+
+
+/* v2.05: 준비 진행계획 개별 날짜 수정 */
+.prepPlanEditorActions{position:relative;display:flex;align-items:center;gap:3px}
+.prepInlineEdit{font-size:13px;color:#536274}
+.prepInlineEdit:hover{background:#f1f5f9;color:#111}
+.prepInlineDatePicker{position:absolute;right:0;bottom:0;width:1px!important;height:1px!important;min-width:0!important;padding:0!important;border:0!important;opacity:.01;pointer-events:none}

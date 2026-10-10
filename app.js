@@ -941,10 +941,20 @@ function basePreparationEntries(e){
 }
 function preparationEntries(e){
   const moves=(e?.prepMoves&&typeof e.prepMoves==='object')?e.prepMoves:{};
-  return basePreparationEntries(e).map(entry=>{
+  const movedEntries=basePreparationEntries(e).map(entry=>{
     const moved=typeof moves[entry.key]==='string'&&moves[entry.key]?moves[entry.key]:'';
     return moved?{...entry,date:moved,moved:true}:{...entry,moved:false};
-  }).filter(entry=>!e?.prepDeadline || entry.date<=e.prepDeadline)
+  }).filter(entry=>!e?.prepDeadline || entry.date<=e.prepDeadline);
+
+  // 자동 준비일이 다른 자동 준비일 날짜로 이동되어 겹치면 같은 날 카드가 두 장 생길 수 있다.
+  // 자동계산은 날짜당 1개 계획이므로, 충돌 시 그 날짜가 원래 sourceDate인 항목을 우선한다.
+  const autoByDate=new Map(), others=[];
+  for(const entry of movedEntries){
+    if(entry.type!=='auto'){ others.push(entry); continue; }
+    const prev=autoByDate.get(entry.date);
+    if(!prev || (entry.sourceDate===entry.date && prev.sourceDate!==prev.date)) autoByDate.set(entry.date,entry);
+  }
+  return [...autoByDate.values(),...others]
     .sort((a,b)=>a.date.localeCompare(b.date)||a.type.localeCompare(b.type)||a.text.localeCompare(b.text));
 }
 function preparationEntryDone(e,key){ return !!(key && e?.prepDone && e.prepDone[key]); }
@@ -2675,18 +2685,36 @@ function fitAllScheduleLaneHeights(){
     const key=lane.dataset.laneKey||'';
     const cells=[...lane.querySelectorAll('.scheduleLaneCell')];
     const side=lane.querySelector('.scheduleLaneSide');
+    const grid=lane.querySelector('.scheduleLaneGrid');
 
-    // 현재 수동 높이가 넓은 경우 scrollHeight가 그 높이 자체를 반환해 줄어들지 않을 수 있다.
-    // 먼저 최소 높이로 잠깐 렌더링한 뒤 실제 overflow 높이를 재면 '내용만큼' 정확히 계산할 수 있다.
+    // 자동맞춤은 현재 높이에 절대 의존하지 않아야 한다.
+    // CSS의 height transition이 살아 있으면 44px로 바꾼 직후에도 이전 높이에서 애니메이션 중인 값을
+    // scrollHeight가 읽어, 자동맞춤을 누를 때마다 그 값 + 여유폭만큼 커지는 누적 오류가 생긴다.
+    // 측정하는 동안 transition을 완전히 끄고 동일한 44px 기준 상태에서 매번 새로 측정한다.
+    const prevGridTransition=grid?.style.transition||'';
+    const prevSideTransition=side?.style.transition||'';
+    if(grid) grid.style.setProperty('transition','none','important');
+    if(side) side.style.setProperty('transition','none','important');
     lane.style.setProperty('--lane-h','44px');
     void lane.offsetHeight;
+    if(grid) void grid.offsetHeight;
 
     const cellNeed=Math.max(0,...cells.map(measureLaneCellContentHeight));
     const sideNeed=measureLaneSideNaturalHeight(side);
-    // 스크롤바 경계에서 1~2px 부족해지는 브라우저 반올림까지 여유를 둔다.
     const h=Math.max(44,Math.min(2400,Math.ceil(Math.max(cellNeed,sideNeed)+6)));
     state.settings.laneHeights[key]=h;
     lane.style.setProperty('--lane-h',`${h}px`);
+    void lane.offsetHeight;
+
+    // 최종 높이를 즉시 확정한 뒤 기존 transition 설정만 되돌린다.
+    if(grid){
+      if(prevGridTransition) grid.style.transition=prevGridTransition;
+      else grid.style.removeProperty('transition');
+    }
+    if(side){
+      if(prevSideTransition) side.style.transition=prevSideTransition;
+      else side.style.removeProperty('transition');
+    }
   });
   save({rerender:false});
 }
@@ -3291,6 +3319,7 @@ function setRepeatRule(e){
 
 let prepDraftNotes={};
 let prepDraftTasks=[];
+let prepDraftMoves={};
 let prepDraftAutoEnabled=false;
 function collectPrepDailyNotes(){
   const next={...prepDraftNotes};
@@ -3354,8 +3383,10 @@ function renderPrepDailyRows(){
     if(entry.type==='auto') return `<label class="prepDailyRow prepPlanEditorRow"><span class="prepDailyDate">${esc(preparationDateLabel(entry.date))}<small>자동</small></span><input data-prep-date="${esc(entry.date)}" value="${esc(prepDraftNotes[entry.date]||'')}" placeholder="이날 진행할 내용"></label>`;
     const firstForRule=!seenRule.has(entry.ruleId); seenRule.add(entry.ruleId);
     const rule=entry.ruleLabel?`<small class="prepEditorRule">${esc(entry.ruleLabel)}</small>`:'';
-    const del=firstForRule?`<button type="button" class="prepRuleDelete prepInlineDelete" data-prep-task-delete="${esc(entry.ruleId)}" title="${entry.type==='repeat'||entry.type==='weekly'?'이 반복 준비업무 전체 삭제':'이 준비업무 삭제'}">×</button>`:'<span></span>';
-    return `<div class="prepDailyRow prepPlanEditorRow prepManualPlanRow"><span class="prepDailyDate">${esc(preparationDateLabel(entry.date))}${rule}</span><div class="prepPlanEditorText">${esc(entry.text||'계획 미입력')}</div>${del}</div>`;
+    const editDate=firstForRule&&entry.type==='date'?`<button type="button" class="prepRuleDelete prepInlineEdit" data-prep-task-edit-date="${esc(entry.ruleId)}" title="이 준비업무 날짜 수정" aria-label="날짜 수정">✎</button><input type="date" class="prepInlineDatePicker" data-prep-task-date-picker="${esc(entry.ruleId)}" value="${esc(entry.date)}" max="${esc(deadline)}" aria-label="준비업무 날짜 선택">`:'';
+    const del=firstForRule?`<button type="button" class="prepRuleDelete prepInlineDelete" data-prep-task-delete="${esc(entry.ruleId)}" title="${entry.type==='repeat'||entry.type==='weekly'?'이 반복 준비업무 전체 삭제':'이 준비업무 삭제'}">×</button>`:'';
+    const actions=firstForRule?`<div class="prepPlanEditorActions">${editDate}${del}</div>`:'<span></span>';
+    return `<div class="prepDailyRow prepPlanEditorRow prepManualPlanRow"><span class="prepDailyDate">${esc(preparationDateLabel(entry.date))}${rule}</span><div class="prepPlanEditorText">${esc(entry.text||'계획 미입력')}</div>${actions}</div>`;
   }).join(''):`<div class="prepRuleEmpty">아직 준비 진행계획이 없습니다. 위의 추가 방식에서 계획을 만들어 주세요.</div>`;
   renderPrepTaskRules();
 }
@@ -3465,6 +3496,7 @@ function openEvent(date,id,options={}){
   if(e){
     prepDraftNotes={...(e.prepDailyNotes||{})};
     prepDraftTasks=(e.prepTasks||[]).map(x=>({...x}));
+    prepDraftMoves={...(e.prepMoves||{})};
     prepDraftAutoEnabled=typeof e.prepAutoEnabled==='boolean'?e.prepAutoEnabled:e.prepMode!=='custom';
     $('#prepEnabled').checked=!!e.prepEnabled;
     $('#prepDeadline').value=e.prepDeadline||e.date||'';
@@ -3474,7 +3506,7 @@ function openEvent(date,id,options={}){
     $('#prepIncludeDeadline').checked=!!e.prepIncludeDeadline;
     if($('#prepAutoEnabled')) $('#prepAutoEnabled').checked=prepDraftAutoEnabled;
   }else{
-    prepDraftNotes={}; prepDraftTasks=[]; prepDraftAutoEnabled=false;
+    prepDraftNotes={}; prepDraftTasks=[]; prepDraftMoves={}; prepDraftAutoEnabled=false;
     $('#prepEnabled').checked=false;
     $('#prepDeadline').value='';
     $('#prepMode').value='auto';
@@ -3601,7 +3633,7 @@ $('#eventForm').onsubmit=e=>{
     start:$('#allDay').checked?'':$('#start').value, end:$('#allDay').checked?'':$('#end').value,
     hours:$('#kind').value==='payment'?0:(timedHoursFromForm()??getDurationInputs()), noDuration:$('#kind').value==='payment'?true:($('#noDuration').checked && timedHoursFromForm()===null), kind:$('#kind').value, place:$('#place').value.trim(),
     paymentAmount:$('#kind').value==='payment'?Math.max(0,Number($('#paymentAmount').value)||0):0, paymentMethod:$('#kind').value==='payment'?$('#paymentMethod').value.trim():'',
-    prepEnabled, prepDeadline:prepEnabled?$('#prepDeadline').value:'', prepMode:prepEnabled&&$('#prepMode').value==='custom'?'custom':'auto', prepAutoEnabled:prepEnabled&&!!prepDraftAutoEnabled, prepDays:prepEnabled?Math.max(1,Number($('#prepDays').value)||1):5, prepWeekdaysOnly:prepEnabled&&!!$('#prepWeekdaysOnly').checked, prepIncludeDeadline:prepEnabled&&!!$('#prepIncludeDeadline').checked, prepDailyNotes:prepEnabled&&prepDraftAutoEnabled?Object.fromEntries(prepFormDates().map(d=>[d,String(prepDraftNotes[d]||'').trim()]).filter(([,v])=>v)):{}, prepTasks:prepEnabled?prepDraftTasks.map(x=>({...x})):[], prepDone:prepEnabled?{...(old?.prepDone||{})}:{}, prepMoves:prepEnabled?{...(old?.prepMoves||{})}:{},
+    prepEnabled, prepDeadline:prepEnabled?$('#prepDeadline').value:'', prepMode:prepEnabled&&$('#prepMode').value==='custom'?'custom':'auto', prepAutoEnabled:prepEnabled&&!!prepDraftAutoEnabled, prepDays:prepEnabled?Math.max(1,Number($('#prepDays').value)||1):5, prepWeekdaysOnly:prepEnabled&&!!$('#prepWeekdaysOnly').checked, prepIncludeDeadline:prepEnabled&&!!$('#prepIncludeDeadline').checked, prepDailyNotes:prepEnabled&&prepDraftAutoEnabled?Object.fromEntries(prepFormDates().map(d=>[d,String(prepDraftNotes[d]||'').trim()]).filter(([,v])=>v)):{}, prepTasks:prepEnabled?prepDraftTasks.map(x=>({...x})):[], prepDone:prepEnabled?{...(old?.prepDone||{})}:{}, prepMoves:prepEnabled?{...prepDraftMoves}:{},
     availabilityBlock:!['payment','anniversary'].includes($('#kind').value) && !!$('#availabilityBlock').checked,
     availabilityTargetCalId:(!['payment','anniversary'].includes($('#kind').value) && $('#availabilityBlock').checked)?($('#availabilityTarget').value||defaultAvailabilityTargetForSelectedCalendar()):'',
     repeat, repeatRule:repeat==='none'?null:getRepeatRule(), memo:$('#memo').value,
@@ -3736,7 +3768,7 @@ $('#purchaseForm').onsubmit=e=>{ e.preventDefault(); const id=$('#purchaseId').v
 $('#cancelPurchase').onclick=()=>closeDialog($('#purchaseDlg'));
 $('#deletePurchase').onclick=()=>{ const id=$('#purchaseId').value; if(id&&confirm('이 구매항목을 삭제할까요?')){ state.purchases=state.purchases.filter(x=>x.id!==id); closeDialog($('#purchaseDlg')); save(); } };
 $('#allDay').onchange=updateAllDayUI; $('#noDuration').onchange=()=>updateDurationMode(); $('#kind').onchange=updateKindUI; $('#availabilityBlock').onchange=updateAvailabilityBlockUI; $('#cal').onchange=()=>{ if($('#availabilityBlock').checked){ const v=defaultAvailabilityTargetForSelectedCalendar(); if([...$('#availabilityTarget').options].some(o=>o.value===v)) $('#availabilityTarget').value=v; } }; $('#start').onchange=updateDurationMode; $('#end').onchange=updateDurationMode; $('#endDate').onchange=updateDurationMode; $('#repeat').onchange=updateRepeatUI;
-$('#prepEnabled').onchange=()=>{ if($('#prepEnabled').checked){ if(!$('#eid').value){ prepDraftNotes={}; prepDraftTasks=[]; prepDraftAutoEnabled=$('#prepMode')?.value!=='custom'; } $('#prepDeadline').value=$('#date').value||ds(cursor); $('#repeat').value='none'; updateRepeatUI(); } updatePrepUI(); };
+$('#prepEnabled').onchange=()=>{ if($('#prepEnabled').checked){ if(!$('#eid').value){ prepDraftNotes={}; prepDraftTasks=[]; prepDraftMoves={}; prepDraftAutoEnabled=$('#prepMode')?.value!=='custom'; } $('#prepDeadline').value=$('#date').value||ds(cursor); $('#repeat').value='none'; updateRepeatUI(); } updatePrepUI(); };
 $('#prepDeadline').onchange=()=>{ if($('#prepDeadline').value){ $('#date').value=$('#prepDeadline').value; $('#endDate').value=$('#prepDeadline').value; updateDurationMode(); } updatePrepRepeatRuleUI(); renderPrepDailyRows(); };
 $('#prepMode').onchange=()=>{ collectPrepDailyNotes(); renderPrepDailyRows(); };
 if($('#prepAutoEnabled')) $('#prepAutoEnabled').onchange=()=>{ collectPrepDailyNotes(); prepDraftAutoEnabled=!!$('#prepAutoEnabled').checked; renderPrepDailyRows(); };
@@ -3744,7 +3776,36 @@ $('#prepDays').oninput=()=>{ if($('#prepAutoEnabled')?.checked) prepDraftAutoEna
 $('#addPrepOne').onclick=addPrepDateTask; $('#addPrepRepeat').onclick=addPrepRepeatTask;
 $('#prepRepeatStartMode').onchange=updatePrepRepeatRuleUI; $('#prepRepeatType').onchange=updatePrepRepeatRuleUI; if($('#prepRepeatEndType')) $('#prepRepeatEndType').onchange=updatePrepRepeatRuleUI; if($('#prepRepeatStartDate')) $('#prepRepeatStartDate').onchange=updatePrepRepeatRuleUI; if($('#prepRepeatBeforeDays')) $('#prepRepeatBeforeDays').oninput=updatePrepRepeatRuleUI;
 if($('#prepRuleList')) $('#prepRuleList').onclick=e=>{ const b=e.target.closest('[data-prep-rule-delete]'); if(!b) return; const id=b.dataset.prepRuleDelete; prepDraftTasks=prepDraftTasks.filter(x=>x.id!==id); renderPrepDailyRows(); };
-if($('#prepDailyRows')) $('#prepDailyRows').onclick=e=>{ const b=e.target.closest('[data-prep-task-delete]'); if(!b) return; e.preventDefault(); const id=b.dataset.prepTaskDelete; prepDraftTasks=prepDraftTasks.filter(x=>String(x.id)!==String(id)); renderPrepDailyRows(); };
+if($('#prepDailyRows')){
+  $('#prepDailyRows').onclick=e=>{
+    const edit=e.target.closest('[data-prep-task-edit-date]');
+    if(edit){
+      e.preventDefault();
+      const id=String(edit.dataset.prepTaskEditDate||'');
+      const picker=$(`#prepDailyRows [data-prep-task-date-picker="${CSS.escape(id)}"]`);
+      if(!picker) return;
+      try{ if(typeof picker.showPicker==='function') picker.showPicker(); else picker.click(); }
+      catch(_){ picker.focus(); picker.click(); }
+      return;
+    }
+    const b=e.target.closest('[data-prep-task-delete]'); if(!b) return;
+    e.preventDefault();
+    const id=String(b.dataset.prepTaskDelete||'');
+    prepDraftTasks=prepDraftTasks.filter(x=>String(x.id)!==id);
+    for(const key of Object.keys(prepDraftMoves||{})) if(key===`date:${id}`||key.startsWith(`weekly:${id}:`)||key.startsWith(`repeat:${id}:`)) delete prepDraftMoves[key];
+    renderPrepDailyRows();
+  };
+  $('#prepDailyRows').onchange=e=>{
+    const picker=e.target.closest('[data-prep-task-date-picker]'); if(!picker) return;
+    const id=String(picker.dataset.prepTaskDatePicker||''), date=String(picker.value||''), deadline=$('#prepDeadline')?.value||'';
+    const task=prepDraftTasks.find(x=>String(x.id)===id && x.type==='date');
+    if(!task || !date) return;
+    if(deadline && date>deadline){ alert('준비 날짜는 기한 날짜보다 늦을 수 없습니다.'); picker.value=task.date||''; return; }
+    task.date=date;
+    delete prepDraftMoves[`date:${id}`];
+    renderPrepDailyRows();
+  };
+}
 $('#date').onchange=()=>{
   if($('#prepEnabled').checked){ $('#prepDeadline').value=$('#date').value; $('#endDate').value=$('#date').value; renderPrepDailyRows(); }
   if(!$('#endDate').value || $('#endDate').value<$('#date').value) $('#endDate').value=$('#date').value;
@@ -4172,7 +4233,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.03',
+    appVersion:'2.05',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
