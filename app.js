@@ -3370,9 +3370,13 @@ function renderPrepDailyRows(){
   summary.classList.remove('warn');
   const autoDates=prepDraftAutoEnabled?prepFormDates():[];
   const manualEntries=prepCustomEntriesFromForm();
-  const combined=[];
-  autoDates.forEach(date=>combined.push({date,type:'auto',text:String(prepDraftNotes[date]||'').trim(),key:`auto:${date}`}));
-  manualEntries.forEach(entry=>combined.push({...entry}));
+  const baseCombined=[];
+  autoDates.forEach(date=>baseCombined.push({date,sourceDate:date,type:'auto',text:String(prepDraftNotes[date]||'').trim(),key:`auto:${date}`,ruleId:date,ruleLabel:'자동'}));
+  manualEntries.forEach(entry=>baseCombined.push({...entry}));
+  const combined=baseCombined.map(entry=>{
+    const moved=typeof prepDraftMoves?.[entry.key]==='string'&&prepDraftMoves[entry.key]?prepDraftMoves[entry.key]:'';
+    return moved?{...entry,date:moved,moved:true}:{...entry,moved:false};
+  }).filter(entry=>!deadline||entry.date<=deadline);
   combined.sort((a,b)=>a.date.localeCompare(b.date)||(a.type==='auto'?-1:b.type==='auto'?1:a.text.localeCompare(b.text)));
   const uniqueDates=[...new Set(combined.map(x=>x.date))];
   const autoLabel=prepDraftAutoEnabled?`자동 ${autoDates.length}일`:'';
@@ -3380,12 +3384,16 @@ function renderPrepDailyRows(){
   summary.textContent=combined.length?`준비 진행계획 ${combined.length}건 · ${uniqueDates.length}일${autoLabel||extraLabel?' · ':''}${[autoLabel,extraLabel].filter(Boolean).join(' + ')} → 마감 ${deadline}`:`준비 진행계획을 추가하세요. → 마감 ${deadline}`;
   const seenRule=new Set();
   wrap.innerHTML=combined.length?combined.map(entry=>{
-    if(entry.type==='auto') return `<label class="prepDailyRow prepPlanEditorRow"><span class="prepDailyDate">${esc(preparationDateLabel(entry.date))}<small>자동</small></span><input data-prep-date="${esc(entry.date)}" value="${esc(prepDraftNotes[entry.date]||'')}" placeholder="이날 진행할 내용"></label>`;
     const firstForRule=!seenRule.has(entry.ruleId); seenRule.add(entry.ruleId);
-    const rule=entry.ruleLabel?`<small class="prepEditorRule">${esc(entry.ruleLabel)}</small>`:'';
-    const editDate=firstForRule&&entry.type==='date'?`<button type="button" class="prepRuleDelete prepInlineEdit" data-prep-task-edit-date="${esc(entry.ruleId)}" title="이 준비업무 날짜 수정" aria-label="날짜 수정">✎</button><input type="date" class="prepInlineDatePicker" data-prep-task-date-picker="${esc(entry.ruleId)}" value="${esc(entry.date)}" max="${esc(deadline)}" aria-label="준비업무 날짜 선택">`:'';
+    const sourceDate=String(entry.sourceDate||entry.date||'');
+    const editDate=`<button type="button" class="prepRuleDelete prepInlineEdit" data-prep-entry-edit-key="${esc(entry.key)}" title="이 준비업무 날짜 수정" aria-label="날짜 수정">✎</button><input type="date" class="prepInlineDatePicker" data-prep-entry-date-picker="${esc(entry.key)}" data-prep-entry-type="${esc(entry.type)}" data-prep-entry-rule-id="${esc(entry.ruleId||'')}" data-prep-entry-source-date="${esc(sourceDate)}" value="${esc(entry.date)}" max="${esc(deadline)}" aria-label="준비업무 날짜 선택">`;
+    if(entry.type==='auto'){
+      const movedMark=entry.moved?`<small class="prepEditorRule">이동</small>`:'<small>자동</small>';
+      return `<label class="prepDailyRow prepPlanEditorRow"><span class="prepDailyDate">${esc(preparationDateLabel(entry.date))}${movedMark}</span><input data-prep-date="${esc(sourceDate)}" value="${esc(prepDraftNotes[sourceDate]||'')}" placeholder="이날 진행할 내용"><div class="prepPlanEditorActions">${editDate}</div></label>`;
+    }
+    const rule=entry.ruleLabel?`<small class="prepEditorRule">${esc(entry.ruleLabel)}${entry.moved?' · 이동':''}</small>`:'';
     const del=firstForRule?`<button type="button" class="prepRuleDelete prepInlineDelete" data-prep-task-delete="${esc(entry.ruleId)}" title="${entry.type==='repeat'||entry.type==='weekly'?'이 반복 준비업무 전체 삭제':'이 준비업무 삭제'}">×</button>`:'';
-    const actions=firstForRule?`<div class="prepPlanEditorActions">${editDate}${del}</div>`:'<span></span>';
+    const actions=`<div class="prepPlanEditorActions">${editDate}${del}</div>`;
     return `<div class="prepDailyRow prepPlanEditorRow prepManualPlanRow"><span class="prepDailyDate">${esc(preparationDateLabel(entry.date))}${rule}</span><div class="prepPlanEditorText">${esc(entry.text||'계획 미입력')}</div>${actions}</div>`;
   }).join(''):`<div class="prepRuleEmpty">아직 준비 진행계획이 없습니다. 위의 추가 방식에서 계획을 만들어 주세요.</div>`;
   renderPrepTaskRules();
@@ -3778,11 +3786,11 @@ $('#prepRepeatStartMode').onchange=updatePrepRepeatRuleUI; $('#prepRepeatType').
 if($('#prepRuleList')) $('#prepRuleList').onclick=e=>{ const b=e.target.closest('[data-prep-rule-delete]'); if(!b) return; const id=b.dataset.prepRuleDelete; prepDraftTasks=prepDraftTasks.filter(x=>x.id!==id); renderPrepDailyRows(); };
 if($('#prepDailyRows')){
   $('#prepDailyRows').onclick=e=>{
-    const edit=e.target.closest('[data-prep-task-edit-date]');
+    const edit=e.target.closest('[data-prep-entry-edit-key]');
     if(edit){
       e.preventDefault();
-      const id=String(edit.dataset.prepTaskEditDate||'');
-      const picker=$(`#prepDailyRows [data-prep-task-date-picker="${CSS.escape(id)}"]`);
+      const key=String(edit.dataset.prepEntryEditKey||'');
+      const picker=[...$$('#prepDailyRows [data-prep-entry-date-picker]')].find(x=>String(x.dataset.prepEntryDatePicker||'')===key);
       if(!picker) return;
       try{ if(typeof picker.showPicker==='function') picker.showPicker(); else picker.click(); }
       catch(_){ picker.focus(); picker.click(); }
@@ -3796,13 +3804,19 @@ if($('#prepDailyRows')){
     renderPrepDailyRows();
   };
   $('#prepDailyRows').onchange=e=>{
-    const picker=e.target.closest('[data-prep-task-date-picker]'); if(!picker) return;
-    const id=String(picker.dataset.prepTaskDatePicker||''), date=String(picker.value||''), deadline=$('#prepDeadline')?.value||'';
-    const task=prepDraftTasks.find(x=>String(x.id)===id && x.type==='date');
-    if(!task || !date) return;
-    if(deadline && date>deadline){ alert('준비 날짜는 기한 날짜보다 늦을 수 없습니다.'); picker.value=task.date||''; return; }
-    task.date=date;
-    delete prepDraftMoves[`date:${id}`];
+    const picker=e.target.closest('[data-prep-entry-date-picker]'); if(!picker) return;
+    const key=String(picker.dataset.prepEntryDatePicker||''), type=String(picker.dataset.prepEntryType||''), ruleId=String(picker.dataset.prepEntryRuleId||''), sourceDate=String(picker.dataset.prepEntrySourceDate||''), date=String(picker.value||''), deadline=$('#prepDeadline')?.value||'';
+    if(!date) return;
+    if(deadline && date>deadline){ alert('준비 날짜는 기한 날짜보다 늦을 수 없습니다.'); picker.value=prepDraftMoves[key]||sourceDate||''; return; }
+    if(type==='date'){
+      const task=prepDraftTasks.find(x=>String(x.id)===ruleId && x.type==='date');
+      if(!task) return;
+      task.date=date;
+      delete prepDraftMoves[key];
+    }else{
+      if(date===sourceDate) delete prepDraftMoves[key];
+      else prepDraftMoves[key]=date;
+    }
     renderPrepDailyRows();
   };
 }
@@ -4233,7 +4247,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.05',
+    appVersion:'2.06',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
