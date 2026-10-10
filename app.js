@@ -1050,7 +1050,6 @@ function buildOccurrenceMap(rangeStart, rangeEnd, options={}){
   return map;
 }
 function isDone(e){
-  if(e.kind==='anniversary') return false;
   if((e.repeat||'none')==='none') return !!e.done;
   return (e.doneDates||[]).includes(e._occurrenceStart||e.date);
 }
@@ -1142,7 +1141,7 @@ function checklistProgress(e,occ=''){
   return {total:items.length,done:count,complete:items.length>0&&count===items.length};
 }
 function setOccurrenceDoneState(e,occ,done){
-  if(!e || e.kind==='anniversary') return;
+  if(!e) return;
   const key=occ||e.date;
   if((e.repeat||'none')==='none') e.done=!!done;
   else{
@@ -2125,9 +2124,9 @@ function openEventPopover(anchor,id,occ){
   if(details) details.classList.toggle('hidden',!(placeText||memoText));
   const planBtn=$('#eventPopoverPlan'); if(planBtn) planBtn.classList.toggle('hidden',!base.prepEnabled);
   const doneWrap=$('#eventPopoverDoneWrap'), done=$('#eventPopoverDone'), doneText=$('#eventPopoverDoneText');
-  const canComplete=base.kind!=='anniversary';
-  doneWrap.classList.toggle('hidden',!canComplete);
-  if(canComplete){ done.checked=!!isDone(e); doneText.textContent=base.kind==='payment'?'납부완료':'완료'; }
+  const canComplete=true;
+  doneWrap.classList.toggle('hidden',false);
+  done.checked=!!isDone(e); doneText.textContent=base.kind==='payment'?'납부완료':'완료';
   positionEventPopover(anchor);
 }
 $('#eventPopoverClose').onclick=closeEventPopover;
@@ -2138,7 +2137,7 @@ $('#eventPopoverEdit').onclick=()=>{
 $('#eventPopoverPlan').onclick=()=>{ const {id,occ}=eventPopoverState; if(!id) return; closeEventPopover(); openPreparationPlan(id,occ||''); };
 $('#eventPopoverDone').onchange=()=>{
   const {id,occ}=eventPopoverState; if(!id) return;
-  const ev=state.events.find(x=>x.id===id); if(!ev || ev.kind==='anniversary') return;
+  const ev=state.events.find(x=>x.id===id); if(!ev) return;
   const current=isDone({...ev,_occurrenceStart:occ||ev.date});
   const want=!!$('#eventPopoverDone').checked;
   if(current!==want) toggleDone(id,occ||ev.date);
@@ -2488,7 +2487,7 @@ function toggleSubtask(id,occ,subtaskId){
   save();
 }
 function toggleDone(id,occ){
-  const e=state.events.find(x=>x.id===id); if(!e || e.kind==='anniversary') return;
+  const e=state.events.find(x=>x.id===id); if(!e) return;
   const list=checklistItems(e);
   if(e.kind!=='payment' && list.length){
     const key=occ||e.date, currentlyDone=isDone({...e,_occurrenceStart:key});
@@ -3632,7 +3631,7 @@ function openEvent(date,id,options={}){
   const occurrenceView=e?{...e,_occurrenceStart:activeEventOccurrence}:null;
   const doneWrap=$('#eventDoneWrap'), doneInput=$('#eventDone'), doneText=$('#eventDoneText');
   if(doneWrap){
-    const canComplete=!!e && e.kind!=='anniversary';
+    const canComplete=!!e;
     doneWrap.classList.toggle('hidden',!canComplete);
     if(canComplete){ doneInput.checked=!!isDone(occurrenceView); doneText.textContent=e.kind==='payment'?'납부완료':'완료'; }
   }
@@ -3759,7 +3758,7 @@ $('#editWholeSeries').onclick=()=>{
 $('#cancelRepeatEdit').onclick=()=>{ pendingRepeatEdit=null; closeDialog($('#repeatEditDlg')); };
 $('#cancelEvent').onclick=()=>{ activeEventOccurrence=null; closeDialog($('#eventDlg')); };
 $('#eventDone').onchange=()=>{
-  const id=$('#eid').value, ev=state.events.find(x=>x.id===id); if(!ev || ev.kind==='anniversary') return;
+  const id=$('#eid').value, ev=state.events.find(x=>x.id===id); if(!ev) return;
   const occ=activeEventOccurrence||ev.date;
   const want=!!$('#eventDone').checked;
   const now=isDone({...ev,_occurrenceStart:occ});
@@ -4308,7 +4307,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.07',
+    appVersion:'2.08',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
