@@ -2308,11 +2308,5 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 .prepEditingSave:hover{background:#e5efff}
 
 
-/* v2.09: Firebase Storage attachments */
-.attachmentEditor{border:1px solid #e5e7eb;border-radius:8px;background:#fafcff;padding:9px;display:grid;gap:7px}
-.attachmentEditorHead{display:flex;align-items:center;justify-content:space-between;gap:10px}.attachmentEditorHead b{font-size:12px}.attachmentEditorHead button{padding:5px 8px;font-size:11px}
-.attachmentList{display:grid;gap:5px}.attachmentEmpty{padding:8px;border:1px dashed #d8dde5;border-radius:6px;background:#fff;color:#9299a4;font-size:11px;text-align:center}
-.attachmentRow{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:6px;padding:6px 7px;border:1px solid #e1e5eb;border-radius:6px;background:#fff;min-width:0}.attachmentRow.pending{background:#f8fbff;border-style:dashed}.attachmentClip{font-size:12px}.attachmentName{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;color:#334155}.attachmentRow button.attachmentName{border:0;background:transparent;padding:0}.attachmentRow button.attachmentName:hover{text-decoration:underline;background:transparent}.attachmentRow small{color:#7b8490;font-size:10px;white-space:nowrap}.attachmentRemove{border:0!important;background:transparent!important;padding:1px 4px!important;color:#9299a4;font-size:15px;line-height:1}.attachmentRemove:hover{color:#c5221f!important}
-.attachmentMark{display:inline-flex;align-items:center;justify-content:center;font-size:11px;line-height:1;flex:0 0 auto;filter:grayscale(1);opacity:.72}
-.eventPopoverAttachments{grid-template-columns:36px minmax(0,1fr)}.eventPopoverAttachmentList{display:grid;gap:4px;min-width:0}.eventPopoverAttachment{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px;align-items:center}.eventPopoverAttachmentName{border:0!important;background:transparent!important;padding:1px 0!important;text-align:left;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#315b96}.eventPopoverAttachmentName:hover{text-decoration:underline}.eventPopoverAttachmentDownload{padding:1px 5px!important;border:0!important;background:transparent!important;color:#667085;font-size:12px}
-@media(max-width:760px){.attachmentRow{grid-template-columns:auto minmax(0,1fr) auto}.attachmentRow small{display:none}.attachmentEditorHead button{font-size:12px}}
+/* v2.10: 반복일정 수정창 기준일 표시 + 반복 시작/종료 표시 통일 */
+.eventDialogTitleLine{display:flex;align-items:center;gap:9px;min-width:0}.eventDialogTitleLine h3{margin:0;white-space:nowrap}.eventOccurrenceDate{font-size:12px;color:#667085;font-weight:700;white-space:nowrap}.eventOccurrenceDate:empty{display:none}

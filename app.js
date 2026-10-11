@@ -7,9 +7,6 @@ import {
 import {
   getFirestore, doc, getDoc, getDocFromServer, setDoc, onSnapshot, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
-import {
-  getStorage, ref as storageRef, uploadBytes, getDownloadURL
-} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js';
 
 const FIREBASE_CONFIG = {
   apiKey: 'AIzaSyAG1fSeZNxx5I1--zM_bW0iVQu53ggRjDc',
@@ -69,11 +66,10 @@ function suggestSubCalendarColor(parentId, editId=''){
 const app = initializeApp(FIREBASE_CONFIG);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const storage = getStorage(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '2.09',
+  version: '2.00',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -107,10 +103,6 @@ let lastScheduleView = 'week';
 let calendarFocusId = null;
 let activeDrag = null;
 let activeEventOccurrence = null;
-let attachmentDraft = [];
-let pendingAttachmentFiles = [];
-const ATTACHMENT_MAX_COUNT = 10;
-const ATTACHMENT_MAX_BYTES = 20 * 1024 * 1024;
 let lastFirebaseSavedAt = null;
 let lastLocalSavedAt = null;
 let localDirty = false;
@@ -354,7 +346,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '2.09',
+    version: '2.00',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -370,9 +362,6 @@ function normalizeState(raw){
       repeatRule:e.repeatRule||null,
       paymentAmount:Math.max(0,Number(e.paymentAmount)||0),
       paymentMethod:typeof e.paymentMethod==='string'?e.paymentMethod:'',
-      attachments:Array.isArray(e.attachments)?e.attachments.filter(a=>a&&a.path&&a.name).slice(0,ATTACHMENT_MAX_COUNT).map(a=>({
-        id:String(a.id||uid()),name:String(a.name||'파일'),path:String(a.path||''),size:Math.max(0,Number(a.size)||0),type:String(a.type||''),uploadedAt:String(a.uploadedAt||'')
-      })):[],
       prepEnabled:!!e.prepEnabled,
       prepDeadline:typeof e.prepDeadline==='string'&&e.prepDeadline?e.prepDeadline:(e.date||''),
       prepMode:e.prepMode==='custom'?'custom':'auto',
@@ -1210,11 +1199,9 @@ function eventItemHtml(e, compact=false){
   const checklistButton=checklist.length?`<button type="button" class="checklistToggle ${expanded?'on':''}" data-action="checklist-toggle" title="세부 체크리스트 ${checklistState.done}/${checklistState.total}">☷ ${checklistState.done}/${checklistState.total}</button>`:'';
   const repeatBadge=!prepDay&&recurring?`<span class="repeatMark" title="${esc(repeatRuleLabel(e))}">↻</span>`:'';
   const carryBadge=inLabel?`<span class="carryBadge carryIn" title="${esc(inLabel)}">↪</span>`:'';
-  const attachmentCount=Array.isArray(e.attachments)?e.attachments.length:0;
-  const attachmentBadge=attachmentCount?`<span class="attachmentMark" title="첨부파일 ${attachmentCount}개">📎</span>`:'';
   const amountInline=!prepDay&&payment&&Number(e.paymentAmount)>0?`<span class="inlineMeta">₩${Number(e.paymentAmount).toLocaleString('ko-KR')}</span>`:'';
   return `<div class="item ${done?'done':''} kind-${esc(e.kind||'event')} ${recurring&&!prepDay?'recurringItem':''} ${payment&&!prepDay?'paymentItem':''} ${e.fixedId?'manualPlacedItem':''} ${e.flexibleId?'flexiblePlacedItem':''} ${inLabel?'carriedIn':''} ${outRecord?'carriedOut':''} ${prepDay?'prepDayItem':''} ${prepDeadlineDay?'prepDeadlineDayItem':''} ${deadlineItem?'prepDeadlineItem':''}" draggable="${drag}" data-eid="${esc(e.id)}" data-occurrence="${esc(e._occurrenceStart||e.date)}" data-render-date="${esc(renderDate)}" data-cal-id="${esc(e.calId)}" data-lane="${payment?'payment':'work'}" data-prep-day="${prepDay?'1':''}" data-prep-key="${prepDay?esc(e._prepKey||''):''}" data-prep-source-date="${prepDay?esc(e._prepSourceDate||''):''}" data-prep-type="${prepDay?esc(e._prepType||''):''}" data-prep-rule-id="${prepDay?esc(e._prepRuleId||''):''}" data-prep-event="${e.prepEnabled?'1':''}" style="--item-color:${esc(c.color)};border-left-color:${esc(c.color)}">
-    <div class="itemRow">${dragHandle}${!prepDay&&e.important?`<button type="button" class="importanceBtn on" data-action="importance" aria-label="중요 표시 해제" title="중요 표시 해제">★</button>`:''}${mainCheck}<div class="itemTitle" title="${esc(tooltip)}">${timePrefix}<span class="durationPrefix">${esc(durationPrefix)}</span>${!prepDay&&payment?'₩ ':(!checkable&&!prepDay?kindPrefix(e):'')}${esc(shownTitle)}</div>${amountInline}${attachmentBadge}${repeatBadge}${carryBadge}${checklistButton}</div>
+    <div class="itemRow">${dragHandle}${!prepDay&&e.important?`<button type="button" class="importanceBtn on" data-action="importance" aria-label="중요 표시 해제" title="중요 표시 해제">★</button>`:''}${mainCheck}<div class="itemTitle" title="${esc(tooltip)}">${timePrefix}<span class="durationPrefix">${esc(durationPrefix)}</span>${!prepDay&&payment?'₩ ':(!checkable&&!prepDay?kindPrefix(e):'')}${esc(shownTitle)}</div>${amountInline}${repeatBadge}${carryBadge}${checklistButton}</div>
     ${expanded?checklistHtml(e,false):''}
   </div>`;
 }
@@ -2130,19 +2117,11 @@ function openEventPopover(anchor,id,occ){
   if((base.repeat||'none')!=='none') meta.push(repeatRuleLabel(base));
   $('#eventPopoverMeta').textContent=meta.filter(Boolean).join(' · ');
   const details=$('#eventPopoverDetails');
-  const placeRow=$('#eventPopoverPlace'), memoRow=$('#eventPopoverMemo'), attachmentRow=$('#eventPopoverAttachments'), attachmentList=$('#eventPopoverAttachmentList');
-  const placeText=String(base.place||'').trim(), memoText=String(base.memo||'').trim(), attachments=Array.isArray(base.attachments)?base.attachments:[];
+  const placeRow=$('#eventPopoverPlace'), memoRow=$('#eventPopoverMemo');
+  const placeText=String(base.place||'').trim(), memoText=String(base.memo||'').trim();
   if(placeRow){ placeRow.classList.toggle('hidden',!placeText); const span=placeRow.querySelector('span'); if(span) span.textContent=placeText; }
   if(memoRow){ memoRow.classList.toggle('hidden',!memoText); const span=memoRow.querySelector('span'); if(span) span.textContent=memoText; }
-  if(attachmentRow){
-    attachmentRow.classList.toggle('hidden',!attachments.length);
-    if(attachmentList){
-      attachmentList.innerHTML=attachments.map((a,i)=>`<div class="eventPopoverAttachment"><button type="button" class="eventPopoverAttachmentName" data-attachment-index="${i}" title="파일 열기">📎 ${esc(a.name)}</button><button type="button" class="eventPopoverAttachmentDownload" data-attachment-index="${i}" title="다운로드">↓</button></div>`).join('');
-      attachmentList.querySelectorAll('.eventPopoverAttachmentName').forEach(btn=>btn.onclick=()=>openStoredAttachment(attachments[Number(btn.dataset.attachmentIndex)]));
-      attachmentList.querySelectorAll('.eventPopoverAttachmentDownload').forEach(btn=>btn.onclick=()=>downloadStoredAttachment(attachments[Number(btn.dataset.attachmentIndex)]));
-    }
-  }
-  if(details) details.classList.toggle('hidden',!(placeText||memoText||attachments.length));
+  if(details) details.classList.toggle('hidden',!(placeText||memoText));
   const planBtn=$('#eventPopoverPlan'); if(planBtn) planBtn.classList.toggle('hidden',!base.prepEnabled);
   const doneWrap=$('#eventPopoverDoneWrap'), done=$('#eventPopoverDone'), doneText=$('#eventPopoverDoneText');
   const canComplete=true;
@@ -3277,6 +3256,39 @@ function updateYearlyCalendarUI(){
   $('#lunarYearlyOptions').classList.toggle('hidden',!isLunar);
   if(isLunar) updateLunarYearlyHint();
 }
+let eventSpanDaysDraft=0;
+let lastRepeatFormType='none';
+function internalEventEndDateFromForm(){
+  const start=$('#date').value||ds(new Date());
+  if($('#repeat').value==='none') return $('#endDate').value||start;
+  return ds(add(parse(start),Math.max(0,Number(eventSpanDaysDraft)||0)));
+}
+function syncTopEndDateWithRepeat(){
+  const repeat=$('#repeat').value;
+  if(repeat==='none'){
+    const start=$('#date').value;
+    if(start) $('#endDate').value=ds(add(parse(start),Math.max(0,Number(eventSpanDaysDraft)||0)));
+    return;
+  }
+  const endType=$('#repeatEndType').value;
+  $('#endDate').value=endType==='date'?($('#repeatEndDate').value||''):'';
+}
+function handleRepeatTypeChange(){
+  const next=$('#repeat').value;
+  if(lastRepeatFormType==='none' && next!=='none'){
+    const start=$('#date').value, end=$('#endDate').value||start;
+    if(start&&end) eventSpanDaysDraft=Math.max(0,diffDays(start,end));
+  }
+  lastRepeatFormType=next;
+  updateRepeatUI();
+}
+function syncRepeatEndFromTop(){
+  if($('#repeat').value==='none') return;
+  const v=$('#endDate').value;
+  if(v){ $('#repeatEndType').value='date'; $('#repeatEndDate').value=v; }
+  else { $('#repeatEndType').value='never'; $('#repeatEndDate').value=''; }
+  updateRepeatEndUI();
+}
 function updateRepeatUI(){
   const type=$('#repeat').value, date=$('#date').value||ds(new Date()), d=parse(date);
   $('#repeatDetails').classList.toggle('hidden',type==='none');
@@ -3292,11 +3304,13 @@ function updateRepeatUI(){
   if(!$('#lunarDay').value) $('#lunarDay').value=lp?.day||1;
   if(type==='yearly') updateYearlyCalendarUI();
   updateRepeatEndUI();
+  syncTopEndDateWithRepeat();
 }
 function updateRepeatEndUI(){
   const t=$('#repeatEndType').value;
   $('#repeatEndDateWrap').classList.toggle('hidden',t!=='date');
   $('#repeatCountWrap').classList.toggle('hidden',t!=='count');
+  syncTopEndDateWithRepeat();
 }
 function getRepeatRule(){
   const date=$('#date').value, d=parse(date), nth=Math.floor((d.getDate()-1)/7)+1;
@@ -3588,82 +3602,6 @@ function cleanedChecklistDoneMap(map,items){
   }
   return out;
 }
-function attachmentSizeLabel(bytes){
-  const n=Math.max(0,Number(bytes)||0);
-  if(n<1024) return `${n}B`;
-  if(n<1024*1024) return `${(n/1024).toFixed(n<10*1024?1:0)}KB`;
-  return `${(n/(1024*1024)).toFixed(n<10*1024*1024?1:0)}MB`;
-}
-function safeStorageFilename(name){
-  return String(name||'file').replace(/[\\/:*?"<>|#%{}]/g,'_').replace(/\s+/g,' ').trim().slice(0,120)||'file';
-}
-function attachmentKey(a){ return String(a?.id||a?.path||''); }
-function renderAttachmentEditor(){
-  const box=$('#attachmentList'); if(!box) return;
-  const rows=[];
-  for(const a of attachmentDraft){
-    rows.push(`<div class="attachmentRow" data-attachment-id="${esc(attachmentKey(a))}"><span class="attachmentClip">📎</span><button type="button" class="attachmentName attachmentOpenExisting" title="열기">${esc(a.name)}</button><small>${esc(attachmentSizeLabel(a.size))}</small><button type="button" class="attachmentRemove" title="첨부에서 제거">×</button></div>`);
-  }
-  for(const p of pendingAttachmentFiles){
-    rows.push(`<div class="attachmentRow pending" data-pending-id="${esc(p.id)}"><span class="attachmentClip">📎</span><span class="attachmentName">${esc(p.file.name)}</span><small>${esc(attachmentSizeLabel(p.file.size))} · 저장 시 업로드</small><button type="button" class="attachmentRemove" title="첨부에서 제거">×</button></div>`);
-  }
-  box.innerHTML=rows.join('')||'<div class="attachmentEmpty">첨부파일 없음</div>';
-  box.querySelectorAll('.attachmentRow[data-attachment-id]').forEach(row=>{
-    row.querySelector('.attachmentOpenExisting')?.addEventListener('click',()=>openStoredAttachment(attachmentDraft.find(a=>attachmentKey(a)===row.dataset.attachmentId)));
-    row.querySelector('.attachmentRemove')?.addEventListener('click',()=>{ attachmentDraft=attachmentDraft.filter(a=>attachmentKey(a)!==row.dataset.attachmentId); renderAttachmentEditor(); });
-  });
-  box.querySelectorAll('.attachmentRow[data-pending-id]').forEach(row=>{
-    row.querySelector('.attachmentRemove')?.addEventListener('click',()=>{ pendingAttachmentFiles=pendingAttachmentFiles.filter(p=>p.id!==row.dataset.pendingId); renderAttachmentEditor(); });
-  });
-}
-function addAttachmentFiles(fileList){
-  const files=[...(fileList||[])];
-  for(const file of files){
-    if(attachmentDraft.length+pendingAttachmentFiles.length>=ATTACHMENT_MAX_COUNT){ alert(`첨부파일은 최대 ${ATTACHMENT_MAX_COUNT}개까지 등록할 수 있습니다.`); break; }
-    if(file.size>ATTACHMENT_MAX_BYTES){ alert(`${file.name}\n파일 크기가 20MB를 초과해 첨부할 수 없습니다.`); continue; }
-    pendingAttachmentFiles.push({id:uid(),file});
-  }
-  const input=$('#attachmentInput'); if(input) input.value='';
-  renderAttachmentEditor();
-}
-async function uploadPendingAttachments(){
-  if(!pendingAttachmentFiles.length) return attachmentDraft.map(a=>({...a}));
-  if(!currentUser) throw new Error('로그인이 필요합니다.');
-  const uploaded=[];
-  for(const p of pendingAttachmentFiles){
-    const id=uid();
-    const filename=safeStorageFilename(p.file.name);
-    const path=`users/${currentUser.uid}/calendar-attachments/${id}/${filename}`;
-    const ref=storageRef(storage,path);
-    await uploadBytes(ref,p.file,{contentType:p.file.type||'application/octet-stream'});
-    uploaded.push({id,name:p.file.name,path,size:p.file.size,type:p.file.type||'',uploadedAt:new Date().toISOString()});
-  }
-  return [...attachmentDraft.map(a=>({...a})),...uploaded];
-}
-async function openStoredAttachment(a){
-  if(!a?.path) return;
-  const win=window.open('about:blank','_blank');
-  try{
-    const url=await getDownloadURL(storageRef(storage,a.path));
-    if(win) win.location.href=url; else window.open(url,'_blank','noopener');
-  }catch(err){
-    if(win) win.close();
-    console.error(err); alert('첨부파일을 열 수 없습니다. Firebase Storage 연결과 권한을 확인하세요.');
-  }
-}
-async function downloadStoredAttachment(a){
-  if(!a?.path) return;
-  try{
-    const url=await getDownloadURL(storageRef(storage,a.path));
-    const res=await fetch(url); if(!res.ok) throw new Error('download failed');
-    const blob=await res.blob(), href=URL.createObjectURL(blob), link=document.createElement('a');
-    link.href=href; link.download=a.name||'attachment'; document.body.appendChild(link); link.click(); link.remove();
-    setTimeout(()=>URL.revokeObjectURL(href),1500);
-  }catch(err){ console.error(err); openStoredAttachment(a); }
-}
-$('#addAttachmentBtn')?.addEventListener('click',()=>$('#attachmentInput')?.click());
-$('#attachmentInput')?.addEventListener('change',e=>addAttachmentFiles(e.target.files));
-
 function openEvent(date,id,options={}){
   closeEventPopover();
   const e=state.events.find(x=>x.id===id);
@@ -3674,11 +3612,12 @@ function openEvent(date,id,options={}){
   const requestedCalId=!e && typeof options?.calId==='string' && state.calendars.some(c=>c.id===options.calId) ? options.calId : '';
   activeEventOccurrence=e?(date||e.date):(date||ds(cursor));
   $('#eventTitle').textContent=e?'일정 수정':(paymentPreset?'납부일정 추가':(quickPreset?'Quick 추가':(commonPreset?'공통일정 추가':(recurringPreset?'자동반복 업무 추가':'일정 등록'))));
+  const occLabel=$('#eventOccurrenceDate'); if(occLabel) occLabel.textContent=e?activeEventOccurrence:'';
+  eventSpanDaysDraft=e?Math.max(0,diffDays(e.date,e.endDate||e.date)):0;
   $('#eid').value=e?.id||''; $('#title').value=e?.title||''; $('#important').checked=!!e?.important; $('#cal').value=e?.calId||requestedCalId||cals()[0]?.id||'';
   $('#date').value=e?.date||date||ds(cursor); $('#endDate').value=e?.endDate||e?.date||date||ds(cursor);
   $('#allDay').checked=e?.allDay??true; $('#start').value=e?.start||''; $('#end').value=e?.end||''; setDurationInputs(e?.hours??1); $('#noDuration').checked=paymentPreset?true:!!e?.noDuration;
-  $('#kind').value=e?.kind||(paymentPreset?'payment':(quickPreset?'todo':(commonPreset?'appointment':(recurringPreset?'todo':'event')))); $('#place').value=e?.place||''; $('#repeat').value=e?.repeat||(paymentPreset?'monthly':(recurringPreset?'weekly':'none')); $('#memo').value=e?.memo||'';
-  attachmentDraft=Array.isArray(e?.attachments)?e.attachments.map(a=>({...a})):[]; pendingAttachmentFiles=[]; renderAttachmentEditor();
+  $('#kind').value=e?.kind||(paymentPreset?'payment':(quickPreset?'todo':(commonPreset?'appointment':(recurringPreset?'todo':'event')))); $('#place').value=e?.place||''; $('#repeat').value=e?.repeat||(paymentPreset?'monthly':(recurringPreset?'weekly':'none')); lastRepeatFormType=$('#repeat').value; $('#memo').value=e?.memo||'';
   // 새 일정은 이전에 열었던 일정의 준비/마감 정보를 절대 이어받지 않는다.
   if(e){
     prepDraftNotes={...(e.prepDailyNotes||{})};
@@ -3799,11 +3738,14 @@ function requestRepeatEditScope(old,obj){
   $('#repeatEditInfo').textContent=`${occ} 반복 일정의 수정 범위를 선택하세요.`;
   openDialog($('#repeatEditDlg'));
 }
-$('#eventForm').onsubmit=async e=>{
+$('#eventForm').onsubmit=e=>{
   e.preventDefault();
   const id=$('#eid').value, old=state.events.find(x=>x.id===id);
-  if($('#endDate').value && $('#endDate').value<$('#date').value){ alert('종료일은 시작일보다 빠를 수 없습니다.'); return; }
-  if(!$('#allDay').checked && $('#start').value && $('#end').value && $('#end').value<=$('#start').value && $('#date').value===$('#endDate').value){ alert('종료 시간은 시작 시간보다 늦어야 합니다.'); return; }
+  const repeat=$('#repeat').value;
+  const internalEndDate=internalEventEndDateFromForm();
+  if(repeat==='none' && $('#endDate').value && $('#endDate').value<$('#date').value){ alert('종료일은 시작일보다 빠를 수 없습니다.'); return; }
+  if(repeat!=='none' && $('#repeatEndType').value==='date' && $('#endDate').value && $('#endDate').value<$('#date').value){ alert('반복 종료 날짜는 시작 날짜보다 빠를 수 없습니다.'); return; }
+  if(!$('#allDay').checked && $('#start').value && $('#end').value && $('#end').value<=$('#start').value && $('#date').value===internalEndDate){ alert('종료 시간은 시작 시간보다 늦어야 합니다.'); return; }
   if($('#repeat').value!=='none' && $('#repeatEndType').value==='date' && !$('#repeatEndDate').value){ alert('반복 종료 날짜를 선택하세요.'); return; }
   if($('#repeat').value!=='none' && $('#repeatEndType').value==='date' && $('#repeatEndDate').value<$('#date').value){ alert('반복 종료 날짜는 시작 날짜보다 빠를 수 없습니다.'); return; }
   if($('#repeat').value==='yearly' && $('#yearlyCalendar').value==='lunar' && !lunarFormatter){ alert('현재 브라우저에서는 음력 날짜 변환을 지원하지 않습니다.'); return; }
@@ -3812,30 +3754,18 @@ $('#eventForm').onsubmit=async e=>{
   if(prepEnabled && !$('#prepDeadline').value){ alert('기한 날짜를 선택하세요.'); return; }
   if(prepEnabled){ $('#date').value=$('#prepDeadline').value; $('#endDate').value=$('#prepDeadline').value; }
   collectPrepDailyNotes();
-  const repeat=$('#repeat').value;
-  const saveBtn=$('#saveEvent'), saveBtnLabel=saveBtn?.textContent||'저장';
-  let savedAttachments=[];
-  try{
-    if(saveBtn){ saveBtn.disabled=true; if(pendingAttachmentFiles.length) saveBtn.textContent='파일 업로드 중…'; }
-    savedAttachments=await uploadPendingAttachments();
-  }catch(err){
-    console.error(err); alert('첨부파일 업로드에 실패했습니다. Firebase Storage가 활성화되어 있는지 확인하세요.');
-    if(saveBtn){ saveBtn.disabled=false; saveBtn.textContent=saveBtnLabel; }
-    return;
-  }
-  if(saveBtn){ saveBtn.disabled=false; saveBtn.textContent=saveBtnLabel; }
   const checklist=checklistFromText($('#checklistText').value,checklistItems(old||{}));
   const checklistDoneByDate=cleanedChecklistDoneMap(old?.checklistDoneByDate||{},checklist);
   const obj={
     id:id||uid(), title:$('#title').value.trim(), important:$('#important').checked, calId:$('#cal').value, date:$('#date').value,
-    endDate:$('#endDate').value||$('#date').value, allDay:$('#allDay').checked,
+    endDate:internalEndDate, allDay:$('#allDay').checked,
     start:$('#allDay').checked?'':$('#start').value, end:$('#allDay').checked?'':$('#end').value,
     hours:$('#kind').value==='payment'?0:(timedHoursFromForm()??getDurationInputs()), noDuration:$('#kind').value==='payment'?true:($('#noDuration').checked && timedHoursFromForm()===null), kind:$('#kind').value, place:$('#place').value.trim(),
     paymentAmount:$('#kind').value==='payment'?Math.max(0,Number($('#paymentAmount').value)||0):0, paymentMethod:$('#kind').value==='payment'?$('#paymentMethod').value.trim():'',
     prepEnabled, prepDeadline:prepEnabled?$('#prepDeadline').value:'', prepMode:prepEnabled&&$('#prepMode').value==='custom'?'custom':'auto', prepAutoEnabled:prepEnabled&&!!prepDraftAutoEnabled, prepDays:prepEnabled?Math.max(1,Number($('#prepDays').value)||1):5, prepWeekdaysOnly:prepEnabled&&!!$('#prepWeekdaysOnly').checked, prepIncludeDeadline:prepEnabled&&!!$('#prepIncludeDeadline').checked, prepDailyNotes:prepEnabled&&prepDraftAutoEnabled?Object.fromEntries(prepFormDates().map(d=>[d,String(prepDraftNotes[d]||'').trim()]).filter(([,v])=>v)):{}, prepTasks:prepEnabled?prepDraftTasks.map(x=>({...x})):[], prepDone:prepEnabled?{...(old?.prepDone||{})}:{}, prepMoves:prepEnabled?{...prepDraftMoves}:{},
     availabilityBlock:!['payment','anniversary'].includes($('#kind').value) && !!$('#availabilityBlock').checked,
     availabilityTargetCalId:(!['payment','anniversary'].includes($('#kind').value) && $('#availabilityBlock').checked)?($('#availabilityTarget').value||defaultAvailabilityTargetForSelectedCalendar()):'',
-    repeat, repeatRule:repeat==='none'?null:getRepeatRule(), memo:$('#memo').value, attachments:savedAttachments,
+    repeat, repeatRule:repeat==='none'?null:getRepeatRule(), memo:$('#memo').value,
     checklist, checklistDoneByDate, orderByDate:old?.orderByDate||{},
     done:old?.done||false, doneDates:old?.doneDates||[], excludedDates:old?.excludedDates||[], fixedId:old?.fixedId||null
   };
@@ -3966,7 +3896,7 @@ $('#togglePurchase').onclick=()=>{ state.settings.fixedPanelsCollapsed.purchase=
 $('#purchaseForm').onsubmit=e=>{ e.preventDefault(); const id=$('#purchaseId').value, old=state.purchases.find(x=>x.id===id), maxOrder=(state.purchases||[]).reduce((m,p)=>Math.max(m,Number(p.order)||0),-1), obj={id:id||uid(),name:$('#purchaseName').value.trim(),qty:Math.max(1,Number($('#purchaseQty').value)||1),memo:$('#purchaseMemo').value,done:$('#purchaseDone').checked,createdAt:old?.createdAt||new Date().toISOString(),order:old?.order??(maxOrder+1)}; if(!obj.name) return; if(id) state.purchases[state.purchases.findIndex(x=>x.id===id)]=obj; else state.purchases.push(obj); closeDialog($('#purchaseDlg')); save(); };
 $('#cancelPurchase').onclick=()=>closeDialog($('#purchaseDlg'));
 $('#deletePurchase').onclick=()=>{ const id=$('#purchaseId').value; if(id&&confirm('이 구매항목을 삭제할까요?')){ state.purchases=state.purchases.filter(x=>x.id!==id); closeDialog($('#purchaseDlg')); save(); } };
-$('#allDay').onchange=updateAllDayUI; $('#noDuration').onchange=()=>updateDurationMode(); $('#kind').onchange=updateKindUI; $('#availabilityBlock').onchange=updateAvailabilityBlockUI; $('#cal').onchange=()=>{ if($('#availabilityBlock').checked){ const v=defaultAvailabilityTargetForSelectedCalendar(); if([...$('#availabilityTarget').options].some(o=>o.value===v)) $('#availabilityTarget').value=v; } }; $('#start').onchange=updateDurationMode; $('#end').onchange=updateDurationMode; $('#endDate').onchange=updateDurationMode; $('#repeat').onchange=updateRepeatUI;
+$('#allDay').onchange=updateAllDayUI; $('#noDuration').onchange=()=>updateDurationMode(); $('#kind').onchange=updateKindUI; $('#availabilityBlock').onchange=updateAvailabilityBlockUI; $('#cal').onchange=()=>{ if($('#availabilityBlock').checked){ const v=defaultAvailabilityTargetForSelectedCalendar(); if([...$('#availabilityTarget').options].some(o=>o.value===v)) $('#availabilityTarget').value=v; } }; $('#start').onchange=updateDurationMode; $('#end').onchange=updateDurationMode; $('#endDate').onchange=()=>{ if($('#repeat').value!=='none') syncRepeatEndFromTop(); updateDurationMode(); }; $('#repeat').onchange=handleRepeatTypeChange;
 $('#prepEnabled').onchange=()=>{ if($('#prepEnabled').checked){ if(!$('#eid').value){ prepDraftNotes={}; prepDraftTasks=[]; prepDraftMoves={}; prepDraftAutoEnabled=$('#prepMode')?.value!=='custom'; } $('#prepDeadline').value=$('#date').value||ds(cursor); $('#repeat').value='none'; updateRepeatUI(); } updatePrepUI(); };
 $('#prepDeadline').onchange=()=>{ if($('#prepDeadline').value){ $('#date').value=$('#prepDeadline').value; $('#endDate').value=$('#prepDeadline').value; updateDurationMode(); } updatePrepRepeatRuleUI(); renderPrepDailyRows(); };
 $('#prepMode').onchange=()=>{ collectPrepDailyNotes(); renderPrepDailyRows(); };
@@ -3996,7 +3926,7 @@ $('#date').onchange=()=>{
   $('#yearlyMonth').value=d.getMonth()+1; $('#yearlyDay').value=d.getDate();
   if($('#yearlyCalendar').value==='lunar' && lp){ $('#lunarMonth').value=lp.month; $('#lunarDay').value=lp.day; $('#lunarLeap').checked=!!lp.leap; }
   updateRepeatUI(); updateDurationMode();
-}; $('#monthlyMode').onchange=updateMonthlyRepeatUI; $('#monthlyMonthEnd').onchange=updateMonthlyRepeatUI; $('#repeatEndType').onchange=updateRepeatEndUI;
+}; $('#monthlyMode').onchange=updateMonthlyRepeatUI; $('#monthlyMonthEnd').onchange=updateMonthlyRepeatUI; $('#repeatEndType').onchange=updateRepeatEndUI; $('#repeatEndDate').onchange=()=>{ updateRepeatEndUI(); };
 $('#yearlyCalendar').onchange=()=>{
   if($('#yearlyCalendar').value==='lunar'){
     const lp=lunarPartsFromSolar(parse($('#date').value||ds(new Date())));
@@ -4416,7 +4346,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.09',
+    appVersion:'2.10',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
