@@ -4,13 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
-  <title>캘린더 v2.08</title>
-  <link rel="manifest" href="manifest.json?v=2.08">
+  <title>캘린더 v2.09</title>
+  <link rel="manifest" href="manifest.json?v=2.09">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="icon-180.png">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css">
-  <link rel="stylesheet" href="style.css?v=2.08">
+  <link rel="stylesheet" href="style.css?v=2.09">
 </head>
 <body>
 <header>
@@ -95,6 +95,7 @@
   <div id="eventPopoverDetails" class="eventPopoverDetails hidden">
     <div id="eventPopoverPlace" class="eventPopoverDetail hidden"><b>장소</b><span></span></div>
     <div id="eventPopoverMemo" class="eventPopoverDetail hidden"><b>메모</b><span></span></div>
+    <div id="eventPopoverAttachments" class="eventPopoverDetail eventPopoverAttachments hidden"><b>첨부</b><div id="eventPopoverAttachmentList" class="eventPopoverAttachmentList"></div></div>
   </div>
   <label id="eventPopoverDoneWrap" class="eventPopoverDone"><input id="eventPopoverDone" type="checkbox"><span id="eventPopoverDoneText">완료</span></label>
   <div class="eventPopoverActions"><button id="eventPopoverPlan" type="button" class="hidden">준비계획 보기</button><button id="eventPopoverEdit" type="button">✎ 수정</button></div>
@@ -267,6 +268,12 @@
     </div>
 
     <label>메모<textarea id="memo" rows="4"></textarea></label>
+    <div class="attachmentEditor">
+      <div class="attachmentEditorHead"><b>첨부파일</b><button type="button" id="addAttachmentBtn">📎 파일 추가</button></div>
+      <input id="attachmentInput" type="file" multiple hidden>
+      <div id="attachmentList" class="attachmentList"></div>
+      <small id="attachmentHint" class="hint">파일당 최대 20MB · 최대 10개</small>
+    </div>
     <div class="checklistEditor">
       <div class="checklistEditorHead"><b>세부 체크리스트</b><button type="button" id="importMemoChecklist">메모 줄 가져오기</button></div>
       <textarea id="checklistText" rows="4" placeholder="한 줄에 하나씩 입력하세요. 예: 거래처 A 정리"></textarea>
@@ -514,6 +521,6 @@
   <div><span class="spinner"></span><b>Firebase 최신 데이터 불러오는 중…</b><small>저장된 최신 일정을 확인하고 있어요.</small></div>
 </div>
 
-<script type="module" src="app.js?v=2.08"></script>
+<script type="module" src="app.js?v=2.09"></script>
 </body>
 </html>
