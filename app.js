@@ -4351,7 +4351,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.11',
+    appVersion:'2.12',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
@@ -4391,8 +4391,135 @@ $('#downloadBackupBtn').onclick=downloadBackup;
 $('#restoreBackupBtn').onclick=()=>$('#restoreFile').click();
 $('#restoreFile').onchange=e=>restoreBackupFile(e.target.files?.[0]);
 
+// v2.12: 외부에서 만든 일정 JSON을 기존 데이터에 안전하게 병합합니다.
+let pendingEventImport=null;
+function validImportDate(value){
+  const s=String(value||'').trim();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d=parse(s);
+  return Number.isFinite(d.getTime()) && ds(d)===s;
+}
+function importCalendarName(raw){
+  return String(raw?.calendarName||raw?.targetCalendarName||raw?.calendar||'').trim();
+}
+function normalizeEventImport(raw,fileName=''){
+  const list=Array.isArray(raw)?raw:(Array.isArray(raw?.events)?raw.events:null);
+  if(!list) throw new Error('events array missing');
+  const topCalendar=importCalendarName(raw);
+  const batchId=String(raw?.batchId||raw?.importId||raw?.name||'').trim();
+  const valid=[], invalid=[];
+  list.forEach((item,index)=>{
+    if(!item || typeof item!=='object'){ invalid.push({index,reason:'형식 오류',date:'',title:''}); return; }
+    const date=String(item.date||item.startDate||'').trim();
+    const title=String(item.title||item.name||'').trim();
+    if(!validImportDate(date) || !title){ invalid.push({index,reason:!title?'제목 없음':'날짜 오류',date,title}); return; }
+    const rawEnd=String(item.endDate||date).trim();
+    const endDate=validImportDate(rawEnd)&&dayNum(rawEnd)>=dayNum(date)?rawEnd:date;
+    const rowCalendar=String(item.calendarName||item.calendar||topCalendar||'').trim();
+    const itemKey=String(item.importKey||item.key||item.id||'').trim();
+    const importKey=itemKey?`${batchId||'calendar-import'}:${itemKey}`:(batchId?`${batchId}:${index+1}`:'');
+    const hours=Math.max(0,Number(item.hours)||0);
+    valid.push({
+      index,date,endDate,title,
+      memo:String(item.memo??item.description??'').trim(),
+      place:String(item.place||'').trim(),
+      important:!!item.important,
+      allDay:item.allDay!==false,
+      start:String(item.start||'').trim(),
+      end:String(item.end||'').trim(),
+      hours,
+      noDuration:item.noDuration!==undefined?!!item.noDuration:hours<=0,
+      calendarName:rowCalendar,
+      importKey,
+      batchId
+    });
+  });
+  return {name:String(raw?.name||raw?.title||fileName||'일정 파일').trim(),fileName,calendarName:topCalendar,batchId,valid,invalid,total:list.length};
+}
+function preferredImportCalendarId(pack){
+  const wanted=String(pack?.calendarName||pack?.valid?.find(x=>x.calendarName)?.calendarName||'').trim();
+  const exact=wanted?cals().find(c=>String(c.name||'').trim()===wanted):null;
+  if(exact) return exact.id;
+  if(calendarFocusId && cals().some(c=>c.id===calendarFocusId)) return calendarFocusId;
+  return cals()[0]?.id||'';
+}
+function eventImportDuplicate(row,calId,seen){
+  const key=String(row.importKey||'');
+  if(key && (state.events.some(e=>String(e.importKey||'')===key) || seen.keys.has(key))) return true;
+  const signature=`${calId}\u0000${row.date}\u0000${row.title.trim()}`;
+  if(state.events.some(e=>e.calId===calId && e.date===row.date && String(e.title||'').trim()===row.title.trim()) || seen.signatures.has(signature)) return true;
+  if(key) seen.keys.add(key);
+  seen.signatures.add(signature);
+  return false;
+}
+function analyzeEventImport(calId){
+  const pack=pendingEventImport;
+  if(!pack) return {rows:[],newRows:[],duplicates:[],invalid:[]};
+  const seen={keys:new Set(),signatures:new Set()}, rows=[], newRows=[], duplicates=[];
+  for(const row of pack.valid){
+    const duplicate=eventImportDuplicate(row,calId,seen);
+    const item={...row,status:duplicate?'duplicate':'new'};
+    rows.push(item); (duplicate?duplicates:newRows).push(item);
+  }
+  return {rows,newRows,duplicates,invalid:pack.invalid||[]};
+}
+function renderEventImportPreview(){
+  const pack=pendingEventImport; if(!pack) return;
+  const calId=$('#eventImportTargetCal').value;
+  const analysis=analyzeEventImport(calId);
+  const calName=cal(calId)?.name||'-';
+  $('#eventImportSource').innerHTML=`<b>${esc(pack.name||'일정 파일')}</b><br>${esc(pack.fileName||'')} · 대상 캘린더: ${esc(calName)}`;
+  $('#eventImportSummary').innerHTML=`<span class="importStat"><strong>${pack.total}</strong>개 읽음</span><span class="importStat new"><strong>${analysis.newRows.length}</strong>개 새 일정</span><span class="importStat duplicate"><strong>${analysis.duplicates.length}</strong>개 중복 제외</span>${analysis.invalid.length?`<span class="importStat invalid"><strong>${analysis.invalid.length}</strong>개 형식 오류</span>`:''}`;
+  const validHtml=analysis.rows.map(row=>`<div class="importPreviewRow ${row.status==='new'?'isNew':'isDuplicate'}"><span class="importDate">${esc(row.date)}</span><span class="importTitle" title="${esc(row.title)}">${row.important?'★ ':''}${esc(row.title)}</span><span class="importStatus">${row.status==='new'?'등록':'중복 제외'}</span></div>`).join('');
+  const invalidHtml=analysis.invalid.map(row=>`<div class="importPreviewRow isInvalid"><span class="importDate">${esc(row.date||'-')}</span><span class="importTitle">${esc(row.title||row.reason||'형식 오류')}</span><span class="importStatus">${esc(row.reason||'오류')}</span></div>`).join('');
+  $('#eventImportPreview').innerHTML=validHtml+invalidHtml || '<div class="empty">가져올 일정이 없습니다.</div>';
+  const btn=$('#confirmEventImport'); btn.disabled=!analysis.newRows.length; btn.textContent=analysis.newRows.length?`새 일정 ${analysis.newRows.length}개 등록`:'등록할 새 일정 없음';
+}
+async function openEventImportFile(file){
+  if(!file) return;
+  try{
+    const raw=JSON.parse(await file.text());
+    pendingEventImport=normalizeEventImport(raw,file.name||'');
+    if(!pendingEventImport.valid.length && !pendingEventImport.invalid.length) throw new Error('empty import');
+    const select=$('#eventImportTargetCal');
+    select.innerHTML=cals().map(c=>`<option value="${esc(c.id)}">${esc(calendarPath(c.id))}</option>`).join('');
+    const preferred=preferredImportCalendarId(pendingEventImport); if(preferred) select.value=preferred;
+    renderEventImportPreview();
+    closeDialog($('#settingsDlg')); openDialog($('#eventImportDlg'));
+  }catch(err){ console.error(err); alert('올바른 일정 가져오기 JSON 파일이 아닙니다.'); pendingEventImport=null; }
+  finally{ $('#eventImportFile').value=''; }
+}
+function importedEventObject(row,calId){
+  return {
+    id:uid(),title:row.title,important:!!row.important,calId,date:row.date,endDate:row.endDate||row.date,
+    allDay:row.allDay!==false,start:row.start||'',end:row.end||'',hours:Number(row.hours)||0,noDuration:!!row.noDuration,
+    kind:'event',place:row.place||'',paymentAmount:0,paymentMethod:'',
+    prepEnabled:false,prepDeadline:row.date,prepMode:'auto',prepAutoEnabled:true,prepDays:5,prepWeekdaysOnly:false,prepIncludeDeadline:false,prepDailyNotes:{},prepTasks:[],prepDone:{},prepMoves:{},
+    availabilityBlock:false,availabilityTargetCalId:'',repeat:'none',repeatRule:null,memo:row.memo||'',
+    checklist:[],checklistDoneByDate:{},orderByDate:{},done:false,doneDates:[],excludedDates:[],fixedId:null,
+    importKey:row.importKey||'',importBatchId:row.batchId||'',importedAt:new Date().toISOString()
+  };
+}
+$('#importEventsBtn').onclick=()=>$('#eventImportFile').click();
+$('#eventImportFile').onchange=e=>openEventImportFile(e.target.files?.[0]);
+$('#eventImportTargetCal').onchange=renderEventImportPreview;
+$('#cancelEventImport').onclick=()=>{ pendingEventImport=null; closeDialog($('#eventImportDlg')); openDialog($('#settingsDlg')); };
+$('#eventImportForm').onsubmit=e=>e.preventDefault();
+$('#confirmEventImport').onclick=()=>{
+  if(!pendingEventImport) return;
+  const calId=$('#eventImportTargetCal').value; if(!calId) return;
+  const analysis=analyzeEventImport(calId);
+  if(!analysis.newRows.length){ alert('새로 등록할 일정이 없습니다.'); return; }
+  const firstDate=analysis.newRows[0]?.date||'';
+  analysis.newRows.forEach(row=>state.events.push(importedEventObject(row,calId)));
+  pendingEventImport=null; closeDialog($('#eventImportDlg'));
+  if(firstDate && validImportDate(firstDate)) cursor=parse(firstDate);
+  save();
+  alert(`${analysis.newRows.length}개 일정을 등록했습니다.${analysis.duplicates.length?`\n중복 ${analysis.duplicates.length}개는 제외했습니다.`:''}`);
+};
+
 // Native dialog cancel/ESC never saves. Explicit cancel buttons above only close dialogs.
-['eventDlg','repeatEditDlg','repeatDeleteDlg','repeatMoveDlg','carryDlg','calDlg','fixedDlg','diaryDlg','searchDlg','settingsDlg'].forEach(id=>{
+['eventDlg','repeatEditDlg','repeatDeleteDlg','repeatMoveDlg','carryDlg','calDlg','fixedDlg','diaryDlg','searchDlg','settingsDlg','eventImportDlg'].forEach(id=>{
   const d=$(`#${id}`); d.addEventListener('cancel',()=>{});
 });
 

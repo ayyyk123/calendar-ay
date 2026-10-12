@@ -2310,3 +2310,26 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 
 /* v2.10: 반복일정 수정창 기준일 표시 + 반복 시작/종료 표시 통일 */
 .eventDialogTitleLine{display:flex;align-items:center;gap:9px;min-width:0}.eventDialogTitleLine h3{margin:0;white-space:nowrap}.eventOccurrenceDate{font-size:12px;color:#667085;font-weight:700;white-space:nowrap}.eventOccurrenceDate:empty{display:none}
+
+
+/* v2.12 - 일정 JSON 가져오기 */
+.eventImportDlg{width:min(720px,94vw)}
+.importSource{padding:9px 10px;border:1px solid #e5e7eb;border-radius:8px;background:#fafafa;font-size:12px;color:#5f6773;word-break:break-word}
+.importSummary{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+.importSummary .importStat{display:inline-flex;align-items:center;gap:4px;padding:5px 8px;border:1px solid #e2e6eb;border-radius:999px;background:#fff;font-size:12px}
+.importSummary .importStat strong{font-size:13px}
+.importSummary .importStat.new{border-color:#bcd7c5;background:#f3fbf5}
+.importSummary .importStat.duplicate{border-color:#e5dfbf;background:#fffdf4}
+.importSummary .importStat.invalid{border-color:#e5c2c2;background:#fff7f7}
+.importPreview{max-height:44vh;overflow:auto;border:1px solid #e5e7eb;border-radius:8px;background:#fff}
+.importPreviewRow{display:grid;grid-template-columns:92px minmax(0,1fr) auto;gap:8px;align-items:center;padding:8px 9px;border-bottom:1px solid #eef0f2;font-size:12px}
+.importPreviewRow:last-child{border-bottom:0}
+.importPreviewRow .importDate{font-variant-numeric:tabular-nums;color:#667085}
+.importPreviewRow .importTitle{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:650}
+.importPreviewRow .importStatus{font-size:10px;padding:2px 6px;border-radius:999px;border:1px solid #dfe3e8;color:#667085;background:#fafafa;white-space:nowrap}
+.importPreviewRow.isNew .importStatus{border-color:#bcd7c5;background:#f3fbf5;color:#356343}
+.importPreviewRow.isDuplicate{opacity:.62}
+.importPreviewRow.isDuplicate .importStatus{border-color:#e5dfbf;background:#fffdf4;color:#786a31}
+.importPreviewRow.isInvalid{opacity:.62}
+.importPreviewRow.isInvalid .importStatus{border-color:#e5c2c2;background:#fff7f7;color:#8a4747}
+@media(max-width:760px){.eventImportDlg{width:min(96vw,720px)}.importPreview{max-height:42vh}.importPreviewRow{grid-template-columns:78px minmax(0,1fr) auto;gap:5px;padding:7px 6px;font-size:10px}.importPreviewRow .importStatus{font-size:9px;padding:2px 4px}}
