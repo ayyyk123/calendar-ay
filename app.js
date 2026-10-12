@@ -1177,7 +1177,12 @@ function eventItemHtml(e, compact=false){
   const renderDate=e._renderDate||e._occurrenceStart||e.date;
   const drag=deadlineItem?'false':'true';
   const prepNote=prepDay?String(e._prepNote||'').trim():'';
-  const shownTitle=prepDay?`${prepDeadlineDay?'준비마감':'준비'} · ${e.title}${prepNote?` › ${prepNote}`:''}`:(deadlineItem?`준비마감 · ${e.title}`:e.title);
+  // v2.11: 준비일정 구역에서는 원본 일정명/`준비` 접두어를 반복하지 않는다.
+  // 일반 준비일은 그날 해야 할 업무만, 마감 관련 카드만 `준비마감`/`마감`을 표시한다.
+  const prepTaskTitle=prepNote||'할 일 미입력';
+  const shownTitle=prepDay
+    ? (prepDeadlineDay?`준비마감 · ${prepTaskTitle}`:prepTaskTitle)
+    : (deadlineItem?`마감 · ${e.title}`:e.title);
   const detail=[];
   if(prepDay){ detail.push(preparationSummary(e)); if(prepNote) detail.push(prepNote); }
   else if(!e.allDay && e.start) detail.push(e.start + (e.end?`–${e.end}`:''));
@@ -4346,7 +4351,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.10',
+    appVersion:'2.11',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
