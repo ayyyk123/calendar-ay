@@ -2311,25 +2311,79 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 /* v2.10: 반복일정 수정창 기준일 표시 + 반복 시작/종료 표시 통일 */
 .eventDialogTitleLine{display:flex;align-items:center;gap:9px;min-width:0}.eventDialogTitleLine h3{margin:0;white-space:nowrap}.eventOccurrenceDate{font-size:12px;color:#667085;font-weight:700;white-space:nowrap}.eventOccurrenceDate:empty{display:none}
 
+/* v2.12: sidebar cleanup + multi-calendar filter + Quick calendar grouping */
+.sidebarSection>.secHead{
+  min-height:34px;
+  margin:0 0 8px!important;
+  padding:6px 8px;
+  border:1px solid #d5dce5;
+  border-radius:7px;
+  background:#e7ecf2;
+  cursor:pointer;
+  transition:background .12s ease,border-color .12s ease;
+}
+.sidebarSection>.secHead:hover{background:#dfe6ee;border-color:#cbd4df}
+.sidebarSection.sidebarSectionCollapsed>.secHead{margin-bottom:0!important;background:#e4e9ef}
+.sidebarSection>.secHead .secTitleWithGrip{flex:1;gap:0;min-width:0}
+.sidebarSection>.secHead .secTitleWithGrip>b{order:0;margin:0;text-align:left}
+.sidebarSection>.secHead .sidebarSectionGrip{order:2;margin-left:auto;opacity:.18;width:12px}
+.sidebarSection>.secHead:hover .sidebarSectionGrip{opacity:.5}
+.sidebarSectionToggle{display:none!important}
+#toggleFlexible,#togglePurchase,#togglePayment{display:none!important}
 
-/* v2.12 - 일정 JSON 가져오기 */
-.eventImportDlg{width:min(720px,94vw)}
-.importSource{padding:9px 10px;border:1px solid #e5e7eb;border-radius:8px;background:#fafafa;font-size:12px;color:#5f6773;word-break:break-word}
-.importSummary{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
-.importSummary .importStat{display:inline-flex;align-items:center;gap:4px;padding:5px 8px;border:1px solid #e2e6eb;border-radius:999px;background:#fff;font-size:12px}
-.importSummary .importStat strong{font-size:13px}
-.importSummary .importStat.new{border-color:#bcd7c5;background:#f3fbf5}
-.importSummary .importStat.duplicate{border-color:#e5dfbf;background:#fffdf4}
-.importSummary .importStat.invalid{border-color:#e5c2c2;background:#fff7f7}
-.importPreview{max-height:44vh;overflow:auto;border:1px solid #e5e7eb;border-radius:8px;background:#fff}
-.importPreviewRow{display:grid;grid-template-columns:92px minmax(0,1fr) auto;gap:8px;align-items:center;padding:8px 9px;border-bottom:1px solid #eef0f2;font-size:12px}
-.importPreviewRow:last-child{border-bottom:0}
-.importPreviewRow .importDate{font-variant-numeric:tabular-nums;color:#667085}
-.importPreviewRow .importTitle{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:650}
-.importPreviewRow .importStatus{font-size:10px;padding:2px 6px;border-radius:999px;border:1px solid #dfe3e8;color:#667085;background:#fafafa;white-space:nowrap}
-.importPreviewRow.isNew .importStatus{border-color:#bcd7c5;background:#f3fbf5;color:#356343}
-.importPreviewRow.isDuplicate{opacity:.62}
-.importPreviewRow.isDuplicate .importStatus{border-color:#e5dfbf;background:#fffdf4;color:#786a31}
-.importPreviewRow.isInvalid{opacity:.62}
-.importPreviewRow.isInvalid .importStatus{border-color:#e5c2c2;background:#fff7f7;color:#8a4747}
-@media(max-width:760px){.eventImportDlg{width:min(96vw,720px)}.importPreview{max-height:42vh}.importPreviewRow{grid-template-columns:78px minmax(0,1fr) auto;gap:5px;padding:7px 6px;font-size:10px}.importPreviewRow .importStatus{font-size:9px;padding:2px 4px}}
+/* 상위 메뉴 띠보다 하위 내용은 한 단계 안쪽으로 정렬 */
+.sidebarSection>#calList,
+.sidebarSection>#fixedList,
+.sidebarSection>#flexibleList,
+.sidebarSection>#purchaseList,
+.sidebarSection>#paymentList,
+.sidebarSection>#ddayList,
+.sidebarSection>#diaryArchiveList,
+.sidebarSection>#diaryMonthFilter,
+.sidebarSection>.hint{
+  margin-left:10px!important;
+  width:calc(100% - 10px)!important;
+}
+.sidebarSection>.hint{display:block}
+
+/* 캘린더 목록은 계층 들여쓰기만 사용하고 불필요한 부가정보를 줄인다. */
+.calRow{grid-template-columns:auto auto minmax(0,1fr) auto auto;column-gap:6px}
+.calRow small{font-size:10px;color:#8a919b}
+.calRow.subCalendarRow{padding-left:calc(5px + var(--cal-depth,1)*14px)}
+#calList.hasCalendarSelection .calRow:not(.calendarFocused) .calNameBtn{color:#707986}
+#calList.hasCalendarSelection .calRow:not(.calendarFocused){background:transparent}
+.calRow.calendarFocused{background:#eaf2ff;box-shadow:inset 3px 0 0 #5f8fd6}
+.calRow.calendarFocused .calNameBtn{color:#244f96;font-weight:750}
+
+/* Quick 구역 안에서도 캘린더별로 한 번만 이름을 보여준다. */
+.quickCalGroup{margin:0 0 4px;min-width:0}
+.quickCalGroup:last-child{margin-bottom:0}
+.quickCalGroup+.quickCalGroup{padding-top:3px;border-top:1px dashed #e6e9ed}
+.quickCalLabel{
+  display:block;
+  margin:1px 2px 2px;
+  padding:0 4px;
+  border-left:3px solid var(--quick-cal-color,#cfd5dc);
+  font-size:8.5px;
+  line-height:14px;
+  font-weight:700;
+  color:#68717e;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.scheduleLaneCell .quickCalLabel{font-size:8px;line-height:12px;margin-bottom:1px}
+.month .quickCalLabel,.multiCompactView .quickCalLabel{font-size:7px;line-height:10px;margin:0 1px 1px;padding-left:2px}
+@media(max-width:760px){
+  .sidebarSection>.secHead{min-height:32px;padding:5px 7px}
+  .sidebarSection>#calList,
+  .sidebarSection>#fixedList,
+  .sidebarSection>#flexibleList,
+  .sidebarSection>#purchaseList,
+  .sidebarSection>#paymentList,
+  .sidebarSection>#ddayList,
+  .sidebarSection>#diaryArchiveList,
+  .sidebarSection>#diaryMonthFilter,
+  .sidebarSection>.hint{margin-left:8px!important;width:calc(100% - 8px)!important}
+  .quickCalLabel{font-size:8px;line-height:12px}
+}

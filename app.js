@@ -100,7 +100,7 @@ let selectedPaymentFilter = 'all';
 let selectedDiaryMonth = 'all';
 let diaryMainMode = 'calendar';
 let lastScheduleView = 'week';
-let calendarFocusId = null;
+let calendarFocusIds = new Set();
 let activeDrag = null;
 let activeEventOccurrence = null;
 let lastFirebaseSavedAt = null;
@@ -298,25 +298,32 @@ function bindSidebarSectionCollapse(){
   const sidebar=$('#sidebar'); if(!sidebar) return;
   sidebar.querySelectorAll(':scope > [data-sidebar-section]').forEach(sec=>{
     const id=sec.dataset.sidebarSection, head=sec.querySelector(':scope > .secHead'); if(!id||!head) return;
-    let btn=head.querySelector('.sidebarSectionToggle');
-    if(!btn){
-      btn=document.createElement('button'); btn.type='button'; btn.className='sidebarSectionToggle';
-      btn.dataset.sectionToggle=id; btn.setAttribute('aria-label','메뉴 접기/펴기');
-      const titleWrap=head.querySelector('.secTitleWithGrip');
-      if(titleWrap){ const grip=titleWrap.querySelector('.sidebarSectionGrip'); if(grip) grip.after(btn); else titleWrap.prepend(btn); }
-      else head.prepend(btn);
-    }
+    head.querySelectorAll('.sidebarSectionToggle').forEach(x=>x.remove());
     const collapsed=sidebarSectionCollapsed(id);
     sec.classList.toggle('sidebarSectionCollapsed',collapsed);
-    btn.textContent=collapsed?'▸':'▾'; btn.title=collapsed?'메뉴 펼치기':'메뉴 접기'; btn.setAttribute('aria-expanded',collapsed?'false':'true');
-    btn.onclick=e=>{
-      e.preventDefault(); e.stopPropagation();
+    head.classList.toggle('sectionBandCollapsed',collapsed);
+    head.setAttribute('role','button');
+    head.setAttribute('tabindex','0');
+    head.setAttribute('aria-expanded',collapsed?'false':'true');
+    head.title=collapsed?'눌러서 메뉴 펼치기':'눌러서 메뉴 접기';
+    const toggle=()=>{
       state.settings.sidebarSectionsCollapsed=state.settings.sidebarSectionsCollapsed||{};
       state.settings.sidebarSectionsCollapsed[id]=!sidebarSectionCollapsed(id);
       save();
     };
+    head.onclick=e=>{
+      // +, 수정, 드래그 손잡이 등 헤더 안의 실제 기능 버튼은 그대로 동작한다.
+      if(e.target.closest('button,input,select,a,.sidebarSectionGrip')) return;
+      e.preventDefault(); toggle();
+    };
+    head.onkeydown=e=>{
+      if(e.key!=='Enter'&&e.key!==' ') return;
+      if(e.target.closest('button,input,select,a,.sidebarSectionGrip')) return;
+      e.preventDefault(); toggle();
+    };
   });
 }
+
 
 function normalizeState(raw){
   const d = defaultState();
@@ -574,20 +581,38 @@ function isCalendarHidden(id){
   return new Set(state.settings.hiddenCalendars||[]).has(id);
 }
 function visibleCals(){ return cals().filter(c=>!isCalendarHidden(c.id)); }
+function sanitizeCalendarFocus(){
+  const valid=new Set(state.calendars.map(c=>c.id));
+  calendarFocusIds=new Set([...calendarFocusIds].filter(id=>valid.has(id)));
+  return calendarFocusIds;
+}
 function focusedCalendarIds(){
-  if(!calendarFocusId) return null;
-  const focus=state.calendars.find(c=>c.id===calendarFocusId);
-  if(!focus){ calendarFocusId=null; return null; }
-  return new Set([focus.id,...descendants(focus.id).map(c=>c.id)]);
+  sanitizeCalendarFocus();
+  if(!calendarFocusIds.size) return null;
+  const out=new Set();
+  for(const id of calendarFocusIds){
+    out.add(id);
+    descendants(id).forEach(c=>out.add(c.id));
+  }
+  return out;
 }
-function focusSuffix(){
-  const focus=calendarFocusId?state.calendars.find(c=>c.id===calendarFocusId):null;
-  return focus?` · ${calendarPath(focus.id)}만 보기`:'';
+function displayCals(){
+  const visible=visibleCals();
+  const focused=focusedCalendarIds();
+  return focused?visible.filter(c=>focused.has(c.id)):visible;
 }
-function compactFocusSuffix(){
-  const focus=calendarFocusId?state.calendars.find(c=>c.id===calendarFocusId):null;
-  return focus?` · ${focus.name}`:'';
+function focusedCalendarList(){
+  sanitizeCalendarFocus();
+  return cals().filter(c=>calendarFocusIds.has(c.id));
 }
+function focusLabel(){
+  const xs=focusedCalendarList();
+  if(!xs.length) return '';
+  if(xs.length===1) return calendarPath(xs[0].id);
+  return `${xs.slice(0,2).map(c=>c.name).join(' · ')}${xs.length>2?` 외 ${xs.length-2}개`:''}`;
+}
+function focusSuffix(){ const label=focusLabel(); return label?` · ${label}만 보기`:''; }
+function compactFocusSuffix(){ const label=focusLabel(); return label?` · ${label}`:''; }
 function setRangeLabel(fullText, compactText=fullText){
   const el=$('#range'); if(!el) return;
   el.textContent=window.matchMedia('(max-width: 760px)').matches?compactText:fullText;
@@ -1009,8 +1034,10 @@ function buildOccurrenceMap(rangeStart, rangeEnd, options={}){
   const includePreparations=options.includePreparations!==false;
   const calendarIds=options.calendarIds instanceof Set ? options.calendarIds : null;
   for(const e of state.events){
-    if(calendarIds && !calendarIds.has(e.calId)) continue;
-    if(!includeHidden && isCalendarHidden(e.calId)) continue;
+    // 캘린더 필터 중에도 공통 일정(D-Day/기념일, 예약·약속)은 항상 남긴다.
+    const alwaysCommon=e.kind==='anniversary'||e.kind==='appointment';
+    if(calendarIds && !calendarIds.has(e.calId) && !alwaysCommon) continue;
+    if(!includeHidden && isCalendarHidden(e.calId) && !alwaysCommon) continue;
     if(includePreparations) for(const prepEntry of preparationEntries(e)){
       const prepDate=prepEntry.date;
       if(prepDate>=rangeStart && prepDate<=rangeEnd && map[prepDate]) map[prepDate].push(preparationVirtualEvent(e,prepEntry));
@@ -1215,10 +1242,21 @@ function appointmentLaneHtml(es, compact=false){
   if(!items.length) return '';
   return `<div class="appointmentLane ${compact?'compactAppointmentLane':''}"><div class="appointmentLaneHead"><span>예약 · 약속</span><small>${items.length}건</small></div><div class="appointmentLaneItems">${items.map(e=>eventItemHtml(e,compact)).join('')}</div></div>`;
 }
+function calendarGroupedItemsHtml(items, compact=false){
+  const xs=items||[];
+  if(!xs.length) return '';
+  const order=new Map(cals().map((c,i)=>[c.id,i]));
+  const groups=new Map();
+  for(const e of xs){ if(!groups.has(e.calId)) groups.set(e.calId,[]); groups.get(e.calId).push(e); }
+  return [...groups.entries()].sort((a,b)=>(order.get(a[0])??9999)-(order.get(b[0])??9999)).map(([calId,events])=>{
+    const c=cal(calId);
+    return `<div class="quickCalGroup" data-quick-cal="${esc(calId)}"><div class="quickCalLabel" style="--quick-cal-color:${esc(c.color)}">${esc(c.name)}</div>${events.map(e=>eventItemHtml(e,compact)).join('')}</div>`;
+  }).join('');
+}
 function quickLaneHtml(es, compact=false, force=false){
   const quick=(es||[]).filter(e=>e.kind==='todo'&&!isPreparationManagedItem(e));
   if(!quick.length && !force) return '';
-  return `<div class="quickLane ${compact?'compactQuickLane':''} ${!quick.length?'emptyLane':''}"><div class="quickLaneHead"><span>Quick</span><small>${quick.length}건</small></div><div class="quickLaneItems">${quick.map(e=>eventItemHtml(e,compact)).join('')}</div></div>`;
+  return `<div class="quickLane ${compact?'compactQuickLane':''} ${!quick.length?'emptyLane':''}"><div class="quickLaneHead"><span>Quick</span><small>${quick.length}건</small></div><div class="quickLaneItems">${calendarGroupedItemsHtml(quick,compact)}</div></div>`;
 }
 function anniversaryLaneHtml(es, compact=false){
   const items=(es||[]).filter(e=>e.kind==='anniversary'&&!isPreparationManagedItem(e));
@@ -1262,15 +1300,16 @@ function daySubCalHeadHtml(date,c,label='↳ '){
   return `<button type="button" class="dayCalToggle" data-daycal-toggle="1" data-date="${esc(date)}" data-cal-id="${esc(c.id)}" aria-expanded="${collapsed?'false':'true'}" title="${esc(c.name)} 접기/펴기 · 가용시간은 상위 캘린더와 공유"><span class="dayCalHeadLabel">${label}${esc(c.name)}</span><span class="dayCalHeadRight sharedCapacityText">상위 공유 <b>${collapsed?'▸':'▾'}</b></span></button>`;
 }
 function groupHtml(date, es){
+  const filtering=calendarFocusIds.size>0;
   const commonTopHtml=commonTopLaneHtml(es,false,true);
-  const prepHtml=prepLaneHtml(es,false,true);
-  const quickHtml=quickLaneHtml(es,false,true);
-  const paymentHtml=paymentLaneHtml(es,false,true);
+  const prepHtml=prepLaneHtml(es,false,!filtering);
+  const quickHtml=quickLaneHtml(es,false,!filtering);
+  const paymentHtml=paymentLaneHtml(es,false,!filtering);
   const appointmentEvents=(es||[]).filter(e=>e.kind==='appointment'&&!isPreparationManagedItem(e));
   const quickEvents=(es||[]).filter(e=>e.kind==='todo'&&!isPreparationManagedItem(e));
   const workEvents=(es||[]).filter(e=>!isPreparationManagedItem(e) && e.kind!=='payment' && e.kind!=='appointment' && e.kind!=='anniversary' && e.kind!=='todo');
   let html='';
-  const visible=visibleCals(), visibleIds=new Set(visible.map(c=>c.id));
+  const visible=displayCals(), visibleIds=new Set(visible.map(c=>c.id));
   let total=appointmentEvents.reduce((sum,e)=>sum+workloadDuration(e),0) + quickEvents.reduce((sum,e)=>sum+workloadDuration(e),0), totalCapacity=0, hasUnknownCapacity=false, blockedRootCount=0;
   for(const root of topLevelCals()){
     const members=[root,...descendants(root.id)].filter(c=>visibleIds.has(c.id));
@@ -1283,16 +1322,22 @@ function groupHtml(date, es){
     const rootCapInfo=capacityForDate(root,date);
     if(rootCapInfo.blocked) blockedRootCount++;
     if(rootCapInfo.unknown) hasUnknownCapacity=true; else totalCapacity+=rootCapInfo.hours;
-    const rootCollapsed=isDayCalCollapsed(date,root.id);
+    const singleChildOnly=!visibleIds.has(root.id)&&members.length===1;
+    const displayCal=singleChildOnly?members[0]:root;
+    const rootCollapsed=isDayCalCollapsed(date,displayCal.id);
     const blockedTitle=rootCapInfo.blocked?' · 가용시간 차단 일정 있음':'';
-    html += `<div class="group calendarTreeGroup ${rootCollapsed?'collapsed':''}" style="--group-color:${esc(root.color)}"><div class="groupHead" style="background:${esc(root.color)}55" title="${esc(root.name)}${blockedTitle}">${dayCalHeadHtml(date,root,rootSum,rootCapInfo.hours,rootCapInfo.unknown)}</div><div class="dayCalGroupBody">`;
-    const direct=groupEvents.filter(e=>e.calId===root.id);
-    if(direct.length) html += nonQuickItemsHtml(direct,false);
-    for(const child of members.filter(c=>c.id!==root.id)){
-      const xs=groupEvents.filter(e=>e.calId===child.id); if(!xs.length) continue;
-      const depth=Math.max(1,calendarDepth(child.id));
-      const childCollapsed=isDayCalCollapsed(date,child.id);
-      html += `<div class="subCalGroup ${childCollapsed?'collapsed':''}" style="--sub-depth:${depth}"><div class="subCalHead" style="border-left-color:${esc(child.color)};background:color-mix(in srgb, ${esc(child.color)} 14%, white)">${daySubCalHeadHtml(date,child,'↳ ')}</div><div class="dayCalGroupBody">${nonQuickItemsHtml(xs,false)}</div></div>`;
+    html += `<div class="group calendarTreeGroup ${rootCollapsed?'collapsed':''}" style="--group-color:${esc(displayCal.color)}"><div class="groupHead" style="background:${esc(displayCal.color)}55" title="${esc(displayCal.name)}${blockedTitle}">${dayCalHeadHtml(date,displayCal,rootSum,rootCapInfo.hours,rootCapInfo.unknown)}</div><div class="dayCalGroupBody">`;
+    if(singleChildOnly){
+      html += nonQuickItemsHtml(groupEvents,false);
+    }else{
+      const direct=groupEvents.filter(e=>e.calId===root.id);
+      if(direct.length) html += nonQuickItemsHtml(direct,false);
+      for(const child of members.filter(c=>c.id!==root.id)){
+        const xs=groupEvents.filter(e=>e.calId===child.id); if(!xs.length) continue;
+        const depth=Math.max(1,calendarDepth(child.id));
+        const childCollapsed=isDayCalCollapsed(date,child.id);
+        html += `<div class="subCalGroup ${childCollapsed?'collapsed':''}" style="--sub-depth:${depth}"><div class="subCalHead" style="border-left-color:${esc(child.color)};background:color-mix(in srgb, ${esc(child.color)} 14%, white)">${daySubCalHeadHtml(date,child,'↳ ')}</div><div class="dayCalGroupBody">${nonQuickItemsHtml(xs,false)}</div></div>`;
+      }
     }
     html += `</div></div>`;
   }
@@ -1327,10 +1372,11 @@ function renderSide(){
   bindSidebarSectionCollapse();
   syncSelects();
   const hidden=new Set(state.settings.hiddenCalendars||[]);
+  sanitizeCalendarFocus();
+  $('#calList').classList.toggle('hasCalendarSelection',calendarFocusIds.size>0);
   $('#calList').innerHTML=cals().map(c=>{
-    const depth=calendarDepth(c.id), kids=directChildren(c.id).length, focused=calendarFocusId===c.id;
-    const capLabel=capacitySidebarLabel(c);
-    return `<div class="calRow ${depth?'subCalendarRow':''} ${focused?'calendarFocused':''}" data-cid="${esc(c.id)}" style="--cal-depth:${depth}"><input class="calVisible" type="checkbox" ${isCalendarHidden(c.id)?'':'checked'} title="표시/숨김"><i class="dot" style="background:${esc(c.color)}"></i><button type="button" class="calNameBtn" title="${esc(c.name)}만 현재 달력 화면에서 보기 (다시 누르면 전체 보기)">${depth?'↳ ':''}${esc(c.name)}</button><small>${esc(c.period)} · ${capLabel}${kids?` · 부속 ${kids}`:''}</small><button type="button" class="calEdit" title="캘린더 수정" aria-label="${esc(c.name)} 수정">✎</button></div>`;
+    const depth=calendarDepth(c.id), focused=calendarFocusIds.has(c.id);
+    return `<div class="calRow ${depth?'subCalendarRow':''} ${focused?'calendarFocused':''}" data-cid="${esc(c.id)}" style="--cal-depth:${depth}"><input class="calVisible" type="checkbox" ${isCalendarHidden(c.id)?'':'checked'} title="표시/숨김"><i class="dot" style="background:${esc(c.color)}"></i><button type="button" class="calNameBtn" aria-pressed="${focused?'true':'false'}" title="${esc(c.name)} 필터 선택/해제 · 여러 캘린더 동시 선택 가능">${esc(c.name)}</button><small>${esc(c.period)}</small><button type="button" class="calEdit" title="캘린더 수정" aria-label="${esc(c.name)} 수정">✎</button></div>`;
   }).join('');
   $$('.calRow').forEach(row=>{
     row.querySelector('.calVisible').onclick=e=>{
@@ -1345,27 +1391,25 @@ function renderSide(){
     row.querySelector('.calNameBtn').onclick=e=>{
       e.stopPropagation();
       const id=row.dataset.cid;
-      // 캘린더 이름 클릭은 현재 주/월/일/목록 보기 방식을 절대 바꾸지 않고
-      // 현재 화면에서 선택한 캘린더 내용만 필터링합니다.
-      if(calendarFocusId===id){
-        calendarFocusId=null;
-        render();
-      }else{
-        calendarFocusId=id;
-        // 선택한 캘린더가 숨김 상태라면 선택 즉시 보이도록 복구합니다.
-        // 상위 캘린더는 그 하위까지 함께 필터링하므로 하위도 표시 상태로 돌립니다.
-        const showIds=[id,...descendants(id).map(c=>c.id)];
-        const set=new Set(state.settings.hiddenCalendars||[]);
-        const before=set.size;
-        showIds.forEach(x=>set.delete(x));
-        state.settings.hiddenCalendars=[...set];
-        if(set.size!==before) save({rerender:false});
-        render();
-      }
-      $('#sidebar').classList.remove('open');
+      // 이름 클릭은 필터를 토글한다. 다른 캘린더를 이어서 눌러 여러 개를 동시에 선택할 수 있다.
+      if(calendarFocusIds.has(id)) calendarFocusIds.delete(id);
+      else calendarFocusIds.add(id);
+      // 선택한 캘린더(및 부속)가 숨김 상태라면 즉시 보이도록 복구한다.
+      const showIds=[id,...descendants(id).map(c=>c.id)];
+      const set=new Set(state.settings.hiddenCalendars||[]);
+      const before=set.size;
+      showIds.forEach(x=>set.delete(x));
+      state.settings.hiddenCalendars=[...set];
+      if(set.size!==before) save({rerender:false});
+      render();
+      // 다중 선택을 이어서 할 수 있도록 사이드바를 자동으로 닫지 않는다.
     };
     row.querySelector('.calEdit').onclick=e=>{ e.stopPropagation(); openCal(row.dataset.cid); };
   });
+  state.settings.fixedPanelsCollapsed=state.settings.fixedPanelsCollapsed||{};
+  state.settings.fixedPanelsCollapsed.flexible=false;
+  state.settings.fixedPanelsCollapsed.purchase=false;
+  state.settings.fixedPanelsCollapsed.payment=false;
   renderFixed(); renderFlexible(); renderPurchases(); renderPayments(); renderDdays(); renderDiaryArchive();
 }
 function currentMonthRange(){
@@ -2532,7 +2576,7 @@ function laneCellCommonHtml(es){
   return xs.map(e=>eventItemHtml(e,false)).join('');
 }
 function laneCellPrepHtml(es){ return (es||[]).filter(e=>isPreparationLaneItem(e)).map(e=>eventItemHtml(e,false)).join(''); }
-function laneCellQuickHtml(es){ return (es||[]).filter(e=>!isPreparationManagedItem(e)&&e.kind==='todo').map(e=>eventItemHtml(e,false)).join(''); }
+function laneCellQuickHtml(es){ const xs=(es||[]).filter(e=>!isPreparationManagedItem(e)&&e.kind==='todo'); return calendarGroupedItemsHtml(xs,false); }
 function laneCellPaymentHtml(es){ return (es||[]).filter(e=>!isPreparationManagedItem(e)&&e.kind==='payment').map(e=>eventItemHtml(e,false)).join(''); }
 function laneOrderedItemsHtml(events,rootId){
   let previousSubCalId='';
@@ -2555,7 +2599,7 @@ function rootLaneCellHtml(date,root,es,visibleIds){
   return `<div class="laneCellLoad ${cls}" title="${esc(root.name)} 가용시간">${capText}${cap.blocked?' · 차단':''}</div>${body}`;
 }
 function daySummaryHtml(date,es){
-  const visible=visibleCals(), visibleIds=new Set(visible.map(c=>c.id));
+  const visible=displayCals(), visibleIds=new Set(visible.map(c=>c.id));
   let total=0,totalCap=0,unknown=false,blocked=0;
   for(const root of topLevelCals()){
     const members=laneCalendarMembers(root,visibleIds); if(!members.length) continue;
@@ -2597,16 +2641,25 @@ function scheduleDateHeader(days){
   return `<div class="scheduleDateGrid"><div class="scheduleDateCorner"></div>${days.map(d=>{const key=ds(d),hasDiary=!!state.diary[key]?.text,h=holidayLabel(key),dow=d.getDay(),dmark=selectedDdayMarkerHtml(key),dayClass=[key===ds(new Date())?'today':'',holidayClass(key),dow===0?'sunday':'',dow===6?'saturday':'',dmark?'ddayTracked':''].filter(Boolean).join(' ');return `<div class="scheduleDateHead ${dayClass}" data-dropdate="${key}" data-date-drop-head="1" title="${key} · 일정을 여기에 놓아 이동"><div class="dayTopLine"><span class="weekdayLabel">${['일','월','화','수','목','금','토'][dow]}</span><span class="dateNum">${d.getDate()}</span><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}" aria-label="${hasDiary?'다이어리 작성됨':'다이어리 미작성'}">${diaryIconHtml(hasDiary)}</button></div><div class="holidayName ${h?'':'holidayEmpty'}" title="${h?esc(h):''}">${h?esc(h):'&nbsp;'}</div>${dmark}</div>`}).join('')}</div>`;
 }
 function scheduleWeekBoard(days,map){
-  const visible=visibleCals(),visibleIds=new Set(visible.map(c=>c.id));
+  const visible=displayCals(),visibleIds=new Set(visible.map(c=>c.id));
+  const filtering=calendarFocusIds.size>0;
+  const allEvents=Object.values(map).flat();
+  const hasPrep=allEvents.some(e=>isPreparationLaneItem(e));
+  const hasQuick=allEvents.some(e=>!isPreparationManagedItem(e)&&e.kind==='todo');
+  const hasPayment=allEvents.some(e=>!isPreparationManagedItem(e)&&e.kind==='payment');
   let html=`<div class="scheduleBoard"><div class="laneLabelWidthResizer" data-lane-label-resize="1" title="좌우로 드래그해 캘린더 이름 영역 너비 조절 · 더블클릭 기본너비"></div>${scheduleDateHeader(days)}`;
+  // 공통 일정은 캘린더 필터와 무관하게 항상 유지한다.
   html+=scheduleLaneHtml('common','공통일정',days,map,(date,es)=>laneCellCommonHtml(es),{type:'common',color:'#d9b5cc'});
-  html+=scheduleLaneHtml('prep','준비일정',days,map,(date,es)=>laneCellPrepHtml(es),{type:'prep',color:'#b8c8ef'});
-  html+=scheduleLaneHtml('quick','Quick',days,map,(date,es)=>laneCellQuickHtml(es),{type:'quick',color:'#cfd5dc'});
-  html+=scheduleLaneHtml('payment','납부',days,map,(date,es)=>laneCellPaymentHtml(es),{type:'payment',color:'#e6d399'});
+  if(!filtering||hasPrep) html+=scheduleLaneHtml('prep','준비일정',days,map,(date,es)=>laneCellPrepHtml(es),{type:'prep',color:'#b8c8ef'});
+  if(!filtering||hasQuick) html+=scheduleLaneHtml('quick','Quick',days,map,(date,es)=>laneCellQuickHtml(es),{type:'quick',color:'#cfd5dc'});
+  if(!filtering||hasPayment) html+=scheduleLaneHtml('payment','납부',days,map,(date,es)=>laneCellPaymentHtml(es),{type:'payment',color:'#e6d399'});
   for(const root of topLevelCals()){
     const members=laneCalendarMembers(root,visibleIds); if(!members.length) continue;
     const subNames=members.filter(c=>c.id!==root.id).map(c=>c.name);
-    html+=scheduleLaneHtml(`cal:${root.id}`,root.name,days,map,(date,es)=>rootLaneCellHtml(date,root,es,visibleIds),{type:'calendar',color:root.color,subtitle:subNames.length?`부속 ${subNames.length}`:root.period});
+    const singleChildOnly=!visibleIds.has(root.id)&&members.length===1;
+    const laneTitle=singleChildOnly?members[0].name:root.name;
+    const laneTargetId=singleChildOnly?members[0].id:root.id;
+    html+=scheduleLaneHtml(`cal:${laneTargetId}`,laneTitle,days,map,(date,es)=>rootLaneCellHtml(date,root,es,visibleIds),{type:'calendar',color:singleChildOnly?members[0].color:root.color,subtitle:filtering?'':(subNames.length?`부속 ${subNames.length}`:root.period)});
   }
   html+=`<div class="scheduleSummaryGrid"><div class="scheduleSummaryLabel">합계</div>${days.map(d=>{const date=ds(d);return `<div class="scheduleSummaryCell">${daySummaryHtml(date,map[date]||[])}</div>`}).join('')}</div></div>`;
   return html;
@@ -2778,7 +2831,7 @@ function mobileSectionIsCollapsed(key){
   return !!state.settings.mobileSectionsCollapsed[key];
 }
 function mobileDayWorkStats(date,es){
-  const visible=visibleCals(), visibleIds=new Set(visible.map(c=>c.id));
+  const visible=displayCals(), visibleIds=new Set(visible.map(c=>c.id));
   let total=0,totalCap=0,unknown=false,blocked=0;
   for(const root of topLevelCals()){
     const members=laneCalendarMembers(root,visibleIds); if(!members.length) continue;
@@ -2822,11 +2875,13 @@ function mobileRootSectionHtml(date,root,es,visibleIds){
   const allForLoad=(es||[]).filter(e=>ids.has(e.calId)&&!isPreparationManagedItem(e)&&!['anniversary','payment'].includes(e.kind));
   const sum=allForLoad.reduce((a,e)=>a+workloadDuration(e),0), cap=capacityForDate(root,date);
   const meta=cap.unknown?`${fmtH(sum)} / 미정`:`${fmtH(sum)} / ${fmtH(cap.hours)}${cap.blocked?' · 차단':''}`;
+  const singleChildOnly=!visibleIds.has(root.id)&&members.length===1;
+  const displayCal=singleChildOnly?members[0]:root;
   const body=normal.map(e=>{
-    const c=cal(e.calId), isSub=e.calId!==root.id;
+    const c=cal(e.calId), isSub=!singleChildOnly&&e.calId!==root.id;
     return `<div class="mobileCalendarEvent ${isSub?'sub':''}">${isSub?`<span class="mobileCalTag" style="--tag-color:${esc(c.color)}">↳ ${esc(c.name)}</span>`:''}${eventItemHtml(e,false)}</div>`;
   }).join('');
-  return mobileSectionHtml(`cal:${root.id}`,root.name,root.color,body,meta);
+  return mobileSectionHtml(`cal:${displayCal.id}`,displayCal.name,displayCal.color,body,meta);
 }
 function renderMobileSchedule(days,map){
   const keys=days.map(ds);
@@ -2835,7 +2890,7 @@ function renderMobileSchedule(days,map){
     mobileSelectedDate=keys.includes(today)?today:keys[Math.min(keys.length-1,Math.max(0,diffDays(ds(days[0]),ds(cursor))))];
   }
   const selected=mobileSelectedDate, d=parse(selected), es=map[selected]||[], h=holidayLabel(selected), hasDiary=!!state.diary[selected]?.text;
-  const visible=visibleCals(), visibleIds=new Set(visible.map(c=>c.id));
+  const visible=displayCals(), visibleIds=new Set(visible.map(c=>c.id));
   const common=es.filter(e=>!isPreparationManagedItem(e)&&(e.kind==='anniversary'||e.kind==='appointment'));
   const prep=es.filter(e=>isPreparationLaneItem(e));
   const quick=es.filter(e=>!isPreparationManagedItem(e)&&e.kind==='todo');
@@ -2844,9 +2899,9 @@ function renderMobileSchedule(days,map){
   const dayMeta=stats.unknown?`${fmtH(stats.total)} · 일부 미정`:(stats.totalCap?`${fmtH(stats.total)} / ${fmtH(stats.totalCap)}`:fmtH(stats.total));
   let sections='';
   sections+=mobileSectionHtml('common','공통 일정','#d9b5cc',mobileCommonBodyHtml(common),`${common.length}건`);
-  sections+=mobileSectionHtml('prep','준비일정','#b8c8ef',prep.map(e=>eventItemHtml(e,false)).join(''),`${prep.length}건`);
-  sections+=mobileSectionHtml('quick','Quick','#cfd5dc',quick.map(e=>eventItemHtml(e,false)).join(''),`${quick.length}건`);
-  sections+=mobileSectionHtml('payment','납부','#e6d399',payments.map(e=>eventItemHtml(e,false)).join(''),`${payments.length}건`);
+  if(!calendarFocusIds.size||prep.length) sections+=mobileSectionHtml('prep','준비일정','#b8c8ef',prep.map(e=>eventItemHtml(e,false)).join(''),`${prep.length}건`);
+  if(!calendarFocusIds.size||quick.length) sections+=mobileSectionHtml('quick','Quick','#cfd5dc',calendarGroupedItemsHtml(quick,false),`${quick.length}건`);
+  if(!calendarFocusIds.size||payments.length) sections+=mobileSectionHtml('payment','납부','#e6d399',payments.map(e=>eventItemHtml(e,false)).join(''),`${payments.length}건`);
   for(const root of topLevelCals()) if(laneCalendarMembers(root,visibleIds).length) sections+=mobileRootSectionHtml(selected,root,es,visibleIds);
   const dow=d.getDay();
   $('#main').className='mobileScheduleView';
@@ -2995,15 +3050,17 @@ function dayResizableSectionHtml(key,innerHtml,{type='calendar',color='#d9d9d9'}
   return `<section class="dayResizableSection ${manual?'manualDayHeight':''}" data-day-lane-key="${esc(key)}" style="--day-lane-h:${h}px;--day-lane-color:${esc(color)}"><div class="dayResizableContent">${innerHtml}</div><div class="dayLaneHeightResizer" data-day-lane-resize="${esc(key)}" data-day-lane-type="${esc(type)}" title="위아래로 드래그해 구역 높이 조절 · 더블클릭 자동높이"><span></span></div></section>`;
 }
 function dayViewGroupHtml(date,es){
+  const filtering=calendarFocusIds.size>0;
   const commonTopHtml=dayResizableSectionHtml('common',commonTopLaneHtml(es,false,true),{type:'common',color:'#d9b5cc'});
-  const prepHtml=dayResizableSectionHtml('prep',prepLaneHtml(es,false,true),{type:'prep',color:'#b8c8ef'});
-  const quickHtml=dayResizableSectionHtml('quick',quickLaneHtml(es,false,true),{type:'quick',color:'#cfd5dc'});
-  const paymentHtml=dayResizableSectionHtml('payment',paymentLaneHtml(es,false,true),{type:'payment',color:'#e6d399'});
+  const prepInner=prepLaneHtml(es,false,!filtering), quickInner=quickLaneHtml(es,false,!filtering), paymentInner=paymentLaneHtml(es,false,!filtering);
+  const prepHtml=prepInner?dayResizableSectionHtml('prep',prepInner,{type:'prep',color:'#b8c8ef'}):'';
+  const quickHtml=quickInner?dayResizableSectionHtml('quick',quickInner,{type:'quick',color:'#cfd5dc'}):'';
+  const paymentHtml=paymentInner?dayResizableSectionHtml('payment',paymentInner,{type:'payment',color:'#e6d399'}):'';
   const appointmentEvents=(es||[]).filter(e=>e.kind==='appointment'&&!isPreparationManagedItem(e));
   const quickEvents=(es||[]).filter(e=>e.kind==='todo'&&!isPreparationManagedItem(e));
   const workEvents=(es||[]).filter(e=>!isPreparationManagedItem(e) && e.kind!=='payment' && e.kind!=='appointment' && e.kind!=='anniversary' && e.kind!=='todo');
   let html='';
-  const visible=visibleCals(), visibleIds=new Set(visible.map(c=>c.id));
+  const visible=displayCals(), visibleIds=new Set(visible.map(c=>c.id));
   let total=appointmentEvents.reduce((sum,e)=>sum+workloadDuration(e),0) + quickEvents.reduce((sum,e)=>sum+workloadDuration(e),0), totalCapacity=0, hasUnknownCapacity=false, blockedRootCount=0;
   for(const root of topLevelCals()){
     const members=[root,...descendants(root.id)].filter(c=>visibleIds.has(c.id));
@@ -3016,12 +3073,14 @@ function dayViewGroupHtml(date,es){
     const rootCapInfo=capacityForDate(root,date);
     if(rootCapInfo.blocked) blockedRootCount++;
     if(rootCapInfo.unknown) hasUnknownCapacity=true; else totalCapacity+=rootCapInfo.hours;
-    const rootCollapsed=isDayCalCollapsed(date,root.id);
+    const singleChildOnly=!visibleIds.has(root.id)&&members.length===1;
+    const displayCal=singleChildOnly?members[0]:root;
+    const rootCollapsed=isDayCalCollapsed(date,displayCal.id);
     const blockedTitle=rootCapInfo.blocked?' · 가용시간 차단 일정 있음':'';
-    let body=`<div class="group calendarTreeGroup ${rootCollapsed?'collapsed':''}" style="--group-color:${esc(root.color)}"><div class="groupHead" style="background:${esc(root.color)}55" title="${esc(root.name)}${blockedTitle}">${dayCalHeadHtml(date,root,rootSum,rootCapInfo.hours,rootCapInfo.unknown)}</div><div class="dayCalGroupBody laneMergedDayItems">`;
-    body+=laneOrderedItemsHtml(groupEvents,root.id);
+    let body=`<div class="group calendarTreeGroup ${rootCollapsed?'collapsed':''}" style="--group-color:${esc(displayCal.color)}"><div class="groupHead" style="background:${esc(displayCal.color)}55" title="${esc(displayCal.name)}${blockedTitle}">${dayCalHeadHtml(date,displayCal,rootSum,rootCapInfo.hours,rootCapInfo.unknown)}</div><div class="dayCalGroupBody laneMergedDayItems">`;
+    body+=laneOrderedItemsHtml(groupEvents,displayCal.id);
     body+=`</div></div>`;
-    html+=dayResizableSectionHtml(`cal:${root.id}`,body,{type:'calendar',color:root.color});
+    html+=dayResizableSectionHtml(`cal:${displayCal.id}`,body,{type:'calendar',color:displayCal.color});
   }
   const overallOver=!hasUnknownCapacity && totalCapacity>0 && total>totalCapacity;
   let capacitySummary=hasUnknownCapacity
@@ -3128,25 +3187,26 @@ function renderDay(){
 }
 function renderList(){
   const start=ds(add(new Date(),-30)),end=ds(add(new Date(),365));
-  const focus=calendarFocusId?state.calendars.find(c=>c.id===calendarFocusId):null;
-  const allowed=focus?new Set([focus.id,...descendants(focus.id).map(c=>c.id)]):null;
+  const allowed=focusedCalendarIds();
+  const selected=focusedCalendarList();
   const map=buildOccurrenceMap(start,end,{calendarIds:allowed});
   const rows=[]; for(const [date,es] of Object.entries(map)) for(const e of es){ if((e._occurrenceStart||e.date)===date) rows.push({date,e}); }
-  setRangeLabel(focus?`${focus.name} 관련 일정`:'일정 목록',focus?`${focus.name} 목록`:'목록'); $('#main').className='listView';
+  const label=focusLabel();
+  setRangeLabel(selected.length?`${label} 관련 일정`:'일정 목록',selected.length?`${label} 목록`:'목록'); $('#main').className='listView';
   let last='';
   let top='';
-  if(focus){
-    const sourceEvents=state.events.filter(e=>allowed.has(e.calId));
-    const manualFixed=state.fixed.filter(f=>allowed.has(f.calId));
-    const kindCount=type=>sourceEvents.filter(e=>e.kind===type).length;
-    top=`<div class="calendarFocusHeader" style="border-left-color:${esc(focus.color)}"><div><b>${esc(calendarPath(focus.id))}</b><small>${descendants(focus.id).length?'부속 캘린더 포함 · ':''}일정 ${kindCount('event')} · 예약·약속 ${kindCount('appointment')} · Quick ${kindCount('todo')} · 습관 ${kindCount('habit')} · 기념일 ${kindCount('anniversary')} · 납부 ${kindCount('payment')} · 날짜지정 ${manualFixed.length}</small></div><button id="clearCalendarFocus" type="button">전체 일정 보기</button></div>`;
+  if(selected.length){
+    const sourceEvents=state.events.filter(e=>allowed?.has(e.calId));
+    const manualFixed=state.fixed.filter(f=>allowed?.has(f.calId));
+    const color=selected[0]?.color||'#d9d9d9';
+    top=`<div class="calendarFocusHeader" style="border-left-color:${esc(color)}"><div><b>${esc(label)}</b><small>선택 ${selected.length}개 · 관련 일정 ${sourceEvents.length}개 · 날짜지정 ${manualFixed.length}개 · 공통 일정은 항상 함께 표시</small></div><button id="clearCalendarFocus" type="button">전체 일정 보기</button></div>`;
     if(manualFixed.length){
       top+=`<div class="calendarFocusFixed"><b>날짜 지정 배치 업무</b>${manualFixed.map(f=>`<button type="button" class="focusFixedItem" data-fid="${esc(f.id)}" style="border-left-color:${esc(cal(f.calId).color)}"><span>${esc(f.name)}</span><small>${esc(calendarPath(f.calId))} · ${esc(durationLabel(f))}</small></button>`).join('')}</div>`;
     }
   }
-  const note=`<div class="listNote">오늘 기준 과거 30일 ~ 앞으로 1년의 ${focus?'선택한 캘린더 관련 ':''}일정입니다. 반복 일정도 각 발생일에 표시됩니다.</div>`;
+  const note=`<div class="listNote">오늘 기준 과거 30일 ~ 앞으로 1년의 ${selected.length?'선택한 캘린더 관련 일정과 공통 ':'전체 '}일정입니다. 반복 일정도 각 발생일에 표시됩니다.</div>`;
   $('#main').innerHTML=top+note+(rows.map(({date,e})=>{let h='';if(last!==date){last=date;h=`<div class="listDate ${holidayClass(date)}">${date}${holidayLabel(date)?` · ${esc(holidayLabel(date))}`:''}</div>`}return h+eventItemHtml(e);}).join('')||'<div class="empty">등록된 일정이 없습니다.</div>');
-  $('#clearCalendarFocus')?.addEventListener('click',()=>{calendarFocusId=null; render();});
+  $('#clearCalendarFocus')?.addEventListener('click',()=>{calendarFocusIds.clear(); render();});
   $$('.focusFixedItem').forEach(x=>x.onclick=()=>openFixed(x.dataset.fid));
   bindItems();
 }
@@ -4391,135 +4451,8 @@ $('#downloadBackupBtn').onclick=downloadBackup;
 $('#restoreBackupBtn').onclick=()=>$('#restoreFile').click();
 $('#restoreFile').onchange=e=>restoreBackupFile(e.target.files?.[0]);
 
-// v2.12: 외부에서 만든 일정 JSON을 기존 데이터에 안전하게 병합합니다.
-let pendingEventImport=null;
-function validImportDate(value){
-  const s=String(value||'').trim();
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
-  const d=parse(s);
-  return Number.isFinite(d.getTime()) && ds(d)===s;
-}
-function importCalendarName(raw){
-  return String(raw?.calendarName||raw?.targetCalendarName||raw?.calendar||'').trim();
-}
-function normalizeEventImport(raw,fileName=''){
-  const list=Array.isArray(raw)?raw:(Array.isArray(raw?.events)?raw.events:null);
-  if(!list) throw new Error('events array missing');
-  const topCalendar=importCalendarName(raw);
-  const batchId=String(raw?.batchId||raw?.importId||raw?.name||'').trim();
-  const valid=[], invalid=[];
-  list.forEach((item,index)=>{
-    if(!item || typeof item!=='object'){ invalid.push({index,reason:'형식 오류',date:'',title:''}); return; }
-    const date=String(item.date||item.startDate||'').trim();
-    const title=String(item.title||item.name||'').trim();
-    if(!validImportDate(date) || !title){ invalid.push({index,reason:!title?'제목 없음':'날짜 오류',date,title}); return; }
-    const rawEnd=String(item.endDate||date).trim();
-    const endDate=validImportDate(rawEnd)&&dayNum(rawEnd)>=dayNum(date)?rawEnd:date;
-    const rowCalendar=String(item.calendarName||item.calendar||topCalendar||'').trim();
-    const itemKey=String(item.importKey||item.key||item.id||'').trim();
-    const importKey=itemKey?`${batchId||'calendar-import'}:${itemKey}`:(batchId?`${batchId}:${index+1}`:'');
-    const hours=Math.max(0,Number(item.hours)||0);
-    valid.push({
-      index,date,endDate,title,
-      memo:String(item.memo??item.description??'').trim(),
-      place:String(item.place||'').trim(),
-      important:!!item.important,
-      allDay:item.allDay!==false,
-      start:String(item.start||'').trim(),
-      end:String(item.end||'').trim(),
-      hours,
-      noDuration:item.noDuration!==undefined?!!item.noDuration:hours<=0,
-      calendarName:rowCalendar,
-      importKey,
-      batchId
-    });
-  });
-  return {name:String(raw?.name||raw?.title||fileName||'일정 파일').trim(),fileName,calendarName:topCalendar,batchId,valid,invalid,total:list.length};
-}
-function preferredImportCalendarId(pack){
-  const wanted=String(pack?.calendarName||pack?.valid?.find(x=>x.calendarName)?.calendarName||'').trim();
-  const exact=wanted?cals().find(c=>String(c.name||'').trim()===wanted):null;
-  if(exact) return exact.id;
-  if(calendarFocusId && cals().some(c=>c.id===calendarFocusId)) return calendarFocusId;
-  return cals()[0]?.id||'';
-}
-function eventImportDuplicate(row,calId,seen){
-  const key=String(row.importKey||'');
-  if(key && (state.events.some(e=>String(e.importKey||'')===key) || seen.keys.has(key))) return true;
-  const signature=`${calId}\u0000${row.date}\u0000${row.title.trim()}`;
-  if(state.events.some(e=>e.calId===calId && e.date===row.date && String(e.title||'').trim()===row.title.trim()) || seen.signatures.has(signature)) return true;
-  if(key) seen.keys.add(key);
-  seen.signatures.add(signature);
-  return false;
-}
-function analyzeEventImport(calId){
-  const pack=pendingEventImport;
-  if(!pack) return {rows:[],newRows:[],duplicates:[],invalid:[]};
-  const seen={keys:new Set(),signatures:new Set()}, rows=[], newRows=[], duplicates=[];
-  for(const row of pack.valid){
-    const duplicate=eventImportDuplicate(row,calId,seen);
-    const item={...row,status:duplicate?'duplicate':'new'};
-    rows.push(item); (duplicate?duplicates:newRows).push(item);
-  }
-  return {rows,newRows,duplicates,invalid:pack.invalid||[]};
-}
-function renderEventImportPreview(){
-  const pack=pendingEventImport; if(!pack) return;
-  const calId=$('#eventImportTargetCal').value;
-  const analysis=analyzeEventImport(calId);
-  const calName=cal(calId)?.name||'-';
-  $('#eventImportSource').innerHTML=`<b>${esc(pack.name||'일정 파일')}</b><br>${esc(pack.fileName||'')} · 대상 캘린더: ${esc(calName)}`;
-  $('#eventImportSummary').innerHTML=`<span class="importStat"><strong>${pack.total}</strong>개 읽음</span><span class="importStat new"><strong>${analysis.newRows.length}</strong>개 새 일정</span><span class="importStat duplicate"><strong>${analysis.duplicates.length}</strong>개 중복 제외</span>${analysis.invalid.length?`<span class="importStat invalid"><strong>${analysis.invalid.length}</strong>개 형식 오류</span>`:''}`;
-  const validHtml=analysis.rows.map(row=>`<div class="importPreviewRow ${row.status==='new'?'isNew':'isDuplicate'}"><span class="importDate">${esc(row.date)}</span><span class="importTitle" title="${esc(row.title)}">${row.important?'★ ':''}${esc(row.title)}</span><span class="importStatus">${row.status==='new'?'등록':'중복 제외'}</span></div>`).join('');
-  const invalidHtml=analysis.invalid.map(row=>`<div class="importPreviewRow isInvalid"><span class="importDate">${esc(row.date||'-')}</span><span class="importTitle">${esc(row.title||row.reason||'형식 오류')}</span><span class="importStatus">${esc(row.reason||'오류')}</span></div>`).join('');
-  $('#eventImportPreview').innerHTML=validHtml+invalidHtml || '<div class="empty">가져올 일정이 없습니다.</div>';
-  const btn=$('#confirmEventImport'); btn.disabled=!analysis.newRows.length; btn.textContent=analysis.newRows.length?`새 일정 ${analysis.newRows.length}개 등록`:'등록할 새 일정 없음';
-}
-async function openEventImportFile(file){
-  if(!file) return;
-  try{
-    const raw=JSON.parse(await file.text());
-    pendingEventImport=normalizeEventImport(raw,file.name||'');
-    if(!pendingEventImport.valid.length && !pendingEventImport.invalid.length) throw new Error('empty import');
-    const select=$('#eventImportTargetCal');
-    select.innerHTML=cals().map(c=>`<option value="${esc(c.id)}">${esc(calendarPath(c.id))}</option>`).join('');
-    const preferred=preferredImportCalendarId(pendingEventImport); if(preferred) select.value=preferred;
-    renderEventImportPreview();
-    closeDialog($('#settingsDlg')); openDialog($('#eventImportDlg'));
-  }catch(err){ console.error(err); alert('올바른 일정 가져오기 JSON 파일이 아닙니다.'); pendingEventImport=null; }
-  finally{ $('#eventImportFile').value=''; }
-}
-function importedEventObject(row,calId){
-  return {
-    id:uid(),title:row.title,important:!!row.important,calId,date:row.date,endDate:row.endDate||row.date,
-    allDay:row.allDay!==false,start:row.start||'',end:row.end||'',hours:Number(row.hours)||0,noDuration:!!row.noDuration,
-    kind:'event',place:row.place||'',paymentAmount:0,paymentMethod:'',
-    prepEnabled:false,prepDeadline:row.date,prepMode:'auto',prepAutoEnabled:true,prepDays:5,prepWeekdaysOnly:false,prepIncludeDeadline:false,prepDailyNotes:{},prepTasks:[],prepDone:{},prepMoves:{},
-    availabilityBlock:false,availabilityTargetCalId:'',repeat:'none',repeatRule:null,memo:row.memo||'',
-    checklist:[],checklistDoneByDate:{},orderByDate:{},done:false,doneDates:[],excludedDates:[],fixedId:null,
-    importKey:row.importKey||'',importBatchId:row.batchId||'',importedAt:new Date().toISOString()
-  };
-}
-$('#importEventsBtn').onclick=()=>$('#eventImportFile').click();
-$('#eventImportFile').onchange=e=>openEventImportFile(e.target.files?.[0]);
-$('#eventImportTargetCal').onchange=renderEventImportPreview;
-$('#cancelEventImport').onclick=()=>{ pendingEventImport=null; closeDialog($('#eventImportDlg')); openDialog($('#settingsDlg')); };
-$('#eventImportForm').onsubmit=e=>e.preventDefault();
-$('#confirmEventImport').onclick=()=>{
-  if(!pendingEventImport) return;
-  const calId=$('#eventImportTargetCal').value; if(!calId) return;
-  const analysis=analyzeEventImport(calId);
-  if(!analysis.newRows.length){ alert('새로 등록할 일정이 없습니다.'); return; }
-  const firstDate=analysis.newRows[0]?.date||'';
-  analysis.newRows.forEach(row=>state.events.push(importedEventObject(row,calId)));
-  pendingEventImport=null; closeDialog($('#eventImportDlg'));
-  if(firstDate && validImportDate(firstDate)) cursor=parse(firstDate);
-  save();
-  alert(`${analysis.newRows.length}개 일정을 등록했습니다.${analysis.duplicates.length?`\n중복 ${analysis.duplicates.length}개는 제외했습니다.`:''}`);
-};
-
 // Native dialog cancel/ESC never saves. Explicit cancel buttons above only close dialogs.
-['eventDlg','repeatEditDlg','repeatDeleteDlg','repeatMoveDlg','carryDlg','calDlg','fixedDlg','diaryDlg','searchDlg','settingsDlg','eventImportDlg'].forEach(id=>{
+['eventDlg','repeatEditDlg','repeatDeleteDlg','repeatMoveDlg','carryDlg','calDlg','fixedDlg','diaryDlg','searchDlg','settingsDlg'].forEach(id=>{
   const d=$(`#${id}`); d.addEventListener('cancel',()=>{});
 });
 
