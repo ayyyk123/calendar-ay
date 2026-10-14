@@ -2109,6 +2109,10 @@ function openPreparationPlan(id,focusDate=''){
   const entries=preparationEntries(e);
   $('#prepPlanTitle').textContent=e.title;
   const prepProgress=preparationProgress(e);
+  const prepComplete=prepProgress.total>0 && prepProgress.done===prepProgress.total;
+  const prepDlg=$('#prepPlanDlg'), completeBadge=$('#prepPlanCompleteBadge');
+  prepDlg?.classList.toggle('complete',prepComplete);
+  if(completeBadge) completeBadge.classList.toggle('hidden',!prepComplete);
   $('#prepPlanSummary').textContent=`${preparationSummary(e)}${prepProgress.total?` · 완료 ${prepProgress.done}/${prepProgress.total}`:''}`;
   const memo=$('#prepPlanGeneralMemo');
   memo.textContent=''; memo.classList.add('hidden');
@@ -2121,7 +2125,7 @@ function openPreparationPlan(id,focusDate=''){
   if(!rows.length) rows.push(`<div class="prepPlanRow"><span class="prepPlanCheckSpacer"></span><div class="prepPlanDate">준비일정</div><div class="prepPlanText muted">등록된 준비 일정이 없습니다.</div></div>`);
   const deadline=e.prepDeadline||e.date, deadlineFocused=activePrepPlanDate&&deadline===activePrepPlanDate;
   const deadlineMemo=String(e.memo||'').trim();
-  rows.push(`<div class="prepPlanRow deadline ${deadlineFocused?'focused':''}"><span class="prepPlanCheckSpacer"></span><div class="prepPlanDate">마감일<small>${esc(deadline)}</small></div><div class="prepPlanText"><b>${esc(e.title)}</b>${e.place?`<br>${esc(e.place)}`:''}${deadlineMemo?`<div class="prepDeadlineMemo"><span>메모</span>${esc(deadlineMemo)}</div>`:''}</div></div>`);
+  rows.push(`<div class="prepPlanRow deadline ${prepComplete?'done completeDeadline':''} ${deadlineFocused?'focused':''}"><span class="prepPlanCheckSpacer">${prepComplete?'✓':''}</span><div class="prepPlanDate">마감일<small>${esc(deadline)}</small></div><div class="prepPlanText"><b>${esc(e.title)}</b>${e.place?`<br>${esc(e.place)}`:''}${deadlineMemo?`<div class="prepDeadlineMemo"><span>메모</span>${esc(deadlineMemo)}</div>`:''}</div></div>`);
   $('#prepPlanList').innerHTML=rows.join('');
   $('#prepPlanList').onclick=ev=>{ const b=ev.target.closest('[data-prep-plan-check]'); if(!b) return; ev.preventDefault(); ev.stopPropagation(); togglePreparationDone(e.id,b.dataset.prepPlanCheck||''); };
   openDialog($('#prepPlanDlg'));
@@ -4411,7 +4415,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.13',
+    appVersion:'2.14',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state

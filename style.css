@@ -2407,3 +2407,19 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
   .sidebarSection>.secHead .secTitleWithGrip>b{font-size:11px}
   .calNameBtn{font-size:10.5px}
 }
+
+
+/* v2.14: 준비계획 완료 상태를 더 분명하게 표시 */
+.prepPlanTitleLine{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.prepPlanCompleteBadge{display:inline-flex;align-items:center;justify-content:center;padding:3px 8px;border:1px solid #a9d8b5;border-radius:999px;background:#edf8f0;color:#25713c;font-size:10px;font-weight:800;line-height:1.2;white-space:nowrap}
+.prepPlanDlg.complete{box-shadow:0 10px 40px #0003, inset 0 4px 0 #6ab77c}
+.prepPlanDlg.complete .prepPlanHead{padding:9px 10px;margin:-4px -4px 10px;border-radius:8px;background:#f3faf5}
+.prepPlanDlg.complete .prepPlanHead p{color:#4f785b;font-weight:700}
+.prepPlanRow.done{opacity:1!important;background:#f4f6f7!important;border-color:#e1e5e8!important}
+.prepPlanRow.done .prepPlanDate{color:#8a9199}
+.prepPlanRow.done .prepPlanDate small{color:#9aa1a8}
+.prepPlanRow.done .prepPlanText{text-decoration:line-through;color:#8b9299!important}
+.prepPlanRow.done .prepPlanCheck{background:#e9f5ec;border-color:#9cc9a7;color:#23713b;font-weight:800}
+.prepPlanRow.completeDeadline{background:#f1f3f4!important;border-color:#dfe3e6!important}
+.prepPlanRow.completeDeadline .prepPlanCheckSpacer{color:#23713b;font-size:15px;font-weight:900}
+.prepPlanDlg.complete #prepPlanList{opacity:.9}
