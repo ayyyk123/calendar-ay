@@ -2634,7 +2634,6 @@ function scheduleLaneHtml(key,title,days,map,cellBuilder,{type='calendar',color=
       <button type="button" class="scheduleLaneToggle" data-lane-toggle="${esc(key)}" title="구역 접기/펴기">
         <span class="scheduleLaneDot" style="background:${esc(color)}"></span>
         <span class="scheduleLaneName"><b aria-label="${esc(title)}">${laneVerticalTitleHtml(title)}</b>${subtitle?`<small>${esc(subtitle)}</small>`:''}</span>
-        <span class="scheduleLaneArrow">${collapsed?'▸':'▾'}</span>
       </button>
     </aside>
     <div class="scheduleLaneGrid">${cells}</div>
@@ -4418,7 +4417,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.18',
+    appVersion:'2.19',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state

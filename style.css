@@ -2505,3 +2505,8 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 @media(min-width:761px){
   .scheduleLaneGrid,.scheduleLaneSide{min-height:40px!important}
 }
+
+
+/* v2.19: hide lane collapse arrows while keeping full title button clickable */
+.scheduleLaneArrow{display:none!important}
+.scheduleLaneToggle{padding-right:6px!important}
