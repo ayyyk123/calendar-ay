@@ -2425,9 +2425,9 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 .prepPlanDlg.complete #prepPlanList{opacity:.9}
 
 
-/* v2.17: 상세 주보기 최소 높이를 34px로 조정 */
+/* v2.18: 상세 주보기 최소 높이를 40px로 조정 */
 @media(min-width:761px){
-  .scheduleLaneGrid,.scheduleLaneSide{min-height:34px}
+  .scheduleLaneGrid,.scheduleLaneSide{min-height:40px}
 }
 \n\n/* v2.16 - 주 상세 구역명 가로 표기 + 조절 가능한 타이트한 이름 영역 */
 #main.laneView{--lane-label-w:var(--lane-label-w-user,72px)!important}
@@ -2501,7 +2501,7 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 }
 
 
-/* v2.17: 가로 구역명이 답답하지 않도록 PC 최소 높이를 살짝 상향 */
+/* v2.18: 가로 구역명이 더 안정적으로 보이도록 PC 최소 높이를 40px로 상향 */
 @media(min-width:761px){
-  .scheduleLaneGrid,.scheduleLaneSide{min-height:34px!important}
+  .scheduleLaneGrid,.scheduleLaneSide{min-height:40px!important}
 }
