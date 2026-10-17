@@ -2429,3 +2429,73 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 @media(min-width:761px){
   .scheduleLaneGrid{min-height:28px}
 }
+\n\n/* v2.16 - 주 상세 구역명 가로 표기 + 조절 가능한 타이트한 이름 영역 */
+#main.laneView{--lane-label-w:var(--lane-label-w-user,72px)!important}
+.scheduleLaneToggle{
+  flex-direction:row!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  gap:4px!important;
+  padding:2px 5px!important;
+  text-align:left!important;
+}
+.scheduleLaneName{
+  display:block!important;
+  flex:1 1 auto!important;
+  min-width:0!important;
+  max-width:none!important;
+  overflow:hidden!important;
+}
+.scheduleLaneToggle b{
+  display:block!important;
+  writing-mode:horizontal-tb!important;
+  text-orientation:mixed!important;
+  width:100%!important;
+  max-width:100%!important;
+  max-height:none!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  font-size:9.5px!important;
+  line-height:1.2!important;
+  letter-spacing:0!important;
+  text-align:left!important;
+}
+.scheduleLaneDot{flex:0 0 auto!important;width:6px!important;height:6px!important}
+.scheduleLaneArrow{
+  position:static!important;
+  flex:0 0 auto!important;
+  margin-left:auto!important;
+  font-size:8px!important;
+  line-height:1!important;
+}
+.scheduleLane.collapsed .scheduleLaneToggle{
+  flex-direction:row!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  padding:2px 5px!important;
+}
+.scheduleLane.collapsed .scheduleLaneName{display:block!important;min-width:0!important}
+.scheduleLane.collapsed .scheduleLaneToggle b{
+  display:block!important;
+  max-height:none!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+.scheduleDateCorner,.scheduleSummaryLabel{
+  writing-mode:horizontal-tb!important;
+  text-orientation:mixed!important;
+  letter-spacing:0!important;
+}
+.scheduleDateCorner{font-size:0!important}
+.scheduleDateCorner::after{content:'구역'!important;white-space:nowrap!important;font-size:7px!important;line-height:1!important}
+.scheduleSummaryLabel{font-size:0!important}
+.scheduleSummaryLabel::after{content:'합계'!important;white-space:nowrap!important;font-size:7px!important;line-height:1!important}
+@media(max-width:760px){
+  #main.laneView{--lane-label-w:48px!important}
+  .scheduleLaneToggle{padding:2px 3px!important;gap:2px!important}
+  .scheduleLaneToggle b{font-size:6.5px!important}
+  .scheduleLaneDot{width:5px!important;height:5px!important}
+  .scheduleLaneArrow{font-size:6px!important}
+}

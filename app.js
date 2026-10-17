@@ -81,7 +81,7 @@ const defaultState = () => ({
   purchases: [],
   diary: {},
   actualWork: {},
-  settings: { hiddenCalendars: [], fixedPanelsCollapsed: { recurring:false, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','dday','diary'], sidebarSectionsCollapsed:{}, laneHeights:{}, laneCollapsed:{}, laneLabelWidth:30, mobileSectionsCollapsed:{}, dayLaneHeights:{}, dayLaneManual:{}, workloadRange:'week', weekViewMode:'detailed', selectedDdayId:'' }
+  settings: { hiddenCalendars: [], fixedPanelsCollapsed: { recurring:false, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','dday','diary'], sidebarSectionsCollapsed:{}, laneHeights:{}, laneCollapsed:{}, laneLabelWidth:72, mobileSectionsCollapsed:{}, dayLaneHeights:{}, dayLaneManual:{}, workloadRange:'week', weekViewMode:'detailed', selectedDdayId:'' }
 });
 
 let state = defaultState();
@@ -439,7 +439,7 @@ function normalizeState(raw){
       dayLaneHeights: (s.settings?.dayLaneHeights && typeof s.settings.dayLaneHeights==='object') ? Object.fromEntries(Object.entries(s.settings.dayLaneHeights).map(([k,v])=>[k,Math.max(52,Math.min(640,Number(v)||0))]).filter(([,v])=>v)) : {},
       dayLaneManual: (s.settings?.dayLaneManual && typeof s.settings.dayLaneManual==='object') ? Object.fromEntries(Object.entries(s.settings.dayLaneManual).filter(([,v])=>!!v).map(([k])=>[k,true])) : {},
       laneCollapsed: (s.settings?.laneCollapsed && typeof s.settings.laneCollapsed==='object') ? {...s.settings.laneCollapsed} : {},
-      laneLabelWidth: Math.max(22,Math.min(120,Number(s.settings?.laneLabelWidth)||30)),
+      laneLabelWidth: (()=>{ const v=Number(s.settings?.laneLabelWidth); return v>=48?Math.max(48,Math.min(180,v)):72; })(),
       workloadRange: ['week','month','year'].includes(s.settings?.workloadRange) ? s.settings.workloadRange : 'week',
       weekViewMode: s.settings?.weekViewMode==='compact' ? 'compact' : 'detailed',
       selectedDdayId: typeof s.settings?.selectedDdayId==='string' ? s.settings.selectedDdayId : ''
@@ -2616,13 +2616,14 @@ function daySummaryHtml(date,es){
 }
 function laneLabelWidth(){
   state.settings=state.settings||{};
-  return Math.max(22,Math.min(120,Number(state.settings.laneLabelWidth)||30));
+  const raw=Number(state.settings.laneLabelWidth);
+  // v2.16: 세로 라벨 시절의 22~30px 저장값은 가로 이름에 너무 좁으므로
+  // 한 번에 읽기 좋은 기본 폭으로 승계한다. 이후에는 사용자가 직접 너비를 조절한다.
+  return raw>=48 ? Math.max(48,Math.min(180,raw)) : 72;
 }
 function laneVerticalTitleHtml(text){
-  return Array.from(String(text||'')).map(ch=>{
-    if(ch===' ') return '<span class="laneTitleChar laneTitleSpace" aria-hidden="true"></span>';
-    return `<span class="laneTitleChar">${esc(ch)}</span>`;
-  }).join('');
+  // 이름 영역 너비를 직접 조절할 수 있으므로 구역명은 한 줄 가로 표기로 단순화한다.
+  return esc(String(text||''));
 }
 function scheduleLaneHtml(key,title,days,map,cellBuilder,{type='calendar',color='#d9d9d9',subtitle=''}={}){
   const collapsed=laneIsCollapsed(key), h=laneHeight(key,type);
@@ -2800,14 +2801,14 @@ function bindScheduleLanes(){
     };
   });
   $$('[data-lane-label-resize]').forEach(handle=>{
-    handle.ondblclick=e=>{ e.preventDefault(); e.stopPropagation(); state.settings.laneLabelWidth=30; if(main) main.style.setProperty('--lane-label-w-user','30px'); save(); };
+    handle.ondblclick=e=>{ e.preventDefault(); e.stopPropagation(); state.settings.laneLabelWidth=72; if(main) main.style.setProperty('--lane-label-w-user','72px'); save(); };
     handle.onpointerdown=e=>{
       if(window.matchMedia('(max-width:760px)').matches) return;
       e.preventDefault(); e.stopPropagation();
       const startX=e.clientX, startW=laneLabelWidth();
       handle.setPointerCapture?.(e.pointerId); document.body.classList.add('resizingLaneLabel');
-      const move=ev=>{ const w=Math.max(22,Math.min(120,startW+(ev.clientX-startX))); if(main) main.style.setProperty('--lane-label-w-user',`${Math.round(w)}px`); };
-      const up=ev=>{ document.removeEventListener('pointermove',move); document.removeEventListener('pointerup',up); document.body.classList.remove('resizingLaneLabel'); const raw=parseFloat(getComputedStyle(main).getPropertyValue('--lane-label-w-user'))||startW; state.settings.laneLabelWidth=Math.max(22,Math.min(120,Math.round(raw))); save(); };
+      const move=ev=>{ const w=Math.max(48,Math.min(180,startW+(ev.clientX-startX))); if(main) main.style.setProperty('--lane-label-w-user',`${Math.round(w)}px`); };
+      const up=ev=>{ document.removeEventListener('pointermove',move); document.removeEventListener('pointerup',up); document.body.classList.remove('resizingLaneLabel'); const raw=parseFloat(getComputedStyle(main).getPropertyValue('--lane-label-w-user'))||startW; state.settings.laneLabelWidth=Math.max(48,Math.min(180,Math.round(raw))); save(); };
       document.addEventListener('pointermove',move); document.addEventListener('pointerup',up,{once:true});
     };
   });
@@ -4416,7 +4417,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.15',
+    appVersion:'2.16',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
