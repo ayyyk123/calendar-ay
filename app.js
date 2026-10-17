@@ -435,7 +435,7 @@ function normalizeState(raw){
       sidebarSectionsCollapsed: (s.settings?.sidebarSectionsCollapsed && typeof s.settings.sidebarSectionsCollapsed==='object') ? {...s.settings.sidebarSectionsCollapsed} : {},
       mobileSectionsCollapsed: (s.settings?.mobileSectionsCollapsed && typeof s.settings.mobileSectionsCollapsed==='object') ? {...s.settings.mobileSectionsCollapsed} : {},
       dayCalendarGroupsCollapsed: (s.settings?.dayCalendarGroupsCollapsed && typeof s.settings.dayCalendarGroupsCollapsed==='object') ? {...s.settings.dayCalendarGroupsCollapsed} : {},
-      laneHeights: (s.settings?.laneHeights && typeof s.settings.laneHeights==='object') ? Object.fromEntries(Object.entries(s.settings.laneHeights).map(([k,v])=>[k,Math.max(44,Math.min(2400,Number(v)||0))]).filter(([,v])=>v)) : {},
+      laneHeights: (s.settings?.laneHeights && typeof s.settings.laneHeights==='object') ? Object.fromEntries(Object.entries(s.settings.laneHeights).map(([k,v])=>[k,Math.max(28,Math.min(2400,Number(v)||0))]).filter(([,v])=>v)) : {},
       dayLaneHeights: (s.settings?.dayLaneHeights && typeof s.settings.dayLaneHeights==='object') ? Object.fromEntries(Object.entries(s.settings.dayLaneHeights).map(([k,v])=>[k,Math.max(52,Math.min(640,Number(v)||0))]).filter(([,v])=>v)) : {},
       dayLaneManual: (s.settings?.dayLaneManual && typeof s.settings.dayLaneManual==='object') ? Object.fromEntries(Object.entries(s.settings.dayLaneManual).filter(([,v])=>!!v).map(([k])=>[k,true])) : {},
       laneCollapsed: (s.settings?.laneCollapsed && typeof s.settings.laneCollapsed==='object') ? {...s.settings.laneCollapsed} : {},
@@ -2566,7 +2566,7 @@ const LANE_HEIGHT_DEFAULTS={common:72,prep:84,quick:64,payment:64,calendar:112};
 function laneHeight(key,type='calendar'){
   state.settings.laneHeights=state.settings.laneHeights||{};
   const stored=Number(state.settings.laneHeights[key]);
-  return stored?Math.max(44,Math.min(2400,stored)):(LANE_HEIGHT_DEFAULTS[type]||112);
+  return stored?Math.max(28,Math.min(2400,stored)):(LANE_HEIGHT_DEFAULTS[type]||112);
 }
 function laneIsCollapsed(key){
   state.settings.laneCollapsed=state.settings.laneCollapsed||{};
@@ -2699,14 +2699,14 @@ function naturalStackHeight(el){
 }
 function measureLaneCellContentHeight(cell){
   if(!cell) return 0;
+  // 현재 레인 높이(scrollHeight)를 출발점으로 쓰면 빈 칸도 그 높이만큼 필요하다고
+  // 오판해서 자동맞춤 최소높이가 사실상 고정된다. 직접 자식의 자연 높이와 실제
+  // 렌더된 마지막 요소 위치만 측정해 '내용 자체'가 필요한 높이만 계산한다.
   const cs=getComputedStyle(cell);
   const padBottom=parseFloat(cs.paddingBottom)||0;
   const rect=cell.getBoundingClientRect();
-  let need=Math.max(0,cell.scrollHeight||0);
-  // 캘린더 레인은 .laneOrderedItem 안쪽 item의 margin이 부모 높이에 합쳐지지 않아
-  // 단순 자식 높이 합산 시 일정 수가 많을수록 자동맞춤이 부족해졌다.
-  // 실제 화면에 그려진 항목의 마지막 위치까지 직접 재서 누락되는 여백까지 포함한다.
-  const rendered=[...cell.querySelectorAll('.laneCellLoad,.laneInlineCalTag,.item')].filter(el=>{
+  let need=naturalStackHeight(cell);
+  const rendered=[...cell.querySelectorAll('.quickCalLabel,.laneCellLoad,.laneInlineCalTag,.item')].filter(el=>{
     const st=getComputedStyle(el);
     return st.display!=='none' && st.visibility!=='hidden' && st.position!=='absolute' && st.position!=='fixed';
   });
@@ -2749,20 +2749,21 @@ function fitAllScheduleLaneHeights(){
     const grid=lane.querySelector('.scheduleLaneGrid');
 
     // 자동맞춤은 현재 높이에 절대 의존하지 않아야 한다.
-    // CSS의 height transition이 살아 있으면 44px로 바꾼 직후에도 이전 높이에서 애니메이션 중인 값을
+    // CSS의 height transition이 살아 있으면 기준 높이로 바꾼 직후에도 이전 높이에서 애니메이션 중인 값을
     // scrollHeight가 읽어, 자동맞춤을 누를 때마다 그 값 + 여유폭만큼 커지는 누적 오류가 생긴다.
-    // 측정하는 동안 transition을 완전히 끄고 동일한 44px 기준 상태에서 매번 새로 측정한다.
+    // 측정하는 동안 transition을 완전히 끄고 동일한 28px 기준 상태에서 매번 새로 측정한다.
     const prevGridTransition=grid?.style.transition||'';
     const prevSideTransition=side?.style.transition||'';
     if(grid) grid.style.setProperty('transition','none','important');
     if(side) side.style.setProperty('transition','none','important');
-    lane.style.setProperty('--lane-h','44px');
+    lane.style.setProperty('--lane-h','28px');
     void lane.offsetHeight;
     if(grid) void grid.offsetHeight;
 
     const cellNeed=Math.max(0,...cells.map(measureLaneCellContentHeight));
-    const sideNeed=measureLaneSideNaturalHeight(side);
-    const h=Math.max(44,Math.min(2400,Math.ceil(Math.max(cellNeed,sideNeed)+6)));
+    // 자동맞춤에서는 왼쪽 세로 캘린더명 높이를 기준에서 제외한다.
+    // 빈 구역/일정 1개 구역이 이름 길이 때문에 불필요하게 커지지 않도록 한다.
+    const h=Math.max(28,Math.min(2400,Math.ceil(cellNeed+4)));
     state.settings.laneHeights[key]=h;
     lane.style.setProperty('--lane-h',`${h}px`);
     void lane.offsetHeight;
@@ -2820,10 +2821,10 @@ function bindScheduleLanes(){
       e.preventDefault(); e.stopPropagation();
       const lane=handle.closest('.scheduleLane'), key=handle.dataset.laneResize; if(!lane) return;
       const grid=lane.querySelector('.scheduleLaneGrid');
-      const startY=e.clientY,startH=Math.max(44,Math.round(grid?.getBoundingClientRect().height||laneHeight(key)));
+      const startY=e.clientY,startH=Math.max(28,Math.round(grid?.getBoundingClientRect().height||laneHeight(key)));
       handle.setPointerCapture?.(e.pointerId); document.body.classList.add('resizingLane');
-      const move=ev=>{ const h=Math.max(44,Math.min(480,startH+(ev.clientY-startY))); lane.style.setProperty('--lane-h',`${Math.round(h)}px`); };
-      const up=ev=>{ document.removeEventListener('pointermove',move); document.removeEventListener('pointerup',up); document.body.classList.remove('resizingLane'); const grid=lane.querySelector('.scheduleLaneGrid'); const h=Math.max(44,Math.min(480,Math.round(grid?.getBoundingClientRect().height||startH))); state.settings.laneHeights=state.settings.laneHeights||{}; state.settings.laneHeights[key]=h; save(); };
+      const move=ev=>{ const h=Math.max(28,Math.min(480,startH+(ev.clientY-startY))); lane.style.setProperty('--lane-h',`${Math.round(h)}px`); };
+      const up=ev=>{ document.removeEventListener('pointermove',move); document.removeEventListener('pointerup',up); document.body.classList.remove('resizingLane'); const grid=lane.querySelector('.scheduleLaneGrid'); const h=Math.max(28,Math.min(480,Math.round(grid?.getBoundingClientRect().height||startH))); state.settings.laneHeights=state.settings.laneHeights||{}; state.settings.laneHeights[key]=h; save(); };
       document.addEventListener('pointermove',move); document.addEventListener('pointerup',up,{once:true});
     };
   });
@@ -4415,7 +4416,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.14',
+    appVersion:'2.15',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
