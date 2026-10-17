@@ -4417,7 +4417,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.19',
+    appVersion:'2.20',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state

@@ -2510,3 +2510,7 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 /* v2.19: hide lane collapse arrows while keeping full title button clickable */
 .scheduleLaneArrow{display:none!important}
 .scheduleLaneToggle{padding-right:6px!important}
+
+
+/* v2.20: detailed week lane label font matches event title size */
+@media(min-width:761px){.scheduleLaneToggle b{font-size:10.5px!important;line-height:1.2!important}}
