@@ -2556,3 +2556,14 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
   body.resizingWeekdayWidth,body.resizingWeekdayWidth *{cursor:col-resize!important;user-select:none!important}
 }
 @media(max-width:760px){.weekdayWidthHandle{display:none!important}}
+
+
+/* v2.25: 요일 너비는 선택한 열만 독립 변경, 나머지 열 고정 */
+@media(min-width:761px){
+  .laneView .scheduleLaneGrid,.multiCompactView,.month{
+    min-width:var(--weekday-total,100%)!important;
+  }
+  .laneView .scheduleDateGrid,.laneView .scheduleSummaryGrid{
+    min-width:calc(var(--weekday-total,100%) + var(--lane-label-w,72px))!important;
+  }
+}

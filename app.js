@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '2.24',
+  version: '2.25',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -81,7 +81,7 @@ const defaultState = () => ({
   purchases: [],
   diary: {},
   actualWork: {},
-  settings: { hiddenCalendars: [], weekdayWidths:[100,100,100,100,100,100,100], fixedPanelsCollapsed: { recurring:false, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','dday','diary'], sidebarSectionsCollapsed:{}, laneHeights:{}, laneCollapsed:{}, laneLabelWidth:72, mobileSectionsCollapsed:{}, dayLaneHeights:{}, dayLaneManual:{}, workloadRange:'week', weekViewMode:'detailed', selectedDdayId:'' }
+  settings: { hiddenCalendars: [], weekdayWidths:[100,100,100,100,100,100,100], weekdayWidthMode:'ratio', fixedPanelsCollapsed: { recurring:false, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','dday','diary'], sidebarSectionsCollapsed:{}, laneHeights:{}, laneCollapsed:{}, laneLabelWidth:72, mobileSectionsCollapsed:{}, dayLaneHeights:{}, dayLaneManual:{}, workloadRange:'week', weekViewMode:'detailed', selectedDdayId:'' }
 });
 
 let state = defaultState();
@@ -418,7 +418,8 @@ function normalizeState(raw){
     ])) : {},
     settings: {
       hiddenCalendars: Array.isArray(s.settings?.hiddenCalendars) ? s.settings.hiddenCalendars : [],
-      weekdayWidths: Array.from({length:7},(_,i)=>Math.max(40,Math.min(400,Number(s.settings?.weekdayWidths?.[i])||100))),
+      weekdayWidths: Array.from({length:7},(_,i)=>Math.max(40,Math.min(700,Number(s.settings?.weekdayWidths?.[i])||100))),
+      weekdayWidthMode: s.settings?.weekdayWidthMode==='px'?'px':'ratio',
       fixedPanelsCollapsed: {
         recurring: !!s.settings?.fixedPanelsCollapsed?.recurring,
         manual: !!s.settings?.fixedPanelsCollapsed?.manual,
@@ -2706,7 +2707,7 @@ function scheduleLaneHtml(key,title,days,map,cellBuilder,{type='calendar',color=
 }
 function scheduleDateHeader(days){
   // 날짜 헤더 전체도 드롭 영역으로 사용합니다. 요일 헤더 경계는 PC에서 열 너비 조절 손잡이로 사용합니다.
-  return `<div class="scheduleDateGrid"><div class="scheduleDateCorner"></div>${days.map((d,i)=>{const key=ds(d),hasDiary=!!state.diary[key]?.text,h=holidayLabel(key),dow=d.getDay(),dmark=selectedDdayMarkerHtml(key),dayClass=[key===ds(new Date())?'today':'',holidayClass(key),dow===0?'sunday':'',dow===6?'saturday':'',dmark?'ddayTracked':''].filter(Boolean).join(' ');return `<div class="scheduleDateHead ${dayClass}" data-weekday-index="${i}" data-dropdate="${key}" data-date-drop-head="1" title="${key} · 일정을 여기에 놓아 이동"><div class="dayTopLine"><span class="weekdayLabel">${['일','월','화','수','목','금','토'][dow]}</span><span class="dateNum">${d.getDate()}</span><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}" aria-label="${hasDiary?'다이어리 작성됨':'다이어리 미작성'}">${diaryIconHtml(hasDiary)}</button></div><div class="holidayName ${h?'':'holidayEmpty'}" title="${h?esc(h):''}">${h?esc(h):'&nbsp;'}</div>${dmark}${i<6?`<span class="weekdayWidthHandle" data-weekday-resize="${i}" title="좌우로 드래그해 ${['월','화','수','목','금','토'][i]}·${['화','수','목','금','토','일'][i]} 너비 조절 · 더블클릭하면 기본 너비로 초기화"></span>`:''}</div>`}).join('')}</div>`;
+  return `<div class="scheduleDateGrid"><div class="scheduleDateCorner"></div>${days.map((d,i)=>{const key=ds(d),hasDiary=!!state.diary[key]?.text,h=holidayLabel(key),dow=d.getDay(),dmark=selectedDdayMarkerHtml(key),dayClass=[key===ds(new Date())?'today':'',holidayClass(key),dow===0?'sunday':'',dow===6?'saturday':'',dmark?'ddayTracked':''].filter(Boolean).join(' ');return `<div class="scheduleDateHead ${dayClass}" data-weekday-index="${i}" data-dropdate="${key}" data-date-drop-head="1" title="${key} · 일정을 여기에 놓아 이동"><div class="dayTopLine"><span class="weekdayLabel">${['일','월','화','수','목','금','토'][dow]}</span><span class="dateNum">${d.getDate()}</span><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}" aria-label="${hasDiary?'다이어리 작성됨':'다이어리 미작성'}">${diaryIconHtml(hasDiary)}</button></div><div class="holidayName ${h?'':'holidayEmpty'}" title="${h?esc(h):''}">${h?esc(h):'&nbsp;'}</div>${dmark}<span class="weekdayWidthHandle" data-weekday-resize="${i}" title="좌우로 드래그해 이 요일만 너비 조절 · 더블클릭하면 전체 기본 너비로 초기화"></span></div>`}).join('')}</div>`;
 }
 function scheduleWeekBoard(days,map){
   const visible=displayCals(),visibleIds=new Set(visible.map(c=>c.id));
@@ -2991,15 +2992,26 @@ function renderMobileSchedule(days,map){
 
 function normalizedWeekdayWidths(){
   const raw=Array.isArray(state.settings?.weekdayWidths)?state.settings.weekdayWidths:[];
-  return Array.from({length:7},(_,i)=>Math.max(40,Math.min(400,Number(raw[i])||100)));
+  const max=state.settings?.weekdayWidthMode==='px'?700:400;
+  return Array.from({length:7},(_,i)=>Math.max(40,Math.min(max,Number(raw[i])||100)));
 }
 function weekdayGridTemplate(){
-  return normalizedWeekdayWidths().map(v=>`minmax(48px,${v}fr)`).join(' ');
+  const widths=normalizedWeekdayWidths();
+  if(state.settings?.weekdayWidthMode==='px') return widths.map(v=>`${Math.round(v)}px`).join(' ');
+  return widths.map(v=>`minmax(48px,${v}fr)`).join(' ');
 }
 function applyWeekdayWidths(){
   const main=$('#main'); if(!main) return;
-  if(window.matchMedia('(max-width:760px)').matches){ main.style.removeProperty('--weekday-cols'); return; }
+  if(window.matchMedia('(max-width:760px)').matches){
+    main.style.removeProperty('--weekday-cols');
+    main.style.removeProperty('--weekday-total');
+    return;
+  }
   main.style.setProperty('--weekday-cols',weekdayGridTemplate());
+  if(state.settings?.weekdayWidthMode==='px'){
+    const total=normalizedWeekdayWidths().reduce((a,b)=>a+b,0);
+    main.style.setProperty('--weekday-total',`${Math.round(total)}px`);
+  }else main.style.setProperty('--weekday-total','100%');
 }
 function bindWeekdayWidthResizers(){
   if(window.matchMedia('(max-width:760px)').matches) return;
@@ -3011,19 +3023,23 @@ function bindWeekdayWidthResizers(){
       if(e.button!==0) return;
       e.preventDefault(); e.stopPropagation();
       const idx=Number(handle.dataset.weekdayResize);
-      if(!(idx>=0&&idx<6)) return;
-      const heads=[...main.querySelectorAll('[data-weekday-index]')].filter((el,pos,arr)=>arr.findIndex(x=>x.dataset.weekdayIndex===el.dataset.weekdayIndex)===pos).sort((a,b)=>Number(a.dataset.weekdayIndex)-Number(b.dataset.weekdayIndex));
-      const left=heads.find(x=>Number(x.dataset.weekdayIndex)===idx), right=heads.find(x=>Number(x.dataset.weekdayIndex)===idx+1);
-      if(!left||!right) return;
-      const widths=heads.map(h=>Math.max(48,h.getBoundingClientRect().width));
-      const startX=e.clientX, pair=widths[idx]+widths[idx+1], min=56;
+      if(!(idx>=0&&idx<7)) return;
+      const heads=[...main.querySelectorAll('[data-weekday-index]')]
+        .filter((el,pos,arr)=>arr.findIndex(x=>x.dataset.weekdayIndex===el.dataset.weekdayIndex)===pos)
+        .sort((a,b)=>Number(a.dataset.weekdayIndex)-Number(b.dataset.weekdayIndex));
+      if(heads.length<7) return;
+      const widths=heads.map(h=>Math.max(56,h.getBoundingClientRect().width));
+      const startX=e.clientX, min=56, max=700;
+      // v2.25: 첫 드래그 순간 현재 보이는 7개 너비를 px로 고정한 뒤,
+      // 선택한 요일 하나만 변경한다. 다른 요일은 절대 같이 줄어들지 않는다.
+      state.settings.weekdayWidthMode='px';
+      state.settings.weekdayWidths=widths.slice();
       document.body.classList.add('resizingWeekdayWidth');
       try{ handle.setPointerCapture(e.pointerId); }catch{}
       const move=ev=>{
         const dx=ev.clientX-startX;
-        const nextLeft=Math.max(min,Math.min(pair-min,widths[idx]+dx));
-        const nextRight=pair-nextLeft;
-        const next=widths.slice(); next[idx]=nextLeft; next[idx+1]=nextRight;
+        const next=widths.slice();
+        next[idx]=Math.max(min,Math.min(max,widths[idx]+dx));
         state.settings.weekdayWidths=next;
         applyWeekdayWidths();
         if(main.classList.contains('multiCompactView')) scheduleMultiWeekCellFit();
@@ -3041,6 +3057,7 @@ function bindWeekdayWidthResizers(){
     handle.ondblclick=e=>{
       e.preventDefault(); e.stopPropagation();
       state.settings.weekdayWidths=[100,100,100,100,100,100,100];
+      state.settings.weekdayWidthMode='ratio';
       applyWeekdayWidths();
       if(main.classList.contains('multiCompactView')) scheduleMultiWeekCellFit();
       save({rerender:false});
@@ -3131,7 +3148,7 @@ function renderMultiWeek(weeks=2){
   if(isMobileSchedule()){ renderMobileSchedule(allDays,map); return; }
   $('#main').className=`multiCompactView weeks${weeks}`;
   $('#main').style.setProperty('--multi-weeks',String(weeks));
-  const heads=['월','화','수','목','금','토','일'].map((x,i)=>`<div class="multiCompactWeekday ${i===5?'saturday':i===6?'sunday':''}" data-weekday-index="${i}">${x}${i<6?`<span class="weekdayWidthHandle" data-weekday-resize="${i}" title="좌우로 드래그해 ${x}·${['화','수','목','금','토','일'][i]} 너비 조절 · 더블클릭하면 기본 너비로 초기화"></span>`:''}</div>`).join('');
+  const heads=['월','화','수','목','금','토','일'].map((x,i)=>`<div class="multiCompactWeekday ${i===5?'saturday':i===6?'sunday':''}" data-weekday-index="${i}">${x}<span class="weekdayWidthHandle" data-weekday-resize="${i}" title="좌우로 드래그해 ${x}요일만 너비 조절 · 더블클릭하면 전체 기본 너비로 초기화"></span></div>`).join('');
   const today=ds(new Date());
   const cells=allDays.map(d=>{
     const key=ds(d), es=map[key]||[], h=holidayLabel(key), dow=d.getDay();
@@ -3156,7 +3173,7 @@ function renderMonth(){
   setRangeLabel(`${y}년 ${m+1}월${focusSuffix()}`,`${y}.${m+1}${compactFocusSuffix()}`);
   $('#main').className='month';
   $('#main').style.setProperty('--month-weeks',String(weekCount));
-  const heads=['월','화','수','목','금','토','일'].map((x,i)=>`<div class="weekdayHeader ${i===5?'saturday':i===6?'sunday':''}" data-weekday-index="${i}">${x}${i<6?`<span class="weekdayWidthHandle" data-weekday-resize="${i}" title="좌우로 드래그해 ${x}·${['화','수','목','금','토','일'][i]} 너비 조절 · 더블클릭하면 기본 너비로 초기화"></span>`:''}</div>`).join('');
+  const heads=['월','화','수','목','금','토','일'].map((x,i)=>`<div class="weekdayHeader ${i===5?'saturday':i===6?'sunday':''}" data-weekday-index="${i}">${x}<span class="weekdayWidthHandle" data-weekday-resize="${i}" title="좌우로 드래그해 ${x}요일만 너비 조절 · 더블클릭하면 전체 기본 너비로 초기화"></span></div>`).join('');
   const cells=[...Array(totalCells)].map((_,i)=>{
     const d=add(s,i),key=ds(d),es=map[key]||[],hasDiary=!!state.diary[key]?.text,h=holidayLabel(key),dow=d.getDay();
     const cellClass=[d.getMonth()!==m?'other':'',holidayClass(key),dow===0?'sunday':'',dow===6?'saturday':''].filter(Boolean).join(' ');
@@ -4556,7 +4573,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.24',
+    appVersion:'2.25',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
