@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '2.00',
+  version: '2.24',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -81,7 +81,7 @@ const defaultState = () => ({
   purchases: [],
   diary: {},
   actualWork: {},
-  settings: { hiddenCalendars: [], fixedPanelsCollapsed: { recurring:false, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','dday','diary'], sidebarSectionsCollapsed:{}, laneHeights:{}, laneCollapsed:{}, laneLabelWidth:72, mobileSectionsCollapsed:{}, dayLaneHeights:{}, dayLaneManual:{}, workloadRange:'week', weekViewMode:'detailed', selectedDdayId:'' }
+  settings: { hiddenCalendars: [], weekdayWidths:[100,100,100,100,100,100,100], fixedPanelsCollapsed: { recurring:false, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','dday','diary'], sidebarSectionsCollapsed:{}, laneHeights:{}, laneCollapsed:{}, laneLabelWidth:72, mobileSectionsCollapsed:{}, dayLaneHeights:{}, dayLaneManual:{}, workloadRange:'week', weekViewMode:'detailed', selectedDdayId:'' }
 });
 
 let state = defaultState();
@@ -418,6 +418,7 @@ function normalizeState(raw){
     ])) : {},
     settings: {
       hiddenCalendars: Array.isArray(s.settings?.hiddenCalendars) ? s.settings.hiddenCalendars : [],
+      weekdayWidths: Array.from({length:7},(_,i)=>Math.max(40,Math.min(400,Number(s.settings?.weekdayWidths?.[i])||100))),
       fixedPanelsCollapsed: {
         recurring: !!s.settings?.fixedPanelsCollapsed?.recurring,
         manual: !!s.settings?.fixedPanelsCollapsed?.manual,
@@ -2704,9 +2705,8 @@ function scheduleLaneHtml(key,title,days,map,cellBuilder,{type='calendar',color=
   </section>`;
 }
 function scheduleDateHeader(days){
-  // 날짜 헤더 전체도 드롭 영역으로 사용합니다. 2주/3주 보기에서 다른 주로 옮길 때
-  // 좁은 일정 칸을 정확히 찾지 않아도 날짜 머리글에 놓으면 해당 날짜로 이동합니다.
-  return `<div class="scheduleDateGrid"><div class="scheduleDateCorner"></div>${days.map(d=>{const key=ds(d),hasDiary=!!state.diary[key]?.text,h=holidayLabel(key),dow=d.getDay(),dmark=selectedDdayMarkerHtml(key),dayClass=[key===ds(new Date())?'today':'',holidayClass(key),dow===0?'sunday':'',dow===6?'saturday':'',dmark?'ddayTracked':''].filter(Boolean).join(' ');return `<div class="scheduleDateHead ${dayClass}" data-dropdate="${key}" data-date-drop-head="1" title="${key} · 일정을 여기에 놓아 이동"><div class="dayTopLine"><span class="weekdayLabel">${['일','월','화','수','목','금','토'][dow]}</span><span class="dateNum">${d.getDate()}</span><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}" aria-label="${hasDiary?'다이어리 작성됨':'다이어리 미작성'}">${diaryIconHtml(hasDiary)}</button></div><div class="holidayName ${h?'':'holidayEmpty'}" title="${h?esc(h):''}">${h?esc(h):'&nbsp;'}</div>${dmark}</div>`}).join('')}</div>`;
+  // 날짜 헤더 전체도 드롭 영역으로 사용합니다. 요일 헤더 경계는 PC에서 열 너비 조절 손잡이로 사용합니다.
+  return `<div class="scheduleDateGrid"><div class="scheduleDateCorner"></div>${days.map((d,i)=>{const key=ds(d),hasDiary=!!state.diary[key]?.text,h=holidayLabel(key),dow=d.getDay(),dmark=selectedDdayMarkerHtml(key),dayClass=[key===ds(new Date())?'today':'',holidayClass(key),dow===0?'sunday':'',dow===6?'saturday':'',dmark?'ddayTracked':''].filter(Boolean).join(' ');return `<div class="scheduleDateHead ${dayClass}" data-weekday-index="${i}" data-dropdate="${key}" data-date-drop-head="1" title="${key} · 일정을 여기에 놓아 이동"><div class="dayTopLine"><span class="weekdayLabel">${['일','월','화','수','목','금','토'][dow]}</span><span class="dateNum">${d.getDate()}</span><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}" aria-label="${hasDiary?'다이어리 작성됨':'다이어리 미작성'}">${diaryIconHtml(hasDiary)}</button></div><div class="holidayName ${h?'':'holidayEmpty'}" title="${h?esc(h):''}">${h?esc(h):'&nbsp;'}</div>${dmark}${i<6?`<span class="weekdayWidthHandle" data-weekday-resize="${i}" title="좌우로 드래그해 ${['월','화','수','목','금','토'][i]}·${['화','수','목','금','토','일'][i]} 너비 조절 · 더블클릭하면 기본 너비로 초기화"></span>`:''}</div>`}).join('')}</div>`;
 }
 function scheduleWeekBoard(days,map){
   const visible=displayCals(),visibleIds=new Set(visible.map(c=>c.id));
@@ -2989,6 +2989,65 @@ function renderMobileSchedule(days,map){
   requestAnimationFrame(()=>{ const active=$('.mobileDayTab.selected'); active?.scrollIntoView({block:'nearest',inline:'center'}); });
 }
 
+function normalizedWeekdayWidths(){
+  const raw=Array.isArray(state.settings?.weekdayWidths)?state.settings.weekdayWidths:[];
+  return Array.from({length:7},(_,i)=>Math.max(40,Math.min(400,Number(raw[i])||100)));
+}
+function weekdayGridTemplate(){
+  return normalizedWeekdayWidths().map(v=>`minmax(48px,${v}fr)`).join(' ');
+}
+function applyWeekdayWidths(){
+  const main=$('#main'); if(!main) return;
+  if(window.matchMedia('(max-width:760px)').matches){ main.style.removeProperty('--weekday-cols'); return; }
+  main.style.setProperty('--weekday-cols',weekdayGridTemplate());
+}
+function bindWeekdayWidthResizers(){
+  if(window.matchMedia('(max-width:760px)').matches) return;
+  const main=$('#main'); if(!main) return;
+  applyWeekdayWidths();
+  const handles=[...main.querySelectorAll('[data-weekday-resize]')];
+  handles.forEach(handle=>{
+    handle.onpointerdown=e=>{
+      if(e.button!==0) return;
+      e.preventDefault(); e.stopPropagation();
+      const idx=Number(handle.dataset.weekdayResize);
+      if(!(idx>=0&&idx<6)) return;
+      const heads=[...main.querySelectorAll('[data-weekday-index]')].filter((el,pos,arr)=>arr.findIndex(x=>x.dataset.weekdayIndex===el.dataset.weekdayIndex)===pos).sort((a,b)=>Number(a.dataset.weekdayIndex)-Number(b.dataset.weekdayIndex));
+      const left=heads.find(x=>Number(x.dataset.weekdayIndex)===idx), right=heads.find(x=>Number(x.dataset.weekdayIndex)===idx+1);
+      if(!left||!right) return;
+      const widths=heads.map(h=>Math.max(48,h.getBoundingClientRect().width));
+      const startX=e.clientX, pair=widths[idx]+widths[idx+1], min=56;
+      document.body.classList.add('resizingWeekdayWidth');
+      try{ handle.setPointerCapture(e.pointerId); }catch{}
+      const move=ev=>{
+        const dx=ev.clientX-startX;
+        const nextLeft=Math.max(min,Math.min(pair-min,widths[idx]+dx));
+        const nextRight=pair-nextLeft;
+        const next=widths.slice(); next[idx]=nextLeft; next[idx+1]=nextRight;
+        state.settings.weekdayWidths=next;
+        applyWeekdayWidths();
+        if(main.classList.contains('multiCompactView')) scheduleMultiWeekCellFit();
+      };
+      const end=ev=>{
+        handle.removeEventListener('pointermove',move); handle.removeEventListener('pointerup',end); handle.removeEventListener('pointercancel',end);
+        document.body.classList.remove('resizingWeekdayWidth');
+        try{ handle.releasePointerCapture(ev.pointerId); }catch{}
+        save({rerender:false});
+      };
+      handle.addEventListener('pointermove',move);
+      handle.addEventListener('pointerup',end);
+      handle.addEventListener('pointercancel',end);
+    };
+    handle.ondblclick=e=>{
+      e.preventDefault(); e.stopPropagation();
+      state.settings.weekdayWidths=[100,100,100,100,100,100,100];
+      applyWeekdayWidths();
+      if(main.classList.contains('multiCompactView')) scheduleMultiWeekCellFit();
+      save({rerender:false});
+    };
+  });
+}
+
 function renderWeek(){
   if(!isMobileSchedule() && state.settings?.weekViewMode==='compact'){ renderMultiWeek(1); return; }
   const s=startWeek(cursor), days=[0,1,2,3,4,5,6].map(i=>add(s,i)), map=buildOccurrenceMap(ds(s),ds(days[6]),{calendarIds:focusedCalendarIds()});
@@ -2996,7 +3055,7 @@ function renderWeek(){
   if(isMobileSchedule()){ renderMobileSchedule(days,map); return; }
   $('#main').className='laneView weekLaneView';
   $('#main').innerHTML=scheduleWeekBoard(days,map);
-  bindItems(); bindScheduleLanes();
+  bindItems(); bindScheduleLanes(); bindWeekdayWidthResizers();
 }
 function monthCellEventsHtml(date, es){
   const limit=4;
@@ -3072,7 +3131,7 @@ function renderMultiWeek(weeks=2){
   if(isMobileSchedule()){ renderMobileSchedule(allDays,map); return; }
   $('#main').className=`multiCompactView weeks${weeks}`;
   $('#main').style.setProperty('--multi-weeks',String(weeks));
-  const heads=['월','화','수','목','금','토','일'].map((x,i)=>`<div class="multiCompactWeekday ${i===5?'saturday':i===6?'sunday':''}">${x}</div>`).join('');
+  const heads=['월','화','수','목','금','토','일'].map((x,i)=>`<div class="multiCompactWeekday ${i===5?'saturday':i===6?'sunday':''}" data-weekday-index="${i}">${x}${i<6?`<span class="weekdayWidthHandle" data-weekday-resize="${i}" title="좌우로 드래그해 ${x}·${['화','수','목','금','토','일'][i]} 너비 조절 · 더블클릭하면 기본 너비로 초기화"></span>`:''}</div>`).join('');
   const today=ds(new Date());
   const cells=allDays.map(d=>{
     const key=ds(d), es=map[key]||[], h=holidayLabel(key), dow=d.getDay();
@@ -3083,6 +3142,7 @@ function renderMultiWeek(weeks=2){
   bindItems();
   $$('.multiCompactMore').forEach(btn=>btn.onclick=e=>{e.stopPropagation();openDayList(btn.dataset.moreDate)});
   scheduleMultiWeekCellFit();
+  bindWeekdayWidthResizers();
 }
 function renderMonth(){
   const y=cursor.getFullYear(),m=cursor.getMonth(),first=new Date(y,m,1),s=startWeek(first);
@@ -3096,14 +3156,14 @@ function renderMonth(){
   setRangeLabel(`${y}년 ${m+1}월${focusSuffix()}`,`${y}.${m+1}${compactFocusSuffix()}`);
   $('#main').className='month';
   $('#main').style.setProperty('--month-weeks',String(weekCount));
-  const heads=['월','화','수','목','금','토','일'].map((x,i)=>`<div class="weekdayHeader ${i===5?'saturday':i===6?'sunday':''}">${x}</div>`).join('');
+  const heads=['월','화','수','목','금','토','일'].map((x,i)=>`<div class="weekdayHeader ${i===5?'saturday':i===6?'sunday':''}" data-weekday-index="${i}">${x}${i<6?`<span class="weekdayWidthHandle" data-weekday-resize="${i}" title="좌우로 드래그해 ${x}·${['화','수','목','금','토','일'][i]} 너비 조절 · 더블클릭하면 기본 너비로 초기화"></span>`:''}</div>`).join('');
   const cells=[...Array(totalCells)].map((_,i)=>{
     const d=add(s,i),key=ds(d),es=map[key]||[],hasDiary=!!state.diary[key]?.text,h=holidayLabel(key),dow=d.getDay();
     const cellClass=[d.getMonth()!==m?'other':'',holidayClass(key),dow===0?'sunday':'',dow===6?'saturday':''].filter(Boolean).join(' ');
     const holidayText=h?esc(h):'&nbsp;';
     return `<div class="cell ${cellClass}" data-dropdate="${key}" ondblclick="window.__newEvent?.('${key}')"><div class="mhead"><span>${d.getDate()}</span><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}" aria-label="${hasDiary?'다이어리 작성됨':'다이어리 미작성'}">${diaryIconHtml(hasDiary)}</button></div><div class="holidayName ${h?'':'holidayEmpty'}" title="${h?esc(h):''}">${holidayText}</div>${selectedDdayMarkerHtml(key,'monthDdayOffset')}${monthCellEventsHtml(key,es)}</div>`;
   }).join('');
-  $('#main').innerHTML=heads+cells; bindItems();
+  $('#main').innerHTML=heads+cells; bindItems(); bindWeekdayWidthResizers();
 }
 
 const DAY_LANE_HEIGHT_DEFAULTS={common:112,prep:132,quick:112,payment:112,calendar:176};
@@ -3283,9 +3343,9 @@ function render(){
   const sidebar=$('#sidebar'), main=$('#main');
   const keep={sidebarTop:sidebar?.scrollTop||0,sidebarLeft:sidebar?.scrollLeft||0,mainTop:main?.scrollTop||0,mainLeft:main?.scrollLeft||0};
   renderSide();
-  $$('#currentViewMenu [data-view]').forEach(b=>b.classList.toggle('on',b.dataset.view===view));
+  $$('#currentViewMenu [data-view], .primaryViewButtons [data-view]').forEach(b=>b.classList.toggle('on',b.dataset.view===view));
   setCurrentViewButtonLabel();
-  const weekBtn=$('#currentViewMenu [data-view="week"]');
+  const weekBtn=$('.primaryViewButtons [data-view="week"]');
   if(weekBtn){
     const compact=state.settings?.weekViewMode==='compact';
     weekBtn.title=view==='week' ? `주 보기 · 다시 누르면 ${compact?'상세 구역형':'간결 달력형'}으로 전환` : `주 보기 (${compact?'간결 달력형':'상세 구역형'})`;
@@ -4271,45 +4331,34 @@ $('#jumpDateBtn')?.addEventListener('click',()=>{ const input=$('#jumpDate'); if
 $('#diaryMainShortcut').onclick=()=>{ if(view==='diary'){ view=lastScheduleView||'week'; } else { lastScheduleView=view; view='diary'; } render(); };
 const VIEW_LABELS={week:'주','2week':'2주','3week':'3주','4week':'4주',month:'월',day:'일',list:'목록',diary:'다이어리'};
 function setCurrentViewButtonLabel(){
-  const btn=$('#currentViewBtn'); if(!btn) return;
-  const label=VIEW_LABELS[view]||VIEW_LABELS[lastScheduleView]||'주';
-  btn.textContent=label;
-  btn.title=(view==='week'||view==='day')?'더블클릭: 구역 높이 자동맞춤 · 오른쪽 클릭: 다른 보기 선택':'현재 보기 · 오른쪽 클릭으로 다른 보기 선택';
-  btn.setAttribute('aria-label',btn.title);
+  $$('.primaryViewButtons [data-view]').forEach(btn=>{
+    const target=btn.dataset.view;
+    btn.classList.toggle('on',target===view);
+    if(target==='week'||target==='day'){
+      btn.title=`${VIEW_LABELS[target]} 보기 · 더블클릭: 구역 높이 자동맞춤 · 오른쪽 클릭: 3주·4주·목록`;
+    }else{
+      btn.title=`${VIEW_LABELS[target]} 보기 · 오른쪽 클릭: 3주·4주·목록`;
+    }
+    btn.setAttribute('aria-label',btn.title);
+  });
+  $$('#currentViewMenu [data-view]').forEach(btn=>btn.classList.toggle('on',btn.dataset.view===view));
 }
-function setCurrentViewMenu(open){
-  const menu=$('#currentViewMenu'), btn=$('#currentViewBtn');
-  if(!menu||!btn) return;
+function setCurrentViewMenu(open,anchor=null){
+  const menu=$('#currentViewMenu'), wrap=$('#currentViewWrap');
+  if(!menu||!wrap) return;
   menu.classList.toggle('hidden',!open);
-  btn.setAttribute('aria-expanded', open?'true':'false');
+  wrap.setAttribute('aria-expanded', open?'true':'false');
+  if(open && anchor){
+    const wr=wrap.getBoundingClientRect(), ar=anchor.getBoundingClientRect();
+    const center=(ar.left+ar.right)/2-wr.left;
+    menu.style.setProperty('--view-menu-anchor',`${Math.max(18,Math.min(wr.width-18,center))}px`);
+  }
 }
-function toggleCurrentViewMenu(force){
+function toggleCurrentViewMenu(force,anchor=null){
   const menu=$('#currentViewMenu'); if(!menu) return;
   const open=(typeof force==='boolean')?force:menu.classList.contains('hidden');
-  setCurrentViewMenu(open);
+  setCurrentViewMenu(open,anchor);
 }
-$('#currentViewBtn')?.addEventListener('contextmenu',e=>{ e.preventDefault(); toggleCurrentViewMenu(); });
-$('#currentViewBtn')?.addEventListener('click',e=>{
-  e.preventDefault();
-  const btn=e.currentTarget;
-  if(isMobileSchedule()) return;
-  if(e.detail>1) return;
-  if(view!=='week' && view!=='day') return;
-  const next=view;
-  clearTimeout(btn.__singleViewTimer);
-  btn.__singleViewTimer=setTimeout(()=>{
-    btn.__singleViewTimer=null;
-    activateViewButton(next);
-  },460);
-});
-$('#currentViewBtn')?.addEventListener('dblclick',e=>{
-  e.preventDefault(); e.stopPropagation();
-  const btn=e.currentTarget;
-  clearTimeout(btn.__singleViewTimer); btn.__singleViewTimer=null;
-  if(view==='week'||view==='day') autoFitFromViewButton(view);
-});
-document.addEventListener('click',e=>{ if(!e.target.closest('#currentViewWrap')) setCurrentViewMenu(false); });
-document.addEventListener('keydown',e=>{ if(e.key==='Escape') setCurrentViewMenu(false); });
 function activateViewButton(next){
   setCurrentViewMenu(false);
   if(next==='week' && view==='week' && !isMobileSchedule()){
@@ -4344,6 +4393,33 @@ function autoFitFromViewButton(next){
     }
   }
 }
+$$('.primaryViewButtons [data-view]').forEach(b=>{
+  const next=b.dataset.view;
+  b.addEventListener('contextmenu',e=>{ e.preventDefault(); e.stopPropagation(); toggleCurrentViewMenu(undefined,b); });
+  if(next==='week'||next==='day'){
+    b.onclick=e=>{
+      e.preventDefault();
+      if(isMobileSchedule()){ activateViewButton(next); return; }
+      if(e.detail>1) return;
+      clearTimeout(b.__singleViewTimer);
+      b.__singleViewTimer=setTimeout(()=>{ b.__singleViewTimer=null; activateViewButton(next); },460);
+    };
+    b.ondblclick=e=>{
+      e.preventDefault(); e.stopPropagation();
+      clearTimeout(b.__singleViewTimer); b.__singleViewTimer=null;
+      autoFitFromViewButton(next);
+    };
+  }else{
+    b.onclick=e=>{ e.preventDefault(); activateViewButton(next); };
+  }
+});
+$('#currentViewWrap')?.addEventListener('contextmenu',e=>{
+  if(e.target.closest('.primaryViewBtn')) return;
+  e.preventDefault();
+  toggleCurrentViewMenu(undefined,$('.primaryViewButtons .on')||$('.primaryViewBtn'));
+});
+document.addEventListener('click',e=>{ if(!e.target.closest('#currentViewWrap')) setCurrentViewMenu(false); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') setCurrentViewMenu(false); });
 $$('#currentViewMenu [data-view]').forEach(b=>{
   b.onclick=e=>{ e.preventDefault(); activateViewButton(b.dataset.view); };
 });
@@ -4480,7 +4556,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.21',
+    appVersion:'2.24',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
