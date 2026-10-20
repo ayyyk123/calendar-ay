@@ -3030,7 +3030,7 @@ function bindWeekdayWidthResizers(){
       if(heads.length<7) return;
       const widths=heads.map(h=>Math.max(56,h.getBoundingClientRect().width));
       const startX=e.clientX, min=56, max=700;
-      // v2.25: 첫 드래그 순간 현재 보이는 7개 너비를 px로 고정한 뒤,
+      // v2.26: 첫 드래그 순간 현재 보이는 7개 너비를 px로 고정한 뒤,
       // 선택한 요일 하나만 변경한다. 다른 요일은 절대 같이 줄어들지 않는다.
       state.settings.weekdayWidthMode='px';
       state.settings.weekdayWidths=widths.slice();
@@ -4573,7 +4573,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.25',
+    appVersion:'2.26',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
