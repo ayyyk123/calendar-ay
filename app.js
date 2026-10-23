@@ -81,7 +81,7 @@ const defaultState = () => ({
   purchases: [],
   diary: {},
   actualWork: {},
-  settings: { hiddenCalendars: [], weekdayWidths:[100,100,100,100,100,100,100], weekdayWidthMode:'ratio', fixedPanelsCollapsed: { recurring:false, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','dday','diary'], sidebarSectionsCollapsed:{}, laneHeights:{}, laneCollapsed:{}, laneLabelWidth:72, mobileSectionsCollapsed:{}, dayLaneHeights:{}, dayLaneManual:{}, workloadRange:'week', weekViewMode:'detailed', selectedDdayId:'' }
+  settings: { hiddenCalendars: [], weekdayWidths:[100,100,100,100,100,100,100], weekdayWidthMode:'ratio', weekdayWidthReference:0, fixedPanelsCollapsed: { recurring:false, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','dday','diary'], sidebarSectionsCollapsed:{}, laneHeights:{}, laneCollapsed:{}, laneLabelWidth:72, mobileSectionsCollapsed:{}, dayLaneHeights:{}, dayLaneManual:{}, workloadRange:'week', weekViewMode:'detailed', selectedDdayId:'' }
 });
 
 let state = defaultState();
@@ -420,6 +420,7 @@ function normalizeState(raw){
       hiddenCalendars: Array.isArray(s.settings?.hiddenCalendars) ? s.settings.hiddenCalendars : [],
       weekdayWidths: Array.from({length:7},(_,i)=>Math.max(40,Math.min(700,Number(s.settings?.weekdayWidths?.[i])||100))),
       weekdayWidthMode: s.settings?.weekdayWidthMode==='px'?'px':'ratio',
+      weekdayWidthReference: Math.max(0,Number(s.settings?.weekdayWidthReference)||0),
       fixedPanelsCollapsed: {
         recurring: !!s.settings?.fixedPanelsCollapsed?.recurring,
         manual: !!s.settings?.fixedPanelsCollapsed?.manual,
@@ -2268,6 +2269,8 @@ document.addEventListener('pointerdown',e=>{
 });
 window.addEventListener('resize',closeEventPopover);
 window.addEventListener('resize',scheduleMultiWeekCellFit,{passive:true});
+let weekdayResizeRefresh=0;
+window.addEventListener('resize',()=>{ clearTimeout(weekdayResizeRefresh); weekdayResizeRefresh=setTimeout(()=>{ applyWeekdayWidths(); scheduleMultiWeekCellFit(); },60); },{passive:true});
 const mobileBreakpoint=window.matchMedia('(max-width: 760px)');
 mobileBreakpoint.addEventListener?.('change',()=>render());
 document.addEventListener('scroll',e=>{ if(!$('#eventPopover')?.classList.contains('hidden') && !$('#eventPopover')?.contains(e.target)) closeEventPopover(); },true);
@@ -2995,32 +2998,38 @@ function normalizedWeekdayWidths(){
   const max=state.settings?.weekdayWidthMode==='px'?700:400;
   return Array.from({length:7},(_,i)=>Math.max(40,Math.min(max,Number(raw[i])||100)));
 }
-function weekdayGridTemplate(){
+function weekdayGridTemplate(forceFit=false){
   const widths=normalizedWeekdayWidths();
-  if(state.settings?.weekdayWidthMode==='px') return widths.map(v=>`${Math.round(v)}px`).join(' ');
-  return widths.map(v=>`minmax(48px,${v}fr)`).join(' ');
+  if(state.settings?.weekdayWidthMode==='px' && !forceFit) return widths.map(v=>`${Math.round(v)}px`).join(' ');
+  // 창이 좁아졌을 때는 저장된 상대 너비 비율을 그대로 유지하면서 7요일을 한 화면 안에 맞춘다.
+  return widths.map(v=>`minmax(0,${Math.max(1,v)}fr)`).join(' ');
+}
+function weekdayWidthShouldFit(main){
+  if(state.settings?.weekdayWidthMode!=='px') return true;
+  const ref=Math.max(0,Number(state.settings?.weekdayWidthReference)||0);
+  const now=Math.max(0,main?.clientWidth||0);
+  // 너비를 조절했던 창보다 현재 창이 확실히 좁아졌을 때만 자동 축소한다.
+  return !!(ref && now && now < ref-8);
 }
 function applyWeekdayWidths(){
   const main=$('#main'); if(!main) return;
-  const isMobile=window.matchMedia('(max-width:760px)').matches;
-  const isPx=state.settings?.weekdayWidthMode==='px';
-  main.classList.toggle('weekdayPxMode', !isMobile && isPx);
-  main.classList.toggle('weekdayRatioMode', !isMobile && !isPx);
-  if(isMobile){
+  if(window.matchMedia('(max-width:760px)').matches){
     main.style.removeProperty('--weekday-cols');
     main.style.removeProperty('--weekday-total');
     main.style.removeProperty('--weekday-board-total');
+    main.classList.remove('weekdayFitMode','weekdayFixedMode');
     return;
   }
-  main.style.setProperty('--weekday-cols',weekdayGridTemplate());
-  if(isPx){
+  const fit=weekdayWidthShouldFit(main);
+  main.classList.toggle('weekdayFitMode',fit);
+  main.classList.toggle('weekdayFixedMode',!fit && state.settings?.weekdayWidthMode==='px');
+  main.style.setProperty('--weekday-cols',weekdayGridTemplate(fit));
+  if(state.settings?.weekdayWidthMode==='px' && !fit){
     const total=normalizedWeekdayWidths().reduce((a,b)=>a+b,0);
     main.style.setProperty('--weekday-total',`${Math.round(total)}px`);
-    // 상세 주보기는 왼쪽 구역명 칸을 포함한 전체 보드폭이 필요하다.
-    // px 모드에서만 실제 요일폭 합계 + 구역명폭만큼 확장한다.
     main.style.setProperty('--weekday-board-total',`calc(var(--lane-label-w,72px) + ${Math.round(total)}px)`);
   }else{
-    // 기본 동일비율 상태에서는 헤더/본문/합계 전체가 화면폭 100% 안에 정확히 들어가야 한다.
+    // 기본 상태 또는 창 축소 상태: 월~일 전체가 현재 화면 너비에 맞춰 들어간다.
     main.style.setProperty('--weekday-total','100%');
     main.style.setProperty('--weekday-board-total','100%');
   }
@@ -3046,6 +3055,7 @@ function bindWeekdayWidthResizers(){
       // 선택한 요일 하나만 변경한다. 다른 요일은 절대 같이 줄어들지 않는다.
       state.settings.weekdayWidthMode='px';
       state.settings.weekdayWidths=widths.slice();
+      state.settings.weekdayWidthReference=Math.max(0,main.clientWidth||0);
       document.body.classList.add('resizingWeekdayWidth');
       try{ handle.setPointerCapture(e.pointerId); }catch{}
       const move=ev=>{
@@ -3070,6 +3080,7 @@ function bindWeekdayWidthResizers(){
       e.preventDefault(); e.stopPropagation();
       state.settings.weekdayWidths=[100,100,100,100,100,100,100];
       state.settings.weekdayWidthMode='ratio';
+      state.settings.weekdayWidthReference=0;
       applyWeekdayWidths();
       if(main.classList.contains('multiCompactView')) scheduleMultiWeekCellFit();
       save({rerender:false});
@@ -4585,7 +4596,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.27',
+    appVersion:'2.29',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state

@@ -2611,24 +2611,25 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 }
 
 
-/* v2.28: ratio 모드에서는 화면 너비를 줄여도 월~일 전체가 항상 보이도록 내부 그리드도 100% 폭에 고정 */
+/* v2.29: 요일 사용자 너비와 창 축소를 분리
+   - 조절 당시/더 넓은 창: 사용자가 지정한 px 폭 유지(필요하면 가로스크롤)
+   - 더 좁은 창: 지정 비율을 유지하면서 월~일 전체를 현재 화면에 맞춤 */
 @media(min-width:761px){
-  #main.weekdayRatioMode.laneView .scheduleBoard,
-  #main.weekdayRatioMode .multiCompactView,
-  #main.weekdayRatioMode .month{
+  #main.weekdayFitMode.laneView .scheduleBoard,
+  #main.weekdayFitMode.multiCompactView,
+  #main.weekdayFitMode.month{
     width:100%!important;
     min-width:0!important;
     max-width:100%!important;
   }
-  #main.weekdayRatioMode.laneView .scheduleDateGrid,
-  #main.weekdayRatioMode.laneView .scheduleSummaryGrid,
-  #main.weekdayRatioMode.laneView .scheduleLane,
-  #main.weekdayRatioMode.laneView .scheduleLaneGrid{
+  #main.weekdayFitMode.laneView .scheduleDateGrid,
+  #main.weekdayFitMode.laneView .scheduleSummaryGrid,
+  #main.weekdayFitMode.laneView .scheduleLane,
+  #main.weekdayFitMode.laneView .scheduleLaneGrid{
     width:100%!important;
     min-width:0!important;
     max-width:100%!important;
   }
-  #main.weekdayRatioMode.laneView{
-    overflow-x:hidden!important;
-  }
+  #main.weekdayFitMode.laneView{overflow-x:hidden!important}
+  #main.weekdayFixedMode.laneView{overflow-x:auto!important}
 }
