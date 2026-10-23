@@ -3008,8 +3008,16 @@ function weekdayWidthShouldFit(main){
   if(state.settings?.weekdayWidthMode!=='px') return true;
   const ref=Math.max(0,Number(state.settings?.weekdayWidthReference)||0);
   const now=Math.max(0,main?.clientWidth||0);
-  // 너비를 조절했던 창보다 현재 창이 확실히 좁아졌을 때만 자동 축소한다.
-  return !!(ref && now && now < ref-8);
+  if(!now) return false;
+  // v2.30: v2.29 이전에 저장된 px 설정은 reference 값이 없다.
+  // 그런 기존 설정도 현재 보드가 화면보다 넓으면 즉시 한 화면 맞춤으로 처리한다.
+  if(!ref){
+    const label=Math.max(48,Math.min(180,Number(state.settings?.laneLabelWidth)||72));
+    const total=normalizedWeekdayWidths().reduce((a,b)=>a+b,0)+label;
+    return total > now-2;
+  }
+  // 새로 조절한 설정은 조절 당시 창보다 현재 창이 좁아졌을 때 자동 축소한다.
+  return now < ref-8;
 }
 function applyWeekdayWidths(){
   const main=$('#main'); if(!main) return;
@@ -4596,7 +4604,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.29',
+    appVersion:'2.30',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state

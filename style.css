@@ -2633,3 +2633,10 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
   #main.weekdayFitMode.laneView{overflow-x:hidden!important}
   #main.weekdayFixedMode.laneView{overflow-x:auto!important}
 }
+
+
+/* v2.30: 이전 버전에서 저장된 px 요일폭도 화면을 넘치면 자동 fit */
+@media(min-width:761px){
+  #main.weekdayFitMode.laneView{overflow-x:hidden!important;}
+  #main.weekdayFitMode.laneView .scheduleBoard{width:100%!important;min-width:0!important;max-width:100%!important;}
+}
