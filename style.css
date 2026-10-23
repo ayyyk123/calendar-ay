@@ -2609,3 +2609,26 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
     scrollbar-gutter:stable;
   }
 }
+
+
+/* v2.28: ratio 모드에서는 화면 너비를 줄여도 월~일 전체가 항상 보이도록 내부 그리드도 100% 폭에 고정 */
+@media(min-width:761px){
+  #main.weekdayRatioMode.laneView .scheduleBoard,
+  #main.weekdayRatioMode .multiCompactView,
+  #main.weekdayRatioMode .month{
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+  }
+  #main.weekdayRatioMode.laneView .scheduleDateGrid,
+  #main.weekdayRatioMode.laneView .scheduleSummaryGrid,
+  #main.weekdayRatioMode.laneView .scheduleLane,
+  #main.weekdayRatioMode.laneView .scheduleLaneGrid{
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+  }
+  #main.weekdayRatioMode.laneView{
+    overflow-x:hidden!important;
+  }
+}

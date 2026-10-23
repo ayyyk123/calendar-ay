@@ -3002,14 +3002,18 @@ function weekdayGridTemplate(){
 }
 function applyWeekdayWidths(){
   const main=$('#main'); if(!main) return;
-  if(window.matchMedia('(max-width:760px)').matches){
+  const isMobile=window.matchMedia('(max-width:760px)').matches;
+  const isPx=state.settings?.weekdayWidthMode==='px';
+  main.classList.toggle('weekdayPxMode', !isMobile && isPx);
+  main.classList.toggle('weekdayRatioMode', !isMobile && !isPx);
+  if(isMobile){
     main.style.removeProperty('--weekday-cols');
     main.style.removeProperty('--weekday-total');
     main.style.removeProperty('--weekday-board-total');
     return;
   }
   main.style.setProperty('--weekday-cols',weekdayGridTemplate());
-  if(state.settings?.weekdayWidthMode==='px'){
+  if(isPx){
     const total=normalizedWeekdayWidths().reduce((a,b)=>a+b,0);
     main.style.setProperty('--weekday-total',`${Math.round(total)}px`);
     // 상세 주보기는 왼쪽 구역명 칸을 포함한 전체 보드폭이 필요하다.
