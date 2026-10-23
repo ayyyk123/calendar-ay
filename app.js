@@ -3005,13 +3005,21 @@ function applyWeekdayWidths(){
   if(window.matchMedia('(max-width:760px)').matches){
     main.style.removeProperty('--weekday-cols');
     main.style.removeProperty('--weekday-total');
+    main.style.removeProperty('--weekday-board-total');
     return;
   }
   main.style.setProperty('--weekday-cols',weekdayGridTemplate());
   if(state.settings?.weekdayWidthMode==='px'){
     const total=normalizedWeekdayWidths().reduce((a,b)=>a+b,0);
     main.style.setProperty('--weekday-total',`${Math.round(total)}px`);
-  }else main.style.setProperty('--weekday-total','100%');
+    // 상세 주보기는 왼쪽 구역명 칸을 포함한 전체 보드폭이 필요하다.
+    // px 모드에서만 실제 요일폭 합계 + 구역명폭만큼 확장한다.
+    main.style.setProperty('--weekday-board-total',`calc(var(--lane-label-w,72px) + ${Math.round(total)}px)`);
+  }else{
+    // 기본 동일비율 상태에서는 헤더/본문/합계 전체가 화면폭 100% 안에 정확히 들어가야 한다.
+    main.style.setProperty('--weekday-total','100%');
+    main.style.setProperty('--weekday-board-total','100%');
+  }
 }
 function bindWeekdayWidthResizers(){
   if(window.matchMedia('(max-width:760px)').matches) return;
@@ -4573,7 +4581,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.26',
+    appVersion:'2.27',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
