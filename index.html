@@ -4,17 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
-  <title>캘린더 v2.30</title>
-  <link rel="manifest" href="manifest.json?v=2.30">
+  <title>캘린더 v2.31</title>
+  <link rel="manifest" href="manifest.json?v=2.31">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="icon-180.png">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css">
-  <link rel="stylesheet" href="style.css?v=2.30">
+  <link rel="stylesheet" href="style.css?v=2.31">
 </head>
 <body>
 <header>
-  <div class="brand"><b>캘린더</b><small> v2.30</small></div>
+  <div class="brand"><b>캘린더</b><small> v2.31</small></div>
   <div id="saveBadge" class="saveBadge loading" title="Firebase 저장 상태"><span class="saveDot"></span><span id="saveBadgeText">Firebase 확인 중</span></div>
   <button id="manualSaveBtn" class="manualSaveBtn iconOnlyBtn" type="button" title="현재 데이터를 Firebase에 즉시 저장" aria-label="최신자료 저장">💾</button>
   <button id="sidebarToggle" class="mobileOnly" type="button" aria-label="메뉴">☰</button>
@@ -443,8 +443,9 @@
     <label>구매할 것<input id="purchaseName" required placeholder="예: 프린터 잉크"></label>
     <div class="row">
       <label>수량<input id="purchaseQty" type="number" min="1" step="1" value="1"></label>
-      <label>구매완료<label class="check"><input type="checkbox" id="purchaseDone"> 완료</label></label>
+      <label>언제까지 구매할지<input id="purchaseDueDate" type="date"></label>
     </div>
+    <small class="purchaseDueHint">날짜를 지정하면 그날 Quick에 구매할 항목이 자동으로 표시됩니다.</small>
     <label>메모<textarea id="purchaseMemo" rows="3"></textarea></label>
     <menu>
       <button type="button" id="deletePurchase" class="danger">삭제</button>
@@ -452,6 +453,16 @@
       <button type="button" id="cancelPurchase">취소</button>
       <button type="submit" class="primary">저장</button>
     </menu>
+  </form>
+</dialog>
+
+<dialog id="purchaseCompleteDlg" class="smallDlg">
+  <form id="purchaseCompleteForm">
+    <h3>구매완료</h3>
+    <div class="purchaseCompleteItem"><b id="purchaseCompleteName"></b></div>
+    <label>구매한 날짜<input id="purchaseCompleteDate" type="date" required></label>
+    <small class="hint">저장하면 구매목록에서는 사라지고, 선택한 날짜의 Quick에 ‘구입완료’ 기록이 남습니다.</small>
+    <menu><span></span><button type="button" id="cancelPurchaseComplete">취소</button><button type="submit" class="primary">완료 저장</button></menu>
   </form>
 </dialog>
 
@@ -515,6 +526,6 @@
   <div><span class="spinner"></span><b>Firebase 최신 데이터 불러오는 중…</b><small>저장된 최신 일정을 확인하고 있어요.</small></div>
 </div>
 
-<script type="module" src="app.js?v=2.30"></script>
+<script type="module" src="app.js?v=2.31"></script>
 </body>
 </html>

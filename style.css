@@ -2640,3 +2640,12 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
   #main.weekdayFitMode.laneView{overflow-x:hidden!important;}
   #main.weekdayFitMode.laneView .scheduleBoard{width:100%!important;min-width:0!important;max-width:100%!important;}
 }
+
+
+/* v2.31: 구매기한 Quick 표시 + 구매완료 날짜 기록 */
+.purchaseOpen{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;align-items:center!important}
+.purchaseOpen small{font-size:8.5px!important;color:#7a8492!important}
+.purchaseDueHint{display:block;margin-top:-3px;color:#758092;font-size:10px}
+.purchaseCompleteItem{padding:9px 10px;border:1px solid #e2e7ed;border-radius:8px;background:#f8fafc}
+.purchaseQuickLabel{--quick-cal-color:#d6b866}
+.item[data-purchase-due="1"]{border-left-style:dashed}

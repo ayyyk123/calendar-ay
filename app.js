@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '2.25',
+  version: '2.31',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -353,7 +353,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '2.00',
+    version: '2.31',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -410,7 +410,7 @@ function normalizeState(raw){
     })) : [],
     fixed: Array.isArray(s.fixed) ? s.fixed.filter(f=>f && f.id && f.name).map(f=>({...f,hours:Number(f.hours)||0,noDuration:!!f.noDuration,important:!!f.important,checklist:Array.isArray(f.checklist)?f.checklist.filter(x=>x&&String(x.text||'').trim()).map((x,i)=>({id:String(x.id||`fcl-${i}-${uid()}`),text:String(x.text||'').trim()})):[]})) : [],
     flexible: Array.isArray(s.flexible) ? s.flexible.filter(f=>f && f.id && f.name).map(f=>({...f,hours:Number(f.hours)||0,noDuration:!!f.noDuration,important:!!f.important,checklist:Array.isArray(f.checklist)?f.checklist.filter(x=>x&&String(x.text||'').trim()).map((x,i)=>({id:String(x.id||`xcl-${i}-${uid()}`),text:String(x.text||'').trim()})):[]})) : [],
-    purchases: Array.isArray(s.purchases) ? s.purchases.filter(p=>p && p.id && p.name).map((p,i)=>({id:String(p.id),name:String(p.name),qty:Math.max(1,Number(p.qty)||1),memo:String(p.memo||''),done:!!p.done,createdAt:String(p.createdAt||''),order:Number.isFinite(Number(p.order))?Number(p.order):i})) : [],
+    purchases: Array.isArray(s.purchases) ? s.purchases.filter(p=>p && p.id && p.name).map((p,i)=>({id:String(p.id),name:String(p.name),qty:Math.max(1,Number(p.qty)||1),memo:String(p.memo||''),dueDate:typeof p.dueDate==='string'?p.dueDate:'',done:!!p.done,createdAt:String(p.createdAt||''),order:Number.isFinite(Number(p.order))?Number(p.order):i})) : [],
     diary: s.diary && typeof s.diary === 'object' ? s.diary : {},
     actualWork: (s.actualWork && typeof s.actualWork==='object') ? Object.fromEntries(Object.entries(s.actualWork).map(([date,rows])=>[
       String(date),
@@ -1092,6 +1092,25 @@ function isPreparationManagedItem(e){ return !!e?._prepDay || isPreparationDeadl
 function isPreparationLaneItem(e){ return !!e?._prepDay || (isPreparationDeadlineOccurrence(e) && !hasPreparationEntryOnDeadline(e)); }
 function isPreparationDeadlineDuplicate(e){ return isPreparationDeadlineOccurrence(e) && hasPreparationEntryOnDeadline(e); }
 
+function purchaseEventCalendarId(){
+  return topLevelCals()[0]?.id || state.calendars[0]?.id || '';
+}
+function purchaseDisplayTitle(p, completed=false){
+  const qty=Math.max(1,Number(p?.qty)||1);
+  const name=String(p?.name||'구매항목').trim();
+  return `${name}${qty>1?` ${qty}개`:''} ${completed?'구입완료':'구매'}`;
+}
+function purchaseDueVirtualEvent(p){
+  const date=String(p?.dueDate||'');
+  return {
+    id:`purchase-due-${p.id}`,purchaseId:String(p.id),_purchaseDue:true,sourceType:'purchaseDue',
+    title:purchaseDisplayTitle(p,false),calId:purchaseEventCalendarId(),date,endDate:date,
+    allDay:true,start:'',end:'',hours:0,noDuration:true,kind:'todo',place:'',repeat:'none',repeatRule:null,
+    memo:String(p.memo||''),important:false,done:false,doneDates:[],checklist:[],checklistDoneByDate:{},orderByDate:{},
+    _occurrenceStart:date,_occurrenceEnd:date,_renderDate:date
+  };
+}
+
 function buildOccurrenceMap(rangeStart, rangeEnd, options={}){
   const map={};
   for(let d=parse(rangeStart), end=parse(rangeEnd); d<=end; d=add(d,1)) map[ds(d)]=[];
@@ -1099,9 +1118,15 @@ function buildOccurrenceMap(rangeStart, rangeEnd, options={}){
   const includeHidden=!!options.includeHidden;
   const includePreparations=options.includePreparations!==false;
   const calendarIds=options.calendarIds instanceof Set ? options.calendarIds : null;
+  // 구매목록의 구매기한은 실제 일정 복제본을 만들지 않고 Quick에 가상 일정으로 표시한다.
+  // 구매기한 수정 시 자동으로 날짜가 따라가고, 구매완료로 목록에서 제거되면 자동으로 사라진다.
+  for(const p of (state.purchases||[])){
+    const due=String(p.dueDate||'');
+    if(due && due>=rangeStart && due<=rangeEnd && map[due]) map[due].push(purchaseDueVirtualEvent(p));
+  }
   for(const e of state.events){
     // 캘린더 필터 중에도 공통 일정(D-Day/기념일, 예약·약속)은 항상 남긴다.
-    const alwaysCommon=e.kind==='anniversary'||e.kind==='appointment';
+    const alwaysCommon=e.kind==='anniversary'||e.kind==='appointment'||e.sourceType==='purchase';
     if(calendarIds && !calendarIds.has(e.calId) && !alwaysCommon) continue;
     if(!includeHidden && isCalendarHidden(e.calId) && !alwaysCommon) continue;
     if(includePreparations) for(const prepEntry of preparationEntries(e)){
@@ -1259,7 +1284,7 @@ function checklistHtml(e,compact=false){
   }).join('')}</div>`;
 }
 function eventItemHtml(e, compact=false){
-  const c=cal(e.calId), prepDay=!!e._prepDay, prepDeadlineDay=prepDay && (e._renderDate||e._prepDate||e.date)===(e.prepDeadline||e.date), deadlineItem=isPreparationDeadlineOccurrence(e);
+  const c=cal(e.calId), purchaseDue=!!e._purchaseDue, purchaseLinked=purchaseDue||e.sourceType==='purchase', prepDay=!!e._prepDay, prepDeadlineDay=prepDay && (e._renderDate||e._prepDate||e.date)===(e.prepDeadline||e.date), deadlineItem=isPreparationDeadlineOccurrence(e);
   const done=prepDay?preparationEntryDone(e,e._prepKey):isDone(e), checkable=e.kind!=='anniversary' && !prepDay;
   const recurring=(e.repeat||'none')!=='none';
   const payment=e.kind==='payment';
@@ -1268,7 +1293,7 @@ function eventItemHtml(e, compact=false){
   const timePrefix=(!prepDay && !e.allDay && e.start)?`${e.start}${e.end?`–${e.end}`:''} `:'';
   const inLabel=prepDay?'':carryoverInLabel(e), outRecord=prepDay?null:carryoverOutRecord(e);
   const renderDate=e._renderDate||e._occurrenceStart||e.date;
-  const drag=deadlineItem?'false':'true';
+  const drag=(deadlineItem||purchaseDue)?'false':'true';
   const prepNote=prepDay?String(e._prepNote||'').trim():'';
   // v2.11: 준비일정 구역에서는 원본 일정명/`준비` 접두어를 반복하지 않는다.
   // 일반 준비일은 그날 해야 할 업무만, 마감 관련 카드만 `준비마감`/`마감`을 표시한다.
@@ -1298,7 +1323,7 @@ function eventItemHtml(e, compact=false){
   const repeatBadge=!prepDay&&recurring?`<span class="repeatMark" title="${esc(repeatRuleLabel(e))}">↻</span>`:'';
   const carryBadge=inLabel?`<span class="carryBadge carryIn" title="${esc(inLabel)}">↪</span>`:'';
   const amountInline=!prepDay&&payment&&Number(e.paymentAmount)>0?`<span class="inlineMeta">₩${Number(e.paymentAmount).toLocaleString('ko-KR')}</span>`:'';
-  return `<div class="item ${done?'done':''} kind-${esc(e.kind||'event')} ${recurring&&!prepDay?'recurringItem':''} ${payment&&!prepDay?'paymentItem':''} ${e.fixedId?'manualPlacedItem':''} ${e.flexibleId?'flexiblePlacedItem':''} ${inLabel?'carriedIn':''} ${outRecord?'carriedOut':''} ${prepDay?'prepDayItem':''} ${prepDeadlineDay?'prepDeadlineDayItem':''} ${deadlineItem?'prepDeadlineItem':''}" draggable="${drag}" data-eid="${esc(e.id)}" data-occurrence="${esc(e._occurrenceStart||e.date)}" data-render-date="${esc(renderDate)}" data-cal-id="${esc(e.calId)}" data-lane="${payment?'payment':'work'}" data-prep-day="${prepDay?'1':''}" data-prep-key="${prepDay?esc(e._prepKey||''):''}" data-prep-source-date="${prepDay?esc(e._prepSourceDate||''):''}" data-prep-type="${prepDay?esc(e._prepType||''):''}" data-prep-rule-id="${prepDay?esc(e._prepRuleId||''):''}" data-prep-event="${e.prepEnabled?'1':''}" style="--item-color:${esc(c.color)};border-left-color:${esc(c.color)}">
+  return `<div class="item ${done?'done':''} kind-${esc(e.kind||'event')} ${recurring&&!prepDay?'recurringItem':''} ${payment&&!prepDay?'paymentItem':''} ${e.fixedId?'manualPlacedItem':''} ${e.flexibleId?'flexiblePlacedItem':''} ${inLabel?'carriedIn':''} ${outRecord?'carriedOut':''} ${prepDay?'prepDayItem':''} ${prepDeadlineDay?'prepDeadlineDayItem':''} ${deadlineItem?'prepDeadlineItem':''}" draggable="${drag}" data-eid="${esc(e.id)}" data-occurrence="${esc(e._occurrenceStart||e.date)}" data-render-date="${esc(renderDate)}" data-cal-id="${esc(e.calId)}" data-lane="${payment?'payment':'work'}" data-prep-day="${prepDay?'1':''}" data-prep-key="${prepDay?esc(e._prepKey||''):''}" data-prep-source-date="${prepDay?esc(e._prepSourceDate||''):''}" data-prep-type="${prepDay?esc(e._prepType||''):''}" data-prep-rule-id="${prepDay?esc(e._prepRuleId||''):''}" data-prep-event="${e.prepEnabled?'1':''}" data-purchase-due="${purchaseDue?'1':''}" data-purchase-id="${purchaseDue?esc(e.purchaseId||''):''}" style="--item-color:${esc(c.color)};border-left-color:${esc(c.color)}">
     <div class="itemRow">${dragHandle}${!prepDay&&e.important?`<button type="button" class="importanceBtn on" data-action="importance" aria-label="중요 표시 해제" title="중요 표시 해제">★</button>`:''}${mainCheck}<div class="itemTitle" title="${esc(tooltip)}">${timePrefix}<span class="durationPrefix">${esc(durationPrefix)}</span>${!prepDay&&payment?'₩ ':(!checkable&&!prepDay?kindPrefix(e):'')}${esc(shownTitle)}</div>${amountInline}${repeatBadge}${carryBadge}${checklistButton}</div>
     ${expanded?checklistHtml(e,false):''}
   </div>`;
@@ -1311,13 +1336,17 @@ function appointmentLaneHtml(es, compact=false){
 function calendarGroupedItemsHtml(items, compact=false){
   const xs=items||[];
   if(!xs.length) return '';
+  const purchaseItems=xs.filter(e=>e._purchaseDue||e.sourceType==='purchase');
+  const normalItems=xs.filter(e=>!e._purchaseDue&&e.sourceType!=='purchase');
   const order=new Map(cals().map((c,i)=>[c.id,i]));
   const groups=new Map();
-  for(const e of xs){ if(!groups.has(e.calId)) groups.set(e.calId,[]); groups.get(e.calId).push(e); }
-  return [...groups.entries()].sort((a,b)=>(order.get(a[0])??9999)-(order.get(b[0])??9999)).map(([calId,events])=>{
+  for(const e of normalItems){ if(!groups.has(e.calId)) groups.set(e.calId,[]); groups.get(e.calId).push(e); }
+  const purchaseHtml=purchaseItems.length?`<div class="quickCalGroup purchaseQuickGroup" data-quick-cal="purchase"><div class="quickCalLabel purchaseQuickLabel">구매목록</div>${purchaseItems.map(e=>eventItemHtml(e,compact)).join('')}</div>`:'';
+  const normalHtml=[...groups.entries()].sort((a,b)=>(order.get(a[0])??9999)-(order.get(b[0])??9999)).map(([calId,events])=>{
     const c=cal(calId);
     return `<div class="quickCalGroup" data-quick-cal="${esc(calId)}"><div class="quickCalLabel" style="--quick-cal-color:${esc(c.color)}">${esc(c.name)}</div>${events.map(e=>eventItemHtml(e,compact)).join('')}</div>`;
   }).join('');
+  return purchaseHtml+normalHtml;
 }
 function quickLaneHtml(es, compact=false, force=false){
   const quick=(es||[]).filter(e=>e.kind==='todo'&&!isPreparationManagedItem(e));
@@ -1723,7 +1752,7 @@ function renderPurchases(){
   const toggle=$('#togglePurchase'); if(toggle){ toggle.textContent=collapsed?'▸':'▾'; toggle.title=collapsed?'구매목록 펼치기':'구매목록 접기'; }
   if(collapsed){ box.innerHTML=''; return; }
   const rows=[...(state.purchases||[])].sort((a,b)=>(Number(a.order)||0)-(Number(b.order)||0) || String(a.createdAt||'').localeCompare(String(b.createdAt||'')) || a.name.localeCompare(b.name,'ko'));
-  box.innerHTML=rows.map(p=>`<div class="purchaseRow ${p.done?'done':''}" data-pid="${esc(p.id)}"><span class="purchaseDragHandle" draggable="true" title="드래그해서 순서 변경" aria-label="순서 변경">⋮⋮</span><button type="button" class="purchaseCheck" title="구매완료 전환">${p.done?'☑':'☐'}</button><button type="button" class="purchaseOpen" title="구매항목 수정"><span>${esc(p.name)}</span>${p.qty>1?`<small>${p.qty}개</small>`:''}</button></div>`).join('') || '<div class="empty">등록된 구매항목이 없습니다.</div>';
+  box.innerHTML=rows.map(p=>`<div class="purchaseRow" data-pid="${esc(p.id)}"><span class="purchaseDragHandle" draggable="true" title="드래그해서 순서 변경" aria-label="순서 변경">⋮⋮</span><button type="button" class="purchaseCheck" title="구매완료 처리">☐</button><button type="button" class="purchaseOpen" title="구매항목 수정"><span>${esc(p.name)}</span><small>${p.qty>1?`${p.qty}개 · `:''}${p.dueDate?`~ ${esc(p.dueDate.slice(5).replace('-','/'))}`:'기한 없음'}</small></button></div>`).join('') || '<div class="empty">등록된 구매항목이 없습니다.</div>';
   let dragId='';
   const applyOrder=(sourceId,targetId,after=false)=>{
     if(!sourceId || !targetId || sourceId===targetId) return;
@@ -1740,7 +1769,7 @@ function renderPurchases(){
     save();
   };
   $$('.purchaseRow').forEach(row=>{
-    row.querySelector('.purchaseCheck')?.addEventListener('click',()=>{ const p=state.purchases.find(x=>x.id===row.dataset.pid); if(!p) return; p.done=!p.done; save(); });
+    row.querySelector('.purchaseCheck')?.addEventListener('click',()=>openPurchaseComplete(row.dataset.pid));
     row.querySelector('.purchaseOpen')?.addEventListener('click',()=>openPurchase(row.dataset.pid));
     const handle=row.querySelector('.purchaseDragHandle');
     handle?.addEventListener('dragstart',e=>{
@@ -1770,7 +1799,7 @@ function renderPurchases(){
 function openPurchase(id=''){
   const p=(state.purchases||[]).find(x=>x.id===id);
   $('#purchaseTitle').textContent=p?'구매항목 수정':'구매항목 추가';
-  $('#purchaseId').value=p?.id||''; $('#purchaseName').value=p?.name||''; $('#purchaseQty').value=p?.qty||1; $('#purchaseMemo').value=p?.memo||''; $('#purchaseDone').checked=!!p?.done;
+  $('#purchaseId').value=p?.id||''; $('#purchaseName').value=p?.name||''; $('#purchaseQty').value=p?.qty||1; $('#purchaseDueDate').value=p?.dueDate||''; $('#purchaseMemo').value=p?.memo||'';
   $('#deletePurchase').style.visibility=p?'visible':'hidden'; openDialog($('#purchaseDlg'));
 }
 function actualWorkValue(date,rootId){
@@ -2232,7 +2261,7 @@ function openEventPopover(anchor,id,occ){
     if(base.paymentMethod) meta.push(base.paymentMethod);
   }else if(base.noDuration) meta.push('소요시간 미체크');
   else if(duration(base)>0) meta.push(fmtH(duration(base)));
-  meta.push(calendarPath(base.calId));
+  meta.push(base.sourceType==='purchase'?'구매목록':calendarPath(base.calId));
   if((base.repeat||'none')!=='none') meta.push(repeatRuleLabel(base));
   $('#eventPopoverMeta').textContent=meta.filter(Boolean).join(' · ');
   const details=$('#eventPopoverDetails');
@@ -2326,6 +2355,12 @@ function bindItems(){
   $$('.item').forEach(item=>{
     item.onclick=e=>{
       const id=item.dataset.eid, occ=item.dataset.occurrence;
+      if(item.dataset.purchaseDue==='1' && item.dataset.purchaseId){
+        e.preventDefault(); e.stopPropagation();
+        if($('#dayListDlg')?.open) closeDialog($('#dayListDlg'));
+        openPurchase(item.dataset.purchaseId);
+        return;
+      }
       const sub=e.target.closest('[data-action="subtask"]');
       if(sub){ e.stopPropagation(); toggleSubtask(id,occ,sub.dataset.subtaskId); return; }
       if(e.target.closest('[data-action="importance"]')){ e.stopPropagation(); toggleImportant(id); return; }
@@ -4134,8 +4169,32 @@ $('#carryForm').onsubmit=e=>{
   closeDialog($('#carryDlg')); closeDialog($('#eventDlg')); activeEventOccurrence=null; save();
 };
 $('#addPurchase').onclick=()=>openPurchase('');
+let activePurchaseCompleteId='';
+function openPurchaseComplete(id){
+  const p=(state.purchases||[]).find(x=>x.id===id); if(!p) return;
+  activePurchaseCompleteId=id;
+  $('#purchaseCompleteName').textContent=purchaseDisplayTitle(p,false);
+  $('#purchaseCompleteDate').value=ds(new Date());
+  openDialog($('#purchaseCompleteDlg'));
+}
+function completePurchase(id,date){
+  const p=(state.purchases||[]).find(x=>x.id===id); if(!p||!date) return;
+  const calId=purchaseEventCalendarId();
+  state.events.push({
+    id:uid(),title:purchaseDisplayTitle(p,true),calId,date,endDate:date,allDay:true,start:'',end:'',hours:0,noDuration:true,
+    kind:'todo',place:'',repeat:'none',repeatRule:null,memo:String(p.memo||''),important:false,done:true,doneDates:[],
+    checklist:[],checklistDoneByDate:{},orderByDate:{},sourceType:'purchase',purchaseSourceId:String(p.id),purchaseDueDate:String(p.dueDate||'')
+  });
+  state.purchases=state.purchases.filter(x=>x.id!==id);
+  activePurchaseCompleteId='';
+  closeDialog($('#purchaseCompleteDlg'));
+  save();
+}
+$('#purchaseCompleteForm').onsubmit=e=>{ e.preventDefault(); const date=$('#purchaseCompleteDate').value; if(!date) return; completePurchase(activePurchaseCompleteId,date); };
+$('#cancelPurchaseComplete').onclick=()=>{ activePurchaseCompleteId=''; closeDialog($('#purchaseCompleteDlg')); };
+
 $('#togglePurchase').onclick=()=>{ state.settings.fixedPanelsCollapsed.purchase=!state.settings.fixedPanelsCollapsed.purchase; save(); };
-$('#purchaseForm').onsubmit=e=>{ e.preventDefault(); const id=$('#purchaseId').value, old=state.purchases.find(x=>x.id===id), maxOrder=(state.purchases||[]).reduce((m,p)=>Math.max(m,Number(p.order)||0),-1), obj={id:id||uid(),name:$('#purchaseName').value.trim(),qty:Math.max(1,Number($('#purchaseQty').value)||1),memo:$('#purchaseMemo').value,done:$('#purchaseDone').checked,createdAt:old?.createdAt||new Date().toISOString(),order:old?.order??(maxOrder+1)}; if(!obj.name) return; if(id) state.purchases[state.purchases.findIndex(x=>x.id===id)]=obj; else state.purchases.push(obj); closeDialog($('#purchaseDlg')); save(); };
+$('#purchaseForm').onsubmit=e=>{ e.preventDefault(); const id=$('#purchaseId').value, old=state.purchases.find(x=>x.id===id), maxOrder=(state.purchases||[]).reduce((m,p)=>Math.max(m,Number(p.order)||0),-1), obj={id:id||uid(),name:$('#purchaseName').value.trim(),qty:Math.max(1,Number($('#purchaseQty').value)||1),dueDate:$('#purchaseDueDate').value||'',memo:$('#purchaseMemo').value,done:false,createdAt:old?.createdAt||new Date().toISOString(),order:old?.order??(maxOrder+1)}; if(!obj.name) return; if(id) state.purchases[state.purchases.findIndex(x=>x.id===id)]=obj; else state.purchases.push(obj); closeDialog($('#purchaseDlg')); save(); };
 $('#cancelPurchase').onclick=()=>closeDialog($('#purchaseDlg'));
 $('#deletePurchase').onclick=()=>{ const id=$('#purchaseId').value; if(id&&confirm('이 구매항목을 삭제할까요?')){ state.purchases=state.purchases.filter(x=>x.id!==id); closeDialog($('#purchaseDlg')); save(); } };
 $('#allDay').onchange=updateAllDayUI; $('#noDuration').onchange=()=>updateDurationMode(); $('#kind').onchange=updateKindUI; $('#availabilityBlock').onchange=updateAvailabilityBlockUI; $('#cal').onchange=()=>{ if($('#availabilityBlock').checked){ const v=defaultAvailabilityTargetForSelectedCalendar(); if([...$('#availabilityTarget').options].some(o=>o.value===v)) $('#availabilityTarget').value=v; } }; $('#start').onchange=updateDurationMode; $('#end').onchange=updateDurationMode; $('#endDate').onchange=()=>{ if($('#repeat').value!=='none') syncRepeatEndFromTop(); updateDurationMode(); }; $('#repeat').onchange=handleRepeatTypeChange;
@@ -4604,7 +4663,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.30',
+    appVersion:'2.31',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
