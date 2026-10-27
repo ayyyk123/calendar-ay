@@ -1721,7 +1721,7 @@ body.resizingLaneLabel *{
   background:#fff;
   color:#03c75a;
   text-decoration:none;
-  font-family:Arial,sans-serif;
+  font-family:var(--ui-font),sans-serif;
   font-size:17px;
   font-weight:900;
   line-height:1;
@@ -2996,3 +2996,19 @@ body,button,input,select,textarea{font-family:var(--ui-font)!important}
 .multiCompactCell.saturday .multiCompactDatePair small{color:#2873c5}
 .multiCompactCell.sunday .multiCompactDatePair small{color:#d84444}
 .dayCompactDow{font-size:10px;font-weight:500;color:#747b87;vertical-align:baseline}
+
+/* v2.51 — Consistent NanumSquare Neo typography in every view and panel.
+   Preserve emoji-specific glyph fonts for diary icons. */
+:root{--ui-font:"NanumSquareNeo","NanumSquare Neo","Malgun Gothic","Apple SD Gothic Neo",sans-serif}
+html,body,
+#sidebar,#main,#main.month,#main.laneView,#main.multiCompactView,
+header,nav,main,aside,dialog,
+button,input,select,textarea,
+#main .item,#main .monthDateGroup,#main .multiCompactDate,#main .dayCompactDate,
+#sidebar .secHead,#sidebar .calRow,#sidebar .ddayRow,
+.listView,.listView .item,.modal,.dialogPanel,
+.currentViewMenu,.searchResults,.searchResult{
+  font-family:var(--ui-font)!important;
+}
+/* Keep the original emoji shapes for diary indicators. */
+.diaryBtn,.mobileDiaryBtn,.naverMemoShortcutIcon{font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif!important}
