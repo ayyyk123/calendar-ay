@@ -2926,3 +2926,46 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   dialog{border-radius:3px!important}
   button:not(.dot):not(.saveDot){border-radius:2px!important}
 }
+
+
+/* v2.48 — finish square, orderly left sidebar. Presentation-only. */
+#sidebar .sidebarSection>.secHead,
+#sidebar .sidebarCalGroup,
+#sidebar .sidebarCalGroupHead,
+#sidebar .calRow,
+#sidebar .fixed,
+#sidebar .flexibleItem,
+#sidebar .paymentRow,
+#sidebar .paymentSidebarItem,
+#sidebar .purchaseRow,
+#sidebar .ddayRow,
+#sidebar .diaryArchiveRow,
+#sidebar .diaryMonthFilter,
+#sidebar .diaryOpenMainBtn,
+#sidebar .fixedAddMenu,
+#sidebar .fixedAddMenu button,
+#sidebar .sidebarSectionToggle,
+#sidebar button:not(.dot),
+#sidebar select,
+#sidebar input:not([type="checkbox"]):not([type="radio"]){
+  border-radius:2px!important;
+}
+/* Flat header bands and consistent, light rectangular outlines. */
+#sidebar .sidebarSection>.secHead{
+  border:1px solid #d4dbe4!important;
+  background:#e8edf3!important;
+  box-shadow:none!important;
+}
+#sidebar .sidebarSection>.secHead:hover{background:#e2e8ef!important}
+#sidebar .sidebarSection.sidebarSectionCollapsed>.secHead{background:#e5eaf0!important}
+#sidebar .calRow,#sidebar .purchaseRow,#sidebar .paymentRow,
+#sidebar .diaryArchiveRow,#sidebar .sidebarCalGroup{
+  box-shadow:none!important;
+}
+#sidebar .calRow:hover{background:#f2f5f8!important}
+#sidebar .ddayRow{border-bottom:1px solid #e5e9ee}
+#sidebar .sidebarCalGroup{overflow:hidden}
+#sidebar .sidebarCalGroupHead{border-radius:0!important}
+#sidebar .secHead button{box-shadow:none!important}
+#sidebar .diaryMonthFilter{border:1px solid #d4dbe4!important}
+#sidebar .sidebarSectionGrip{border-radius:0!important}
