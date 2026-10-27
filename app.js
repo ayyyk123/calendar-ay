@@ -81,7 +81,7 @@ const defaultState = () => ({
   purchases: [],
   diary: {},
   actualWork: {},
-  settings: { hiddenCalendars: [], weekdayWidths:[100,100,100,100,100,100,100], weekdayWidthMode:'ratio', weekdayWidthReference:0, fixedPanelsCollapsed: { recurring:false, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','dday','diary'], sidebarSectionsCollapsed:{}, laneHeights:{}, laneCollapsed:{}, laneLabelWidth:72, mobileSectionsCollapsed:{}, dayLaneHeights:{}, dayLaneManual:{}, workloadRange:'week', weekViewMode:'detailed', selectedDdayId:'' }
+  settings: { hiddenCalendars: [], weekdayWidths:[100,100,100,100,100,100,100], weekdayWidthMode:'ratio', weekdayWidthReference:0, fixedPanelsCollapsed: { recurring:false, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','dday','diary'], sidebarSectionsCollapsed:{}, laneHeights:{}, laneCollapsed:{}, laneLabelWidth:72, mobileSectionsCollapsed:{}, dayLaneHeights:{}, dayLaneManual:{}, workloadRange:'week', weekViewMode:'detailed', monthShowCommonWithFocus:true, selectedDdayId:'' }
 });
 
 let state = defaultState();
@@ -446,6 +446,7 @@ function normalizeState(raw){
       laneLabelWidth: (()=>{ const v=Number(s.settings?.laneLabelWidth); return v>=48?Math.max(48,Math.min(180,v)):72; })(),
       workloadRange: ['week','month','year'].includes(s.settings?.workloadRange) ? s.settings.workloadRange : 'week',
       weekViewMode: s.settings?.weekViewMode==='compact' ? 'compact' : 'detailed',
+      monthShowCommonWithFocus: s.settings?.monthShowCommonWithFocus!==false,
       selectedDdayId: typeof s.settings?.selectedDdayId==='string' ? s.settings.selectedDdayId : ''
     }
   };
@@ -1122,6 +1123,7 @@ function buildOccurrenceMap(rangeStart, rangeEnd, options={}){
   const includeHidden=!!options.includeHidden;
   const includePreparations=options.includePreparations!==false;
   const calendarIds=options.calendarIds instanceof Set ? options.calendarIds : null;
+  const includeCommon=options.includeCommon!==false;
   // 구매목록의 구매기한은 실제 일정 복제본을 만들지 않고 Quick에 가상 일정으로 표시한다.
   // 구매기한 수정 시 자동으로 날짜가 따라가고, 구매완료로 목록에서 제거되면 자동으로 사라진다.
   for(const p of (state.purchases||[])){
@@ -1131,6 +1133,7 @@ function buildOccurrenceMap(rangeStart, rangeEnd, options={}){
   for(const e of state.events){
     // 캘린더 필터 중에도 공통 일정(D-Day/기념일, 예약·약속)은 항상 남긴다.
     const alwaysCommon=e.kind==='anniversary'||e.kind==='appointment'||e.sourceType==='purchase';
+    if(!includeCommon && (e.kind==='anniversary'||e.kind==='appointment')) continue;
     if(calendarIds && !calendarIds.has(e.calId) && !alwaysCommon) continue;
     if(!includeHidden && isCalendarHidden(e.calId) && !alwaysCommon) continue;
     if(includePreparations) for(const prepEntry of preparationEntries(e)){
@@ -3191,7 +3194,7 @@ function monthCellEventsHtml(date, es){
   return `${commonTopLaneHtml(common,true)}${prepLaneHtml(prep,true)}${quickLaneHtml(quick,true)}${paymentLaneHtml(payments,true)}${normal.map(e=>eventItemHtml(e,true)).join('')}${hidden?`<button type="button" class="moreEventsBtn" data-more-date="${esc(date)}">+ ${hidden}건</button>`:''}`;
 }
 function openDayList(date){
-  const map=buildOccurrenceMap(date,date,{calendarIds:focusedCalendarIds()});
+  const map=buildOccurrenceMap(date,date,{calendarIds:focusedCalendarIds(),includeCommon:view!=='month'||!calendarFocusIds.size||state.settings.monthShowCommonWithFocus!==false});
   const h=holidayLabel(date);
   $('#dayListTitle').textContent=`${date}${h?` · ${h}`:''}`;
   $('#dayListBody').innerHTML=groupHtml(date,map[date]||[]);
@@ -3268,6 +3271,16 @@ function renderMultiWeek(weeks=2){
   scheduleMultiWeekCellFit();
   bindWeekdayWidthResizers();
 }
+function updateMonthCommonToggle(){
+  const label=$('#monthCommonToggleLabel'), box=$('#monthCommonToggle');
+  if(!label||!box) return;
+  label.hidden=!(view==='month'&&calendarFocusIds.size>0);
+  box.checked=state.settings.monthShowCommonWithFocus!==false;
+}
+$('#monthCommonToggle')?.addEventListener('change',e=>{
+  state.settings.monthShowCommonWithFocus=!!e.target.checked;
+  save();
+});
 function renderMonth(){
   const y=cursor.getFullYear(),m=cursor.getMonth(),first=new Date(y,m,1),s=startWeek(first);
   // 현재 달이 실제로 차지하는 주 수(4/5/6주)만 렌더링합니다.
@@ -3276,7 +3289,7 @@ function renderMonth(){
   const mondayOffset=(first.getDay()+6)%7;
   const weekCount=Math.ceil((mondayOffset+monthDays)/7);
   const totalCells=weekCount*7;
-  const end=add(s,totalCells-1),map=buildOccurrenceMap(ds(s),ds(end),{calendarIds:focusedCalendarIds()});
+  const end=add(s,totalCells-1),map=buildOccurrenceMap(ds(s),ds(end),{calendarIds:focusedCalendarIds(),includeCommon:!calendarFocusIds.size||state.settings.monthShowCommonWithFocus!==false});
   setRangeLabel(`${y}년 ${m+1}월${focusSuffix()}`,`${y}.${m+1}${compactFocusSuffix()}`);
   $('#main').className='month';
   $('#main').style.setProperty('--month-weeks',String(weekCount));
@@ -3470,6 +3483,7 @@ function render(){
   renderSide();
   $$('#currentViewMenu [data-view], .primaryViewButtons [data-view]').forEach(b=>b.classList.toggle('on',b.dataset.view===view));
   setCurrentViewButtonLabel();
+  updateMonthCommonToggle();
   const weekBtn=$('.primaryViewButtons [data-view="week"]');
   if(weekBtn){
     const compact=state.settings?.weekViewMode==='compact';
@@ -4713,7 +4727,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.38',
+    appVersion:'2.39',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state

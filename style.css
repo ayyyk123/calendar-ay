@@ -2761,3 +2761,9 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
   #main.laneView .scheduleDateGrid>.scheduleDateCorner,
   #main.laneView .scheduleDateGrid>.scheduleDateHead{height:20px!important;max-height:20px!important}
 }
+
+/* v2.39: 월 화면에서 특정 캘린더만 볼 때 공통일정 표시 선택 */
+.monthCommonToggle{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;white-space:nowrap;cursor:pointer;padding:3px 6px;border:1px solid #e2e6ea;border-radius:6px;background:#fff;color:#39424d;flex-shrink:0}
+.monthCommonToggle[hidden]{display:none!important}
+.monthCommonToggle input{margin:0;width:13px;height:13px;accent-color:#5773c5;cursor:pointer}
+@media(max-width:760px){.monthCommonToggle{font-size:10px;padding:2px 4px;gap:3px}.monthCommonToggle input{width:12px;height:12px}}
