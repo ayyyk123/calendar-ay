@@ -2868,3 +2868,61 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 @media(max-width:760px){
  #extraViewMenuToggle{height:32px;padding:0 5px}
 }
+
+
+/* v2.47 — unified clean, square-edged controls.
+   Scope: presentation only; event colors, state, and layout logic remain unchanged. */
+:root{
+  --border:#d5d9df;
+  --soft:#f7f8fa;
+  --ui-square-radius:2px;
+  --ui-panel-border:#dce0e5;
+}
+/* Consistent straight edges for ordinary controls and forms. */
+button:not(.dot):not(.saveDot),
+input:not([type="checkbox"]):not([type="radio"]),select,textarea,
+.searchResults,.searchResult,.dataManage,.repeatBox,.weekdayChecks label,
+.sidebarCalGroup,.sidebarCalGroupHead,.fixed,.paymentLane,
+.groupHead,.group,.item,.month .item,.moreEventsBtn,
+.checklistEditor,.monthCommonToggle,
+.dialogPanel,.card,.panel,.settingsLine,
+.scopeActions button,.saveBadge,
+.currentViewMenu,.calRow,.listView .item {
+  border-radius:var(--ui-square-radius)!important;
+}
+/* Sidebar items, grouping boxes and outlines. */
+.sidebarCalGroup,.fixed,.paymentLane,.repeatBox,.dataManage,.checklistEditor{
+  border-color:var(--ui-panel-border);
+}
+.calRow{transition:background-color .12s ease}
+.calRow:hover,.sidebarCalGroupHead:hover{background:#f3f5f8}
+/* Keep form elements flat and precise, without altering selection/accent semantics. */
+dialog{
+  border:1px solid #d9dce1!important;
+  border-radius:3px!important;
+  box-shadow:0 12px 35px #18243324!important;
+}
+dialog input:not([type="checkbox"]):not([type="radio"]),
+dialog select,dialog textarea{
+  border-color:#cdd3da;
+  border-radius:2px!important;
+}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{
+  outline:2px solid #6758e9;
+  outline-offset:1px;
+}
+/* Make headers and popups understated. Do not override event-specific background colors. */
+.groupHead{border-radius:2px 2px 0 0!important}
+.item,.month .item{border-radius:1px!important}
+.moreEventsBtn{border:1px solid #e3e7ee!important;border-radius:2px!important}
+.saveBadge{border-radius:2px!important}
+.monthCommonToggle{border-radius:2px!important}
+/* Existing toolbar's connected rectangle buttons and purple selection stay as-is. */
+@media(min-width:761px){
+  header nav .primaryViewButtons{border-radius:0!important}
+  header nav .primaryViewBtn,header nav #extraViewMenuToggle{border-radius:0!important}
+}
+@media(max-width:760px){
+  dialog{border-radius:3px!important}
+  button:not(.dot):not(.saveDot){border-radius:2px!important}
+}
