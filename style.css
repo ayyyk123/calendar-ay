@@ -2985,3 +2985,14 @@ body,button,input,select,textarea{font-family:var(--ui-font)!important}
   #main.laneView .scheduleLaneGrid{grid-template-columns:var(--weekday-cols)!important}
   #main.multiCompactView,#main.month{width:100%!important;min-width:0!important;max-width:100%!important;grid-template-columns:var(--weekday-cols,repeat(7,minmax(0,1fr)))!important}
 }
+
+/* v2.50 — Date-first weekday labels across calendar layouts. */
+.month .monthDateGroup{display:inline-flex;align-items:baseline;justify-content:center;gap:3px;min-width:0;white-space:nowrap}
+.month .monthDateDow{font-size:9px;font-weight:500;color:#747b87;line-height:1}
+.month .saturday .monthDateDow{color:#2873c5}
+.month .sunday .monthDateDow{color:#d84444}
+.multiCompactDatePair{display:inline-flex;align-items:baseline;gap:3px;white-space:nowrap;min-width:0}
+.multiCompactDatePair small{font-size:9px;font-weight:500;color:#747b87;line-height:1}
+.multiCompactCell.saturday .multiCompactDatePair small{color:#2873c5}
+.multiCompactCell.sunday .multiCompactDatePair small{color:#d84444}
+.dayCompactDow{font-size:10px;font-weight:500;color:#747b87;vertical-align:baseline}
