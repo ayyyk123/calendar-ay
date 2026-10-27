@@ -3186,7 +3186,7 @@ function renderWeek(){
   $('#main').innerHTML=scheduleWeekBoard(days,map);
   bindItems(); bindScheduleLanes(); bindWeekdayWidthResizers();
 }
-// v2.44: 월 칸의 실제 남는 높이에 따라 표시 개수 자동 결정.
+// v2.45: 월 칸의 실제 남는 높이에 따라 표시 개수 자동 결정.
 function monthCellEventsHtml(date, es){
   const priority=e=>e.kind==='anniversary'?0:e.kind==='appointment'?1:e.kind==='todo'?2:e.kind==='payment'?3:4;
   const ordered=[...(es||[])].filter(e=>!isPreparationDeadlineDuplicate(e)).sort((a,b)=>priority(a)-priority(b));
@@ -3252,11 +3252,34 @@ function openDayList(date){
 }
 $('#closeDayList').onclick=()=>closeDialog($('#dayListDlg'));
 
+// v2.46: 주간 압축 보기에서도 영역 순서(공통→준비→Quick→납부→캘린더)를 유지한다.
+// 같은 캘린더에 속하는 일반 일정은 사용자 설정 캘린더 순서대로 모아서 보여준다.
+function orderedMultiWeekEvents(es){
+  const events=(es||[]).filter(e=>!isPreparationDeadlineDuplicate(e));
+  const calPositions=new Map(cals().map((c,i)=>[c.id,i]));
+  const laneRank=e=>{
+    if(!isPreparationManagedItem(e)&&(e.kind==='anniversary'||e.kind==='appointment')) return 0;
+    if(isPreparationLaneItem(e)) return 1;
+    if(!isPreparationManagedItem(e)&&e.kind==='todo') return 2;
+    if(!isPreparationManagedItem(e)&&e.kind==='payment') return 3;
+    return 4;
+  };
+  return events.map((e,index)=>({e,index,lane:laneRank(e)}))
+    .sort((a,b)=>{
+      if(a.lane!==b.lane) return a.lane-b.lane;
+      // 영역 안에서는 캘린더 설정에서 저장한 순서(부속 캘린더 포함)를 따른다.
+      if(a.lane===2||a.lane===3||a.lane===4){
+        const ca=calPositions.get(a.e.calId)??99999;
+        const cb=calPositions.get(b.e.calId)??99999;
+        if(ca!==cb) return ca-cb;
+      }
+      // 같은 영역/캘린더 안에서 사용자가 지정한 순서를 훼손하지 않는다.
+      return a.index-b.index;
+    }).map(x=>x.e);
+}
 function multiWeekCellEventsHtml(date, es, weeks){
-  const priority=e=>e.kind==='anniversary'?0:e.kind==='appointment'?1:e.kind==='todo'?2:e.kind==='payment'?3:4;
-  const ordered=[...(es||[])].filter(e=>!isPreparationDeadlineDuplicate(e)).sort((a,b)=>priority(a)-priority(b));
-  // v1.82: 일정 개수를 미리 고정 개수로 자르지 않는다.
-  // 셀의 실제 높이를 렌더링 후 측정해서 들어가는 만큼 표시한다.
+  const ordered=orderedMultiWeekEvents(es);
+  // 실제 셀에 들어가는 일정 개수는 기존 자동 높이 계산을 그대로 사용한다.
   return `<div class="multiCompactEvents">${ordered.map(e=>eventItemHtml(e,true)).join('')}</div><button type="button" class="multiCompactMore" data-more-date="${esc(date)}" hidden></button>`;
 }
 function fitMultiWeekCellEvents(){
@@ -4635,6 +4658,7 @@ $$('.primaryViewButtons [data-view]').forEach(b=>{
     b.onclick=e=>{ e.preventDefault(); activateViewButton(next); };
   }
 });
+$('#extraViewMenuToggle')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();toggleCurrentViewMenu(undefined,e.currentTarget);e.currentTarget.setAttribute('aria-expanded',String(!$('#currentViewMenu')?.classList.contains('hidden')));});
 $('#currentViewWrap')?.addEventListener('contextmenu',e=>{
   if(e.target.closest('.primaryViewBtn')) return;
   e.preventDefault();
@@ -4778,7 +4802,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.44',
+    appVersion:'2.46',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state

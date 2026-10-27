@@ -2830,3 +2830,41 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
   header .views > #saveBadge{flex-basis:100px!important;width:100px!important;min-width:100px!important;max-width:100px!important}
   header .views > a,header .views > button{min-width:30px!important;width:30px!important;height:32px!important;padding:0!important}
 }
+
+/* v2.45 desktop: reference toolbar geometry (left navigation / centered connected switcher / right utilities). */
+@media(min-width:761px){
+ :root{--header-h:52px}
+ header{height:var(--header-h)!important;min-height:var(--header-h)!important;display:flex!important;align-items:center!important;flex-wrap:nowrap!important;padding:0 12px!important;gap:12px!important;position:relative!important}
+ header .brand{flex:0 0 auto!important;order:0!important;font-size:15px!important;min-width:0!important;margin-right:4px!important}
+ header nav{order:1!important;display:flex!important;align-items:center!important;flex:1 1 auto!important;min-width:0!important;width:auto!important;gap:6px!important;margin:0!important;overflow:visible!important}
+ header nav #range{order:0!important;flex:0 1 auto!important;margin:0 2px 0 0!important;max-width:240px!important;font-weight:700!important;font-size:13px!important;color:#202632;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+ header nav .dateNavButtons{order:1!important;display:inline-flex!important;align-items:center!important;gap:0!important;flex:none!important}
+ header nav .dateNavButtons button{height:29px!important;min-width:24px!important;padding:0 7px!important;border:1px solid #c9c9c9!important;border-radius:0!important;background:white!important;font-size:12px!important;color:#333!important}
+ header nav .dateNavButtons button+button{border-left:0!important}
+ header nav #today{min-width:43px!important}
+ header nav #jumpDateBtn{order:2!important;display:none!important}
+ header nav #jumpDate{order:3!important}
+ header nav #currentViewWrap{order:4!important;position:absolute!important;left:50%!important;top:50%!important;transform:translate(-50%,-50%)!important;z-index:21!important}
+ header nav .primaryViewButtons{display:inline-flex!important;align-items:stretch!important;gap:0!important;border:1px solid #c9c9c9!important;background:#fff!important}
+ header nav .primaryViewBtn,header nav #extraViewMenuToggle{height:29px!important;min-height:29px!important;min-width:39px!important;padding:0 9px!important;line-height:27px!important;border:0!important;border-right:1px solid #c9c9c9!important;border-radius:0!important;background:#fff!important;color:#202020!important;font-size:12px!important;font-weight:500!important;box-shadow:none!important}
+ header nav #extraViewMenuToggle{min-width:21px!important;padding:0 4px!important;border-right:0!important}
+ header nav .primaryViewBtn.on{background:#6758e9!important;color:#fff!important;border-color:#6758e9!important;font-weight:700!important}
+ header nav #currentViewMenu{top:calc(100% + 6px)!important;left:auto!important;right:0!important}
+ header nav #monthCommonToggleLabel{order:5!important;position:absolute!important;top:calc(100% + 4px)!important;left:50%!important;transform:translateX(-50%)!important;background:#fff!important;border:1px solid #ddd!important;border-radius:5px!important;padding:3px 7px!important;z-index:30!important;white-space:nowrap!important}
+ header nav #monthCommonToggleLabel[hidden]{display:none!important}
+ header .views{order:2!important;display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:3px!important;flex:0 0 auto!important;width:auto!important;min-width:0!important;margin-left:auto!important;white-space:nowrap!important}
+ header .views > #saveBadge{flex:0 1 140px!important;width:140px!important;min-width:90px!important;max-width:140px!important;margin:0 3px 0 0!important}
+ header .views > #manualSaveBtn{margin:0 3px 0 0!important}
+ header .views > a,header .views > button{height:29px!important;min-height:29px!important;min-width:28px!important;width:29px!important;padding:0!important;border-radius:2px!important}
+ .layout{height:calc(100dvh - var(--header-h))!important}
+}
+@media(min-width:761px) and (max-width:1300px){
+ header{gap:6px!important;padding-left:8px!important;padding-right:7px!important}
+ header .brand{font-size:12px!important;margin-right:0!important}
+ header nav #range{max-width:160px!important;font-size:12px!important}
+ header .views > #saveBadge{width:95px!important;min-width:65px!important;max-width:95px!important;flex-basis:95px!important}
+ header nav .primaryViewBtn{min-width:35px!important;padding:0 7px!important}
+}
+@media(max-width:760px){
+ #extraViewMenuToggle{height:32px;padding:0 5px}
+}
