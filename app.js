@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '2.31',
+  version: '2.32',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -353,7 +353,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '2.31',
+    version: '2.32',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -378,6 +378,7 @@ function normalizeState(raw){
       prepIncludeDeadline:!!e.prepIncludeDeadline,
       prepDailyNotes:(e.prepDailyNotes&&typeof e.prepDailyNotes==='object')?Object.fromEntries(Object.entries(e.prepDailyNotes).map(([k,v])=>[String(k),String(v??'')])):{},
       prepDone:(e.prepDone&&typeof e.prepDone==='object')?Object.fromEntries(Object.entries(e.prepDone).filter(([,v])=>!!v).map(([k])=>[String(k),true])):{},
+      prepMissed:(e.prepMissed&&typeof e.prepMissed==='object')?Object.fromEntries(Object.entries(e.prepMissed).filter(([,v])=>!!v).map(([k])=>[String(k),true])):{},
       prepMoves:(e.prepMoves&&typeof e.prepMoves==='object')?Object.fromEntries(Object.entries(e.prepMoves).filter(([,v])=>typeof v==='string'&&v).map(([k,v])=>[String(k),String(v)])):{},
       prepTasks:Array.isArray(e.prepTasks)?e.prepTasks.filter(x=>x&&['date','weekly','repeat'].includes(x.type)).map((x,i)=>({
         id:String(x.id||`prep-${i}-${uid()}`), type:x.type, text:String(x.text||'').trim(),
@@ -1049,9 +1050,12 @@ function preparationEntries(e){
     .sort((a,b)=>a.date.localeCompare(b.date)||a.type.localeCompare(b.type)||a.text.localeCompare(b.text));
 }
 function preparationEntryDone(e,key){ return !!(key && e?.prepDone && e.prepDone[key]); }
+function preparationEntryMissed(e,key){ return !!(key && e?.prepMissed && e.prepMissed[key]); }
 function preparationProgress(e){
-  const entries=preparationEntries(e), total=entries.length, done=entries.filter(x=>preparationEntryDone(e,x.key)).length;
-  return {done,total};
+  const entries=preparationEntries(e), total=entries.length;
+  const done=entries.filter(x=>preparationEntryDone(e,x.key)).length;
+  const missed=entries.filter(x=>preparationEntryMissed(e,x.key)).length;
+  return {done,missed,total};
 }
 function preparationDates(e){
   return [...new Set(preparationEntries(e).map(x=>x.date))].sort();
@@ -1077,7 +1081,7 @@ function preparationVirtualEvent(e,entry){
   const note=typeof entry==='string'?preparationNoteForDate(e,date):String(entry.text||'').trim();
   const key=typeof entry==='string'?`auto:${entry}`:String(entry.key||'');
   const sourceDate=typeof entry==='string'?entry:String(entry.sourceDate||entry.date||'');
-  return {...e,_prepDay:true,_prepDate:date,_renderDate:date,_occurrenceStart:e.date,_occurrenceEnd:e.date,_prepNote:note,_prepKey:key,_prepSourceDate:sourceDate,_prepType:typeof entry==='string'?'auto':String(entry.type||''),_prepRuleId:typeof entry==='string'?'':String(entry.ruleId||''),_prepRuleLabel:typeof entry==='string'?'':String(entry.ruleLabel||'')};
+  return {...e,_prepDay:true,_prepDate:date,_renderDate:date,_occurrenceStart:e.date,_occurrenceEnd:e.date,_prepNote:note,_prepKey:key,_prepMissed:preparationEntryMissed(e,key),_prepSourceDate:sourceDate,_prepType:typeof entry==='string'?'auto':String(entry.type||''),_prepRuleId:typeof entry==='string'?'':String(entry.ruleId||''),_prepRuleLabel:typeof entry==='string'?'':String(entry.ruleLabel||'')};
 }
 function isPreparationDeadlineOccurrence(e){
   if(!e?.prepEnabled || e?._prepDay) return false;
@@ -1285,7 +1289,7 @@ function checklistHtml(e,compact=false){
 }
 function eventItemHtml(e, compact=false){
   const c=cal(e.calId), purchaseDue=!!e._purchaseDue, purchaseLinked=purchaseDue||e.sourceType==='purchase', prepDay=!!e._prepDay, prepDeadlineDay=prepDay && (e._renderDate||e._prepDate||e.date)===(e.prepDeadline||e.date), deadlineItem=isPreparationDeadlineOccurrence(e);
-  const done=prepDay?preparationEntryDone(e,e._prepKey):isDone(e), checkable=e.kind!=='anniversary' && !prepDay;
+  const done=prepDay?preparationEntryDone(e,e._prepKey):isDone(e), missed=prepDay?preparationEntryMissed(e,e._prepKey):false, checkable=e.kind!=='anniversary' && !prepDay;
   const recurring=(e.repeat||'none')!=='none';
   const payment=e.kind==='payment';
   const checklist=prepDay?[]:checklistItems(e), checklistState=prepDay?{done:0,total:0}:checklistProgress(e);
@@ -1298,8 +1302,9 @@ function eventItemHtml(e, compact=false){
   // v2.11: 준비일정 구역에서는 원본 일정명/`준비` 접두어를 반복하지 않는다.
   // 일반 준비일은 그날 해야 할 업무만, 마감 관련 카드만 `준비마감`/`마감`을 표시한다.
   const prepTaskTitle=prepNote||'할 일 미입력';
+  const basePrepTitle=prepDeadlineDay?`준비마감 · ${prepTaskTitle}`:prepTaskTitle;
   const shownTitle=prepDay
-    ? (prepDeadlineDay?`준비마감 · ${prepTaskTitle}`:prepTaskTitle)
+    ? (missed?`못함 · ${basePrepTitle}`:basePrepTitle)
     : (deadlineItem?`마감 · ${e.title}`:e.title);
   const detail=[];
   if(prepDay){ detail.push(preparationSummary(e)); if(prepNote) detail.push(prepNote); }
@@ -1323,7 +1328,7 @@ function eventItemHtml(e, compact=false){
   const repeatBadge=!prepDay&&recurring?`<span class="repeatMark" title="${esc(repeatRuleLabel(e))}">↻</span>`:'';
   const carryBadge=inLabel?`<span class="carryBadge carryIn" title="${esc(inLabel)}">↪</span>`:'';
   const amountInline=!prepDay&&payment&&Number(e.paymentAmount)>0?`<span class="inlineMeta">₩${Number(e.paymentAmount).toLocaleString('ko-KR')}</span>`:'';
-  return `<div class="item ${done?'done':''} kind-${esc(e.kind||'event')} ${recurring&&!prepDay?'recurringItem':''} ${payment&&!prepDay?'paymentItem':''} ${e.fixedId?'manualPlacedItem':''} ${e.flexibleId?'flexiblePlacedItem':''} ${inLabel?'carriedIn':''} ${outRecord?'carriedOut':''} ${prepDay?'prepDayItem':''} ${prepDeadlineDay?'prepDeadlineDayItem':''} ${deadlineItem?'prepDeadlineItem':''}" draggable="${drag}" data-eid="${esc(e.id)}" data-occurrence="${esc(e._occurrenceStart||e.date)}" data-render-date="${esc(renderDate)}" data-cal-id="${esc(e.calId)}" data-lane="${payment?'payment':'work'}" data-prep-day="${prepDay?'1':''}" data-prep-key="${prepDay?esc(e._prepKey||''):''}" data-prep-source-date="${prepDay?esc(e._prepSourceDate||''):''}" data-prep-type="${prepDay?esc(e._prepType||''):''}" data-prep-rule-id="${prepDay?esc(e._prepRuleId||''):''}" data-prep-event="${e.prepEnabled?'1':''}" data-purchase-due="${purchaseDue?'1':''}" data-purchase-id="${purchaseDue?esc(e.purchaseId||''):''}" style="--item-color:${esc(c.color)};border-left-color:${esc(c.color)}">
+  return `<div class="item ${done?'done':''} ${missed?'prepMissedItem':''} kind-${esc(e.kind||'event')} ${recurring&&!prepDay?'recurringItem':''} ${payment&&!prepDay?'paymentItem':''} ${e.fixedId?'manualPlacedItem':''} ${e.flexibleId?'flexiblePlacedItem':''} ${inLabel?'carriedIn':''} ${outRecord?'carriedOut':''} ${prepDay?'prepDayItem':''} ${prepDeadlineDay?'prepDeadlineDayItem':''} ${deadlineItem?'prepDeadlineItem':''}" draggable="${drag}" data-eid="${esc(e.id)}" data-occurrence="${esc(e._occurrenceStart||e.date)}" data-render-date="${esc(renderDate)}" data-cal-id="${esc(e.calId)}" data-lane="${payment?'payment':'work'}" data-prep-day="${prepDay?'1':''}" data-prep-key="${prepDay?esc(e._prepKey||''):''}" data-prep-source-date="${prepDay?esc(e._prepSourceDate||''):''}" data-prep-type="${prepDay?esc(e._prepType||''):''}" data-prep-rule-id="${prepDay?esc(e._prepRuleId||''):''}" data-prep-event="${e.prepEnabled?'1':''}" data-purchase-due="${purchaseDue?'1':''}" data-purchase-id="${purchaseDue?esc(e.purchaseId||''):''}" style="--item-color:${esc(c.color)};border-left-color:${esc(c.color)}">
     <div class="itemRow">${dragHandle}${!prepDay&&e.important?`<button type="button" class="importanceBtn on" data-action="importance" aria-label="중요 표시 해제" title="중요 표시 해제">★</button>`:''}${mainCheck}<div class="itemTitle" title="${esc(tooltip)}">${timePrefix}<span class="durationPrefix">${esc(durationPrefix)}</span>${!prepDay&&payment?'₩ ':(!checkable&&!prepDay?kindPrefix(e):'')}${esc(shownTitle)}</div>${amountInline}${repeatBadge}${carryBadge}${checklistButton}</div>
     ${expanded?checklistHtml(e,false):''}
   </div>`;
@@ -2204,25 +2209,30 @@ function openPreparationPlan(id,focusDate=''){
   const entries=preparationEntries(e);
   $('#prepPlanTitle').textContent=e.title;
   const prepProgress=preparationProgress(e);
-  const prepComplete=prepProgress.total>0 && prepProgress.done===prepProgress.total;
+  const prepComplete=prepProgress.total>0 && prepProgress.done===prepProgress.total && prepProgress.missed===0;
   const prepDlg=$('#prepPlanDlg'), completeBadge=$('#prepPlanCompleteBadge');
   prepDlg?.classList.toggle('complete',prepComplete);
   if(completeBadge) completeBadge.classList.toggle('hidden',!prepComplete);
-  $('#prepPlanSummary').textContent=`${preparationSummary(e)}${prepProgress.total?` · 완료 ${prepProgress.done}/${prepProgress.total}`:''}`;
+  $('#prepPlanSummary').textContent=`${preparationSummary(e)}${prepProgress.total?` · 완료 ${prepProgress.done}/${prepProgress.total}`:''}${prepProgress.missed?` · 못함 ${prepProgress.missed}`:''}`;
   const memo=$('#prepPlanGeneralMemo');
   memo.textContent=''; memo.classList.add('hidden');
   const rows=entries.map(entry=>{
-    const note=String(entry.text||'').trim(), done=preparationEntryDone(e,entry.key);
+    const note=String(entry.text||'').trim(), done=preparationEntryDone(e,entry.key), missed=preparationEntryMissed(e,entry.key);
     const rule=entry.ruleLabel&&entry.type!=='auto'?`<small class="prepPlanRule">${esc(entry.ruleLabel)}${entry.moved?' · 이동':''}</small>`:(entry.moved?`<small class="prepPlanRule">이동</small>`:'');
     const focused=activePrepPlanDate&&entry.date===activePrepPlanDate;
-    return `<div class="prepPlanRow ${done?'done':''} ${focused?'focused':''}"><button type="button" class="prepPlanCheck" data-prep-plan-check="${esc(entry.key)}" title="${done?'완료 해제':'완료 처리'}">${done?'☑':'☐'}</button><div class="prepPlanDate">${esc(preparationDateLabel(entry.date))}<small>${esc(entry.date)}</small>${rule}</div><div class="prepPlanText ${note?'':'muted'}">${esc(note||'계획 미입력')}</div></div>`;
+    return `<div class="prepPlanRow ${done?'done':''} ${missed?'missed':''} ${focused?'focused':''}"><div class="prepPlanStatus"><button type="button" class="prepPlanCheck" data-prep-plan-check="${esc(entry.key)}" title="${done?'완료 해제':'완료 처리'}">${done?'☑':'☐'}</button><button type="button" class="prepPlanMissed ${missed?'on':''}" data-prep-plan-missed="${esc(entry.key)}" title="${missed?'못함 해제':'못함 처리'}">${missed?'못함✓':'못함'}</button></div><div class="prepPlanDate">${esc(preparationDateLabel(entry.date))}<small>${esc(entry.date)}</small>${rule}</div><div class="prepPlanText ${note?'':'muted'}">${esc(note||'계획 미입력')}</div></div>`;
   });
   if(!rows.length) rows.push(`<div class="prepPlanRow"><span class="prepPlanCheckSpacer"></span><div class="prepPlanDate">준비일정</div><div class="prepPlanText muted">등록된 준비 일정이 없습니다.</div></div>`);
   const deadline=e.prepDeadline||e.date, deadlineFocused=activePrepPlanDate&&deadline===activePrepPlanDate;
   const deadlineMemo=String(e.memo||'').trim();
   rows.push(`<div class="prepPlanRow deadline ${prepComplete?'done completeDeadline':''} ${deadlineFocused?'focused':''}"><span class="prepPlanCheckSpacer">${prepComplete?'✓':''}</span><div class="prepPlanDate">마감일<small>${esc(deadline)}</small></div><div class="prepPlanText"><b>${esc(e.title)}</b>${e.place?`<br>${esc(e.place)}`:''}${deadlineMemo?`<div class="prepDeadlineMemo"><span>메모</span>${esc(deadlineMemo)}</div>`:''}</div></div>`);
   $('#prepPlanList').innerHTML=rows.join('');
-  $('#prepPlanList').onclick=ev=>{ const b=ev.target.closest('[data-prep-plan-check]'); if(!b) return; ev.preventDefault(); ev.stopPropagation(); togglePreparationDone(e.id,b.dataset.prepPlanCheck||''); };
+  $('#prepPlanList').onclick=ev=>{
+    const doneBtn=ev.target.closest('[data-prep-plan-check]');
+    if(doneBtn){ ev.preventDefault(); ev.stopPropagation(); togglePreparationDone(e.id,doneBtn.dataset.prepPlanCheck||''); return; }
+    const missedBtn=ev.target.closest('[data-prep-plan-missed]');
+    if(missedBtn){ ev.preventDefault(); ev.stopPropagation(); togglePreparationMissed(e.id,missedBtn.dataset.prepPlanMissed||''); }
+  };
   openDialog($('#prepPlanDlg'));
 }
 $('#closePrepPlan').onclick=()=>closeDialog($('#prepPlanDlg'));
@@ -2569,13 +2579,44 @@ function moveRecurringWholeSeries(e,newDate,occ){
   }
 }
 function finishRepeatMove(){ pendingRepeatMove=null; closeDialog($('#repeatMoveDlg')); save(); }
+let pendingPrepMissed=null;
 function togglePreparationDone(id,key){
   const e=state.events.find(x=>x.id===id && x.prepEnabled); if(!e || !key) return;
   e.prepDone=(e.prepDone&&typeof e.prepDone==='object')?e.prepDone:{};
-  if(e.prepDone[key]) delete e.prepDone[key]; else e.prepDone[key]=true;
-  save();
+  e.prepMissed=(e.prepMissed&&typeof e.prepMissed==='object')?e.prepMissed:{};
+  if(e.prepDone[key]) delete e.prepDone[key];
+  else{ e.prepDone[key]=true; delete e.prepMissed[key]; }
+  save({rerender:false});
   if($('#prepPlanDlg')?.open && activePrepPlanId===id) openPreparationPlan(id,activePrepPlanDate);
+  else render();
 }
+function togglePreparationMissed(id,key){
+  const e=state.events.find(x=>x.id===id && x.prepEnabled); if(!e || !key) return;
+  e.prepMissed=(e.prepMissed&&typeof e.prepMissed==='object')?e.prepMissed:{};
+  e.prepDone=(e.prepDone&&typeof e.prepDone==='object')?e.prepDone:{};
+  const entry=preparationEntries(e).find(x=>x.key===key);
+  if(e.prepMissed[key]){
+    delete e.prepMissed[key];
+    save({rerender:false});
+    if($('#prepPlanDlg')?.open && activePrepPlanId===id) openPreparationPlan(id,activePrepPlanDate); else render();
+    return;
+  }
+  e.prepMissed[key]=true;
+  delete e.prepDone[key];
+  pendingPrepMissed={id,key,date:entry?.date||'',text:String(entry?.text||'').trim()};
+  save({rerender:false});
+  if($('#prepPlanDlg')?.open && activePrepPlanId===id) openPreparationPlan(id,activePrepPlanDate);
+  const label=[entry?.date,entry?.text].filter(Boolean).join(' · ');
+  $('#prepMissedInfo').textContent=label?`${label} — 못함으로 기록했습니다.`:'못함으로 기록했습니다.';
+  openDialog($('#prepMissedDlg'));
+}
+$('#prepMissedKeep').onclick=()=>{ pendingPrepMissed=null; closeDialog($('#prepMissedDlg')); render(); };
+$('#prepMissedEditFuture').onclick=()=>{
+  const p=pendingPrepMissed; pendingPrepMissed=null;
+  closeDialog($('#prepMissedDlg')); closeDialog($('#prepPlanDlg'));
+  if(!p?.id){ render(); return; }
+  openEvent(null,p.id,{prepFocusDate:p.date||''});
+};
 function movePreparationEntry(id,key,newDate,sourceDate='',type='',ruleId=''){
   const e=state.events.find(x=>x.id===id && x.prepEnabled); if(!e || !key || !newDate) return;
   const current=preparationEntries(e).find(x=>x.key===key);
@@ -3952,6 +3993,14 @@ function openEvent(date,id,options={}){
   $('#carryEvent').classList.toggle('hidden',!e || e.kind==='anniversary' || e.kind==='payment' || (occurrenceView&&isDone(occurrenceView)));
   updateAllDayUI(); updateKindUI(); setRepeatRule(e||{date:$('#date').value,repeat:$('#repeat').value,repeatRule:null}); updateDurationMode(); updatePrepUI();
   openDialog($('#eventDlg'));
+  if(options?.prepFocusDate){
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      const target=$('#prepAutoEditor')||$('#prepFields');
+      target?.classList.add('prepMissedEditFocus');
+      target?.scrollIntoView({block:'center',behavior:'smooth'});
+      setTimeout(()=>target?.classList.remove('prepMissedEditFocus'),2200);
+    }));
+  }
 }
 window.__newEvent=openEvent;
 function openDialog(d){ if(!d.open) d.showModal(); }
@@ -4039,7 +4088,7 @@ $('#eventForm').onsubmit=e=>{
     start:$('#allDay').checked?'':$('#start').value, end:$('#allDay').checked?'':$('#end').value,
     hours:$('#kind').value==='payment'?0:(timedHoursFromForm()??getDurationInputs()), noDuration:$('#kind').value==='payment'?true:($('#noDuration').checked && timedHoursFromForm()===null), kind:$('#kind').value, place:$('#place').value.trim(),
     paymentAmount:$('#kind').value==='payment'?Math.max(0,Number($('#paymentAmount').value)||0):0, paymentMethod:$('#kind').value==='payment'?$('#paymentMethod').value.trim():'',
-    prepEnabled, prepDeadline:prepEnabled?$('#prepDeadline').value:'', prepMode:prepEnabled&&$('#prepMode').value==='custom'?'custom':'auto', prepAutoEnabled:prepEnabled&&!!prepDraftAutoEnabled, prepDays:prepEnabled?Math.max(1,Number($('#prepDays').value)||1):5, prepWeekdaysOnly:prepEnabled&&!!$('#prepWeekdaysOnly').checked, prepIncludeDeadline:prepEnabled&&!!$('#prepIncludeDeadline').checked, prepDailyNotes:prepEnabled&&prepDraftAutoEnabled?Object.fromEntries(prepFormDates().map(d=>[d,String(prepDraftNotes[d]||'').trim()]).filter(([,v])=>v)):{}, prepTasks:prepEnabled?prepDraftTasks.map(x=>({...x})):[], prepDone:prepEnabled?{...(old?.prepDone||{})}:{}, prepMoves:prepEnabled?{...prepDraftMoves}:{},
+    prepEnabled, prepDeadline:prepEnabled?$('#prepDeadline').value:'', prepMode:prepEnabled&&$('#prepMode').value==='custom'?'custom':'auto', prepAutoEnabled:prepEnabled&&!!prepDraftAutoEnabled, prepDays:prepEnabled?Math.max(1,Number($('#prepDays').value)||1):5, prepWeekdaysOnly:prepEnabled&&!!$('#prepWeekdaysOnly').checked, prepIncludeDeadline:prepEnabled&&!!$('#prepIncludeDeadline').checked, prepDailyNotes:prepEnabled&&prepDraftAutoEnabled?Object.fromEntries(prepFormDates().map(d=>[d,String(prepDraftNotes[d]||'').trim()]).filter(([,v])=>v)):{}, prepTasks:prepEnabled?prepDraftTasks.map(x=>({...x})):[], prepDone:prepEnabled?{...(old?.prepDone||{})}:{}, prepMissed:prepEnabled?{...(old?.prepMissed||{})}:{}, prepMoves:prepEnabled?{...prepDraftMoves}:{},
     availabilityBlock:!['payment','anniversary'].includes($('#kind').value) && !!$('#availabilityBlock').checked,
     availabilityTargetCalId:(!['payment','anniversary'].includes($('#kind').value) && $('#availabilityBlock').checked)?($('#availabilityTarget').value||defaultAvailabilityTargetForSelectedCalendar()):'',
     repeat, repeatRule:repeat==='none'?null:getRepeatRule(), memo:$('#memo').value,
@@ -4663,7 +4712,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.31',
+    appVersion:'2.32',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
