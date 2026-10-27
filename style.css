@@ -462,7 +462,7 @@ aside{min-height:0}
 
 /* v1.48: 시각 정돈 + Pretendard 타이포그래피 */
 :root{
-  --ui-font:"SUIT Variable", "SUIT", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+  --ui-font:"NanumSquareNeo", "NanumSquare Neo", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
   --border:#e7eaf0;
   --text:#24272d;
   --muted2:#7b8492;
@@ -2972,7 +2972,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
 
 /* v2.49 — NanumSquare Neo + fit all seven weekdays to viewport. */
-:root{--ui-font:"SUIT Variable", "SUIT", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;min-width:0!important;max-width:100%!important}
+:root{--ui-font:"NanumSquareNeo", "NanumSquare Neo", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;min-width:0!important;max-width:100%!important}
   #main.laneView .scheduleDateGrid,
   #main.laneView .scheduleSummaryGrid,
   #main.laneView .scheduleLane,
@@ -2996,13 +2996,13 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
 /* v2.51 — Consistent NanumSquare Neo typography in every view and panel.
    Preserve emoji-specific glyph fonts for diary icons. */
-:root{--ui-font:"SUIT Variable", "SUIT", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+:root{--ui-font:"NanumSquareNeo", "NanumSquare Neo", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
 }
 /* Keep the original emoji shapes for diary indicators. */
 .diaryBtn,.mobileDiaryBtn,.naverMemoShortcutIcon{font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif!important}
 
 /* v2.53: compact date numerals; no view/header overlay, local Hancom Gothic. */
-:root{--ui-font:"SUIT Variable", "SUIT", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;line-height:1.05!important;font-weight:700!important}
+:root{--ui-font:"NanumSquareNeo", "NanumSquare Neo", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;line-height:1.05!important;font-weight:700!important}
 #main.month .monthDateNumber{font-size:11px!important;line-height:1.1!important;font-weight:700!important}
 #main.multiCompactView .multiCompactDatePair>span{font-size:11px!important;line-height:1.1!important;font-weight:700!important}
 #main .dayCompactDate{font-size:12px!important;line-height:1.2!important}
@@ -3016,12 +3016,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 #sidebar #monthCommonToggleLabel{position:static!important;top:auto!important;left:auto!important;right:auto!important;transform:none!important;z-index:auto!important;display:inline-flex!important;max-width:100%!important;width:auto!important;white-space:nowrap!important;padding:3px 6px!important;box-sizing:border-box!important;line-height:1.35!important}
 #sidebar #monthCommonToggleLabel[hidden]{display:none!important}
 
-/* v2.54 — SUIT readability: heavier small text, unchanged sizes and layout. */
-body{font-weight:600}
-button,input,select,textarea{font-weight:600}
-.itemTitle,.month .itemTitle,#main .itemTitle{font-weight:650!important}
-#sidebar .calRow,#sidebar .ddayRow,#sidebar .purchaseRow,#sidebar .paymentRow,#sidebar .diaryArchiveRow{font-weight:600}
-#sidebar .calNameBtn,#sidebar .secHead,#sidebar .sidebarCalGroupTitle{font-weight:650}
-.month .monthDateDow,.multiCompactDatePair small,.dayCompactDow{font-weight:600}
-.month .item .meta,.item .meta{font-weight:550}
-@media(max-width:760px){#main .itemTitle{font-weight:650!important}}
+
+/* v2.55 — NanumSquare Neo: slightly bolder than v2.49, without changing sizes/layout. */
+:root{--ui-font:"NanumSquareNeo","NanumSquare Neo","Malgun Gothic","Apple SD Gothic Neo",sans-serif}
+body{font-weight:500}
+button,input,select,textarea{font-weight:500}
+.itemTitle,.month .itemTitle,#main .itemTitle{font-weight:600!important}
+#sidebar .calRow,#sidebar .ddayRow,#sidebar .purchaseRow,#sidebar .paymentRow,#sidebar .diaryArchiveRow{font-weight:500}
+#sidebar .calNameBtn,#sidebar .secHead,#sidebar .sidebarCalGroupTitle{font-weight:600}
+.month .monthDateDow,.multiCompactDatePair small,.dayCompactDow{font-weight:500}
+.month .item .meta,.item .meta{font-weight:500}
+@media(max-width:760px){#main .itemTitle{font-weight:600!important}}
