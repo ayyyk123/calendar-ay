@@ -462,7 +462,7 @@ aside{min-height:0}
 
 /* v1.48: 시각 정돈 + Pretendard 타이포그래피 */
 :root{
-  --ui-font:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic","Segoe UI",sans-serif;
+  --ui-font:"SUIT Variable", "SUIT", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
   --border:#e7eaf0;
   --text:#24272d;
   --muted2:#7b8492;
@@ -2972,10 +2972,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
 
 /* v2.49 — NanumSquare Neo + fit all seven weekdays to viewport. */
-:root{--ui-font:"NanumSquareNeo","NanumSquare Neo","Malgun Gothic","Apple SD Gothic Neo",sans-serif}
-body,button,input,select,textarea{font-family:var(--ui-font)!important}
-@media (min-width:761px){
-  #main.laneView .scheduleBoard{width:100%!important;min-width:0!important;max-width:100%!important}
+:root{--ui-font:"SUIT Variable", "SUIT", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;min-width:0!important;max-width:100%!important}
   #main.laneView .scheduleDateGrid,
   #main.laneView .scheduleSummaryGrid,
   #main.laneView .scheduleLane,
@@ -2999,16 +2996,22 @@ body,button,input,select,textarea{font-family:var(--ui-font)!important}
 
 /* v2.51 — Consistent NanumSquare Neo typography in every view and panel.
    Preserve emoji-specific glyph fonts for diary icons. */
-:root{--ui-font:"NanumSquareNeo","NanumSquare Neo","Malgun Gothic","Apple SD Gothic Neo",sans-serif}
-html,body,
-#sidebar,#main,#main.month,#main.laneView,#main.multiCompactView,
-header,nav,main,aside,dialog,
-button,input,select,textarea,
-#main .item,#main .monthDateGroup,#main .multiCompactDate,#main .dayCompactDate,
-#sidebar .secHead,#sidebar .calRow,#sidebar .ddayRow,
-.listView,.listView .item,.modal,.dialogPanel,
-.currentViewMenu,.searchResults,.searchResult{
-  font-family:var(--ui-font)!important;
+:root{--ui-font:"SUIT Variable", "SUIT", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
 }
 /* Keep the original emoji shapes for diary indicators. */
 .diaryBtn,.mobileDiaryBtn,.naverMemoShortcutIcon{font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif!important}
+
+/* v2.53: compact date numerals; no view/header overlay, local Hancom Gothic. */
+:root{--ui-font:"SUIT Variable", "SUIT", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;line-height:1.05!important;font-weight:700!important}
+#main.month .monthDateNumber{font-size:11px!important;line-height:1.1!important;font-weight:700!important}
+#main.multiCompactView .multiCompactDatePair>span{font-size:11px!important;line-height:1.1!important;font-weight:700!important}
+#main .dayCompactDate{font-size:12px!important;line-height:1.2!important}
+@media(max-width:760px){
+ #main.laneView .scheduleDateHead .dateNum{font-size:11px!important}
+ #main.month .monthDateNumber{font-size:10px!important}
+ #main.multiCompactView .multiCompactDatePair>span{font-size:10px!important}
+}
+/* The month shared-events toggle lives below the calendar section header, not over weekday cells. */
+#sidebar .monthCommonToggleHome{padding:3px 5px 4px;min-width:0}
+#sidebar #monthCommonToggleLabel{position:static!important;top:auto!important;left:auto!important;right:auto!important;transform:none!important;z-index:auto!important;display:inline-flex!important;max-width:100%!important;width:auto!important;white-space:nowrap!important;padding:3px 6px!important;box-sizing:border-box!important;line-height:1.35!important}
+#sidebar #monthCommonToggleLabel[hidden]{display:none!important}
