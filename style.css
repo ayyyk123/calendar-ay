@@ -2677,3 +2677,47 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 /* v2.35: 못함 준비업무는 완료와 같은 톤 + X 표시, 업무명만 취소선 */
 .prepMissedMark{flex:0 0 auto;color:#888;font-size:10px;font-weight:800;line-height:1;text-decoration:none!important}
 .prepMissedItem .prepMissedMark{text-decoration:none!important}
+
+
+/* v2.36: 월 화면 날짜 헤더 초압축 - 날짜/D-day/공휴일/다이어리 1줄 배치 */
+.month .cell .monthInlineDateHead{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)!important;
+  align-items:center!important;
+  justify-content:stretch!important;
+  width:100%;box-sizing:border-box;
+  height:16px!important;min-height:16px!important;
+  margin:0 0 1px!important;padding:0!important;
+  line-height:14px!important;
+}
+.month .monthHeadLeft,.month .monthHeadRight{display:flex;align-items:center;min-width:0;height:16px;overflow:hidden;gap:2px}
+.month .monthHeadLeft{justify-content:flex-start}
+.month .monthHeadRight{justify-content:flex-end}
+.month .monthDateNumber{display:block;justify-self:center;line-height:16px;white-space:nowrap}
+.month .monthHeadLeft .selectedDdayMarker{
+  display:block!important;flex:0 1 auto;width:auto;min-width:0;
+  height:auto!important;max-height:16px;
+  margin:0!important;padding:0!important;
+  text-align:left!important;line-height:14px!important;
+  font-size:8px!important;
+}
+.month .monthHeadRight .monthInlineHoliday{
+  display:block!important;flex:0 1 auto;min-width:0;width:auto;
+  height:auto!important;min-height:0!important;
+  margin:0!important;padding:0!important;
+  color:#d33;font-size:8px!important;line-height:14px!important;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.month .monthInlineDateHead .diaryBtn{
+  position:static!important;flex:0 0 12px!important;
+  width:12px!important;min-width:12px!important;height:15px!important;
+  padding:0!important;margin:0!important;display:grid;place-items:center;
+  line-height:15px!important;
+}
+.month .monthInlineDateHead .diaryBtn .diaryGlyph{width:10px;height:10px}
+@media(max-width:760px){
+ .month .cell .monthInlineDateHead{height:14px!important;min-height:14px!important;line-height:13px!important}
+ .month .monthHeadLeft,.month .monthHeadRight{height:14px;gap:1px}
+ .month .monthHeadLeft .selectedDdayMarker,.month .monthHeadRight .monthInlineHoliday{font-size:7px!important;line-height:12px!important}
+ .month .monthInlineDateHead .diaryBtn{flex-basis:10px!important;width:10px!important;min-width:10px!important;height:13px!important}
+}

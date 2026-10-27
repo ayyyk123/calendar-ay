@@ -3284,8 +3284,9 @@ function renderMonth(){
   const cells=[...Array(totalCells)].map((_,i)=>{
     const d=add(s,i),key=ds(d),es=map[key]||[],hasDiary=!!state.diary[key]?.text,h=holidayLabel(key),dow=d.getDay();
     const cellClass=[d.getMonth()!==m?'other':'',holidayClass(key),dow===0?'sunday':'',dow===6?'saturday':''].filter(Boolean).join(' ');
-    const holidayText=h?esc(h):'&nbsp;';
-    return `<div class="cell ${cellClass}" data-dropdate="${key}" ondblclick="window.__newEvent?.('${key}')"><div class="mhead"><span>${d.getDate()}</span><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}" aria-label="${hasDiary?'다이어리 작성됨':'다이어리 미작성'}">${diaryIconHtml(hasDiary)}</button></div><div class="holidayName ${h?'':'holidayEmpty'}" title="${h?esc(h):''}">${holidayText}</div>${selectedDdayMarkerHtml(key,'monthDdayOffset')}${monthCellEventsHtml(key,es)}</div>`;
+    const ddayMarker=selectedDdayMarkerHtml(key,'monthDdayOffset');
+    // v2.36: 월간 상단은 1줄. D-day는 날짜 왼쪽, 공휴일과 일기는 오른쪽.
+    return `<div class="cell ${cellClass}" data-dropdate="${key}" ondblclick="window.__newEvent?.('${key}')"><div class="mhead monthInlineDateHead"><div class="monthHeadLeft">${ddayMarker}</div><span class="monthDateNumber">${d.getDate()}</span><div class="monthHeadRight">${h?`<span class="holidayName monthInlineHoliday" title="${esc(h)}">${esc(h)}</span>`:''}<button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}" aria-label="${hasDiary?'다이어리 작성됨':'다이어리 미작성'}">${diaryIconHtml(hasDiary)}</button></div></div>${monthCellEventsHtml(key,es)}</div>`;
   }).join('');
   $('#main').innerHTML=heads+cells; bindItems(); bindWeekdayWidthResizers();
 }
