@@ -462,7 +462,7 @@ aside{min-height:0}
 
 /* v1.48: 시각 정돈 + Pretendard 타이포그래피 */
 :root{
-  --ui-font:"NanumSquareNeo", "NanumSquare Neo", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+  --ui-font:"Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
   --border:#e7eaf0;
   --text:#24272d;
   --muted2:#7b8492;
@@ -2971,8 +2971,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 #sidebar .sidebarSectionGrip{border-radius:0!important}
 
 
-/* v2.49 — NanumSquare Neo + fit all seven weekdays to viewport. */
-:root{--ui-font:"NanumSquareNeo", "NanumSquare Neo", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;min-width:0!important;max-width:100%!important}
+/* v2.49 — Noto Sans KR + fit all seven weekdays to viewport. */
+:root{--ui-font:"Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;min-width:0!important;max-width:100%!important}
   #main.laneView .scheduleDateGrid,
   #main.laneView .scheduleSummaryGrid,
   #main.laneView .scheduleLane,
@@ -2994,15 +2994,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .multiCompactCell.sunday .multiCompactDatePair small{color:#d84444}
 .dayCompactDow{font-size:10px;font-weight:500;color:#747b87;vertical-align:baseline}
 
-/* v2.51 — Consistent NanumSquare Neo typography in every view and panel.
+/* v2.51 — Consistent Noto Sans KR typography in every view and panel.
    Preserve emoji-specific glyph fonts for diary icons. */
-:root{--ui-font:"NanumSquareNeo", "NanumSquare Neo", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+:root{--ui-font:"Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
 }
 /* Keep the original emoji shapes for diary indicators. */
 .diaryBtn,.mobileDiaryBtn,.naverMemoShortcutIcon{font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif!important}
 
 /* v2.53: compact date numerals; no view/header overlay, local Hancom Gothic. */
-:root{--ui-font:"NanumSquareNeo", "NanumSquare Neo", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;line-height:1.05!important;font-weight:700!important}
+:root{--ui-font:"Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;line-height:1.05!important}
 #main.month .monthDateNumber{font-size:11px!important;line-height:1.1!important;font-weight:700!important}
 #main.multiCompactView .multiCompactDatePair>span{font-size:11px!important;line-height:1.1!important;font-weight:700!important}
 #main .dayCompactDate{font-size:12px!important;line-height:1.2!important}
@@ -3017,8 +3017,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 #sidebar #monthCommonToggleLabel[hidden]{display:none!important}
 
 
-/* v2.55 — NanumSquare Neo: slightly bolder than v2.49, without changing sizes/layout. */
-:root{--ui-font:"NanumSquareNeo","NanumSquare Neo","Malgun Gothic","Apple SD Gothic Neo",sans-serif}
+/* v2.55 — Noto Sans KR: balanced weight than v2.49, without changing sizes/layout. */
+:root{--ui-font:"Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",sans-serif}
 body{font-weight:500}
 button,input,select,textarea{font-weight:500}
 .itemTitle,.month .itemTitle,#main .itemTitle{font-weight:600!important}
@@ -3027,3 +3027,8 @@ button,input,select,textarea{font-weight:500}
 .month .monthDateDow,.multiCompactDatePair small,.dayCompactDow{font-weight:500}
 .month .item .meta,.item .meta{font-weight:500}
 @media(max-width:760px){#main .itemTitle{font-weight:600!important}}
+
+/* v2.56 — Noto Sans KR: 500 body, 600 event titles; preserve UI sizing and layout. */
+:root{--ui-font:"Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",sans-serif}
+body,button,input,select,textarea{font-family:var(--ui-font);font-weight:500}
+#main .itemTitle,.month .itemTitle{font-weight:600!important}
