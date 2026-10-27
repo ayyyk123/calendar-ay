@@ -2667,3 +2667,8 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 .prepMissedDlg .scopeActions .primary{background:#222;color:#fff;border-color:#222}
 .prepMissedEditFocus{outline:2px solid #7c9bca;outline-offset:3px;border-radius:8px;transition:outline-color .25s}
 @media(max-width:600px){.prepPlanStatus{gap:2px}.prepPlanMissed{padding:0 4px;font-size:8px}}
+
+
+/* v2.33: 네이버 바로가기 → 네이버 메모 */
+.naverMailShortcut{font-family:inherit!important;font-size:15px!important;font-weight:400!important;color:#03c75a!important}
+@media(max-width:760px){.naverMailShortcut{font-size:14px!important}}
