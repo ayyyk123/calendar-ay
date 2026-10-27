@@ -3081,24 +3081,14 @@ function normalizedWeekdayWidths(){
 }
 function weekdayGridTemplate(forceFit=false){
   const widths=normalizedWeekdayWidths();
-  if(state.settings?.weekdayWidthMode==='px' && !forceFit) return widths.map(v=>`${Math.round(v)}px`).join(' ');
-  // 창이 좁아졌을 때는 저장된 상대 너비 비율을 그대로 유지하면서 7요일을 한 화면 안에 맞춘다.
+  // v2.49: Keep individually customized weekday proportions but ALWAYS
+  // distribute them across the available seven-day width. Pixel widths
+  // smaller than the viewport previously left a blank strip after Sunday.
   return widths.map(v=>`minmax(0,${Math.max(1,v)}fr)`).join(' ');
 }
 function weekdayWidthShouldFit(main){
-  if(state.settings?.weekdayWidthMode!=='px') return true;
-  const ref=Math.max(0,Number(state.settings?.weekdayWidthReference)||0);
-  const now=Math.max(0,main?.clientWidth||0);
-  if(!now) return false;
-  // v2.30: v2.29 이전에 저장된 px 설정은 reference 값이 없다.
-  // 그런 기존 설정도 현재 보드가 화면보다 넓으면 즉시 한 화면 맞춤으로 처리한다.
-  if(!ref){
-    const label=Math.max(48,Math.min(180,Number(state.settings?.laneLabelWidth)||72));
-    const total=normalizedWeekdayWidths().reduce((a,b)=>a+b,0)+label;
-    return total > now-2;
-  }
-  // 새로 조절한 설정은 조절 당시 창보다 현재 창이 좁아졌을 때 자동 축소한다.
-  return now < ref-8;
+  // Weekday column weights still honor saved user adjustments.
+  return true;
 }
 function applyWeekdayWidths(){
   const main=$('#main'); if(!main) return;
@@ -3109,20 +3099,13 @@ function applyWeekdayWidths(){
     main.classList.remove('weekdayFitMode','weekdayFixedMode');
     return;
   }
-  const fit=weekdayWidthShouldFit(main);
-  main.classList.toggle('weekdayFitMode',fit);
-  main.classList.toggle('weekdayFixedMode',!fit && state.settings?.weekdayWidthMode==='px');
-  main.style.setProperty('--weekday-cols',weekdayGridTemplate(fit));
-  if(state.settings?.weekdayWidthMode==='px' && !fit){
-    const total=normalizedWeekdayWidths().reduce((a,b)=>a+b,0);
-    main.style.setProperty('--weekday-total',`${Math.round(total)}px`);
-    main.style.setProperty('--weekday-board-total',`calc(var(--lane-label-w,72px) + ${Math.round(total)}px)`);
-  }else{
-    // 기본 상태 또는 창 축소 상태: 월~일 전체가 현재 화면 너비에 맞춰 들어간다.
-    main.style.setProperty('--weekday-total','100%');
-    main.style.setProperty('--weekday-board-total','100%');
-  }
+  main.classList.add('weekdayFitMode');
+  main.classList.remove('weekdayFixedMode');
+  main.style.setProperty('--weekday-cols',weekdayGridTemplate(true));
+  main.style.setProperty('--weekday-total','100%');
+  main.style.setProperty('--weekday-board-total','100%');
 }
+
 function bindWeekdayWidthResizers(){
   if(window.matchMedia('(max-width:760px)').matches) return;
   const main=$('#main'); if(!main) return;
@@ -4802,7 +4785,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.48',
+    appVersion:'2.49',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state

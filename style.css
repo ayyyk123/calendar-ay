@@ -2969,3 +2969,19 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 #sidebar .secHead button{box-shadow:none!important}
 #sidebar .diaryMonthFilter{border:1px solid #d4dbe4!important}
 #sidebar .sidebarSectionGrip{border-radius:0!important}
+
+
+/* v2.49 — NanumSquare Neo + fit all seven weekdays to viewport. */
+:root{--ui-font:"NanumSquareNeo","NanumSquare Neo","Malgun Gothic","Apple SD Gothic Neo",sans-serif}
+body,button,input,select,textarea{font-family:var(--ui-font)!important}
+@media (min-width:761px){
+  #main.laneView .scheduleBoard{width:100%!important;min-width:0!important;max-width:100%!important}
+  #main.laneView .scheduleDateGrid,
+  #main.laneView .scheduleSummaryGrid,
+  #main.laneView .scheduleLane,
+  #main.laneView .scheduleLaneGrid{width:100%!important;min-width:0!important;max-width:100%!important}
+  #main.laneView .scheduleDateGrid,
+  #main.laneView .scheduleSummaryGrid{grid-template-columns:var(--lane-label-w,72px) var(--weekday-cols)!important}
+  #main.laneView .scheduleLaneGrid{grid-template-columns:var(--weekday-cols)!important}
+  #main.multiCompactView,#main.month{width:100%!important;min-width:0!important;max-width:100%!important;grid-template-columns:var(--weekday-cols,repeat(7,minmax(0,1fr)))!important}
+}
