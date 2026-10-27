@@ -2225,7 +2225,7 @@ function openPreparationPlan(id,focusDate=''){
     const note=String(entry.text||'').trim(), done=preparationEntryDone(e,entry.key), missed=preparationEntryMissed(e,entry.key);
     const rule=entry.ruleLabel&&entry.type!=='auto'?`<small class="prepPlanRule">${esc(entry.ruleLabel)}${entry.moved?' · 이동':''}</small>`:(entry.moved?`<small class="prepPlanRule">이동</small>`:'');
     const focused=activePrepPlanDate&&entry.date===activePrepPlanDate;
-    return `<div class="prepPlanRow ${done?'done':''} ${missed?'missed':''} ${focused?'focused':''}"><div class="prepPlanStatus"><button type="button" class="prepPlanCheck" data-prep-plan-check="${esc(entry.key)}" title="${done?'완료 해제':'완료 처리'}">${done?'☑':'☐'}</button><button type="button" class="prepPlanMissed ${missed?'on':''}" data-prep-plan-missed="${esc(entry.key)}" title="${missed?'못함 해제':'못함 처리'}">${missed?'못함✓':'못함'}</button></div><div class="prepPlanDate">${esc(preparationDateLabel(entry.date))}<small>${esc(entry.date)}</small>${rule}</div><div class="prepPlanText ${note?'':'muted'}">${esc(note||'계획 미입력')}</div></div>`;
+    return `<div class="prepPlanRow ${done?'done':''} ${missed?'missed':''} ${focused?'focused':''}"><div class="prepPlanStatus"><button type="button" class="prepPlanCheck" data-prep-plan-check="${esc(entry.key)}" title="${done?'완료 해제':'완료 처리'}">${done?'☑':'☐'}</button><button type="button" class="prepPlanMissed ${missed?'on':''}" data-prep-plan-missed="${esc(entry.key)}" title="${missed?'못함 해제':'못함 처리'}">${missed?'☑':'☐'}</button></div><div class="prepPlanDate">${esc(preparationDateLabel(entry.date))}<small>${esc(entry.date)}</small>${rule}</div><div class="prepPlanText ${note?'':'muted'}">${esc(note||'계획 미입력')}</div></div>`;
   });
   if(!rows.length) rows.push(`<div class="prepPlanRow"><span class="prepPlanCheckSpacer"></span><div class="prepPlanDate">준비일정</div><div class="prepPlanText muted">등록된 준비 일정이 없습니다.</div></div>`);
   const deadline=e.prepDeadline||e.date, deadlineFocused=activePrepPlanDate&&deadline===activePrepPlanDate;
@@ -3186,7 +3186,7 @@ function renderWeek(){
   $('#main').innerHTML=scheduleWeekBoard(days,map);
   bindItems(); bindScheduleLanes(); bindWeekdayWidthResizers();
 }
-// v2.41: 월 칸의 실제 남는 높이에 따라 표시 개수 자동 결정.
+// v2.44: 월 칸의 실제 남는 높이에 따라 표시 개수 자동 결정.
 function monthCellEventsHtml(date, es){
   const priority=e=>e.kind==='anniversary'?0:e.kind==='appointment'?1:e.kind==='todo'?2:e.kind==='payment'?3:4;
   const ordered=[...(es||[])].filter(e=>!isPreparationDeadlineDuplicate(e)).sort((a,b)=>priority(a)-priority(b));
@@ -4778,7 +4778,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.41',
+    appVersion:'2.44',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state

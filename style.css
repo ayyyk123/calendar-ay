@@ -2768,5 +2768,65 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 .monthCommonToggle input{margin:0;width:13px;height:13px;accent-color:#5773c5;cursor:pointer}
 @media(max-width:760px){.monthCommonToggle{font-size:10px;padding:2px 4px;gap:3px}.monthCommonToggle input{width:12px;height:12px}}
 
-/* v2.41: 기본 숨김 속성이 display:block보다 우선하도록 보장 */
+/* v2.42: 기본 숨김 속성이 display:block보다 우선하도록 보장 */
 .month .moreEventsBtn[hidden]{display:none!important}
+
+/* v2.42: 못함 텍스트 버튼을 빨간 체크박스로 교체 */
+.prepPlanMissed{
+  box-sizing:border-box!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;
+  flex:0 0 24px!important;width:24px!important;min-width:24px!important;height:24px!important;
+  padding:0!important;border:1px solid #cf7b75!important;border-radius:6px!important;
+  background:#fff!important;color:#b64a42!important;font-size:15px!important;font-weight:700!important;
+  line-height:1!important;cursor:pointer!important;
+}
+.prepPlanMissed:hover{background:#fff3f1!important;border-color:#b64a42!important}
+.prepPlanMissed.on{background:#fce9e7!important;border-color:#c6534c!important;color:#a62621!important}
+@media(max-width:600px){.prepPlanMissed{flex-basis:24px!important;width:24px!important;padding:0!important;font-size:15px!important}}
+
+
+/* v2.43: compressed date header and common-events lane clear divider */
+#main.laneView .scheduleDateGrid{
+  position:sticky!important;
+  border-bottom:1px solid #aeb9c7!important;
+  box-shadow:0 1px 0 #d5dce5!important;
+}
+#main.laneView .scheduleDateGrid>.scheduleDateCorner,
+#main.laneView .scheduleDateGrid>.scheduleDateHead{
+  border-bottom:1px solid #aeb9c7!important;
+}
+#main.laneView .scheduleLane:first-of-type{border-top:0!important}
+
+
+/* v2.44: PC top bar follows requested order: brand | range | navigation | view modes | save/actions.
+   Mobile retains its existing stacked responsive layout. */
+@media (min-width:761px){
+  header{display:flex!important;flex-wrap:nowrap!important;align-items:center!important;gap:8px!important;padding-left:16px!important;padding-right:14px!important}
+  header .brand{flex:1 1 auto!important;min-width:90px!important;white-space:nowrap;order:0!important}
+  header nav{order:1!important;display:flex!important;align-items:center!important;flex:0 1 auto!important;width:auto!important;min-width:0!important;gap:7px!important;margin:0!important;overflow:visible!important}
+  header nav #range{order:0!important;display:block!important;max-width:none!important;min-width:0!important;font-size:14px!important;margin:0 12px 0 0!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+  header nav .dateNavButtons{order:1!important;display:flex!important;align-items:center!important;gap:6px!important;flex:none!important}
+  header nav .dateNavButtons button{height:34px!important}
+  header nav #jumpDateBtn{order:2!important;flex:none!important}
+  header nav #jumpDate{order:3!important}
+  header nav #currentViewWrap{order:4!important;flex:none!important}
+  header nav #monthCommonToggleLabel{order:5!important;flex:none!important}
+  header .views{order:2!important;display:flex!important;align-items:center!important;gap:5px!important;margin:0 0 0 auto!important;flex:0 0 auto!important;min-width:0!important;white-space:nowrap!important}
+  header .views > #saveBadge{flex:0 0 144px!important;width:144px!important;min-width:144px!important;max-width:144px!important;margin:0 4px 0 0!important}
+  header .views > #manualSaveBtn{margin:0 4px 0 0!important}
+  :root{--header-h:58px}
+  header{height:var(--header-h)!important;min-height:var(--header-h)!important;grid-template-areas:none!important;grid-template-columns:none!important;grid-template-rows:none!important;overflow:visible!important}
+  .layout{height:calc(100dvh - var(--header-h))!important}
+}
+@media (min-width:761px) and (max-width:1250px){
+  header{gap:5px!important;padding-left:9px!important;padding-right:8px!important}
+  header .brand{font-size:15px!important;min-width:65px!important}
+  header nav{gap:4px!important}
+  header nav #range{font-size:12px!important;margin-right:3px!important;max-width:178px!important}
+  header nav .dateNavButtons{gap:3px!important}
+  header nav .dateNavButtons button{padding:4px 7px!important;min-width:28px!important}
+  header nav .primaryViewButtons{gap:2px!important}
+  header nav .primaryViewBtn{min-width:35px!important;padding:0 7px!important;font-size:11px!important}
+  header .views{gap:2px!important}
+  header .views > #saveBadge{flex-basis:100px!important;width:100px!important;min-width:100px!important;max-width:100px!important}
+  header .views > a,header .views > button{min-width:30px!important;width:30px!important;height:32px!important;padding:0!important}
+}
