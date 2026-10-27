@@ -1124,15 +1124,17 @@ function buildOccurrenceMap(rangeStart, rangeEnd, options={}){
   const includePreparations=options.includePreparations!==false;
   const calendarIds=options.calendarIds instanceof Set ? options.calendarIds : null;
   const includeCommon=options.includeCommon!==false;
+  const includePurchases=options.includePurchases!==false;
   // 구매목록의 구매기한은 실제 일정 복제본을 만들지 않고 Quick에 가상 일정으로 표시한다.
   // 구매기한 수정 시 자동으로 날짜가 따라가고, 구매완료로 목록에서 제거되면 자동으로 사라진다.
-  for(const p of (state.purchases||[])){
+  for(const p of (includePurchases ? (state.purchases||[]) : [])){
     const due=String(p.dueDate||'');
     if(due && due>=rangeStart && due<=rangeEnd && map[due]) map[due].push(purchaseDueVirtualEvent(p));
   }
   for(const e of state.events){
     // 캘린더 필터 중에도 공통 일정(D-Day/기념일, 예약·약속)은 항상 남긴다.
     const alwaysCommon=e.kind==='anniversary'||e.kind==='appointment'||e.sourceType==='purchase';
+    if(!includePurchases && e.sourceType==='purchase') continue;
     if(!includeCommon && (e.kind==='anniversary'||e.kind==='appointment')) continue;
     if(calendarIds && !calendarIds.has(e.calId) && !alwaysCommon) continue;
     if(!includeHidden && isCalendarHidden(e.calId) && !alwaysCommon) continue;
@@ -3289,7 +3291,8 @@ function renderMonth(){
   const mondayOffset=(first.getDay()+6)%7;
   const weekCount=Math.ceil((mondayOffset+monthDays)/7);
   const totalCells=weekCount*7;
-  const end=add(s,totalCells-1),map=buildOccurrenceMap(ds(s),ds(end),{calendarIds:focusedCalendarIds(),includeCommon:!calendarFocusIds.size||state.settings.monthShowCommonWithFocus!==false});
+  const showPurchasesInMonth=!calendarFocusIds.size||focusedCalendarList().some(c=>c.name.trim()==='구매목록');
+  const end=add(s,totalCells-1),map=buildOccurrenceMap(ds(s),ds(end),{calendarIds:focusedCalendarIds(),includeCommon:!calendarFocusIds.size||state.settings.monthShowCommonWithFocus!==false,includePurchases:showPurchasesInMonth});
   setRangeLabel(`${y}년 ${m+1}월${focusSuffix()}`,`${y}.${m+1}${compactFocusSuffix()}`);
   $('#main').className='month';
   $('#main').style.setProperty('--month-weeks',String(weekCount));
@@ -4727,7 +4730,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.39',
+    appVersion:'2.40',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
