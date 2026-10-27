@@ -3015,3 +3015,13 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 #sidebar .monthCommonToggleHome{padding:3px 5px 4px;min-width:0}
 #sidebar #monthCommonToggleLabel{position:static!important;top:auto!important;left:auto!important;right:auto!important;transform:none!important;z-index:auto!important;display:inline-flex!important;max-width:100%!important;width:auto!important;white-space:nowrap!important;padding:3px 6px!important;box-sizing:border-box!important;line-height:1.35!important}
 #sidebar #monthCommonToggleLabel[hidden]{display:none!important}
+
+/* v2.54 — SUIT readability: heavier small text, unchanged sizes and layout. */
+body{font-weight:600}
+button,input,select,textarea{font-weight:600}
+.itemTitle,.month .itemTitle,#main .itemTitle{font-weight:650!important}
+#sidebar .calRow,#sidebar .ddayRow,#sidebar .purchaseRow,#sidebar .paymentRow,#sidebar .diaryArchiveRow{font-weight:600}
+#sidebar .calNameBtn,#sidebar .secHead,#sidebar .sidebarCalGroupTitle{font-weight:650}
+.month .monthDateDow,.multiCompactDatePair small,.dayCompactDow{font-weight:600}
+.month .item .meta,.item .meta{font-weight:550}
+@media(max-width:760px){#main .itemTitle{font-weight:650!important}}
