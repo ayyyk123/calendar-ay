@@ -207,7 +207,7 @@ dialog{border:0;border-radius:12px;box-shadow:0 10px 40px #0003;width:min(560px,
 @media(max-width:760px){.month{--month-cell-min:112px}.moreEventsBtn{font-size:8px;padding:1px 2px}}
 @media(max-width:470px){.month{--month-cell-min:96px}.moreEventsBtn{font-size:7px}}
 .month .moreEventsBtn{position:absolute;left:3px;right:3px;bottom:3px;width:auto;z-index:3;background:#eef2f7}
-.month .cell:has(.moreEventsBtn){padding-bottom:22px}
+.month .cell:has(.moreEventsBtn:not([hidden])){padding-bottom:22px}
 
 /* v1.35: 중요도 별표 + 긴 일정명 한 줄 말줄임 */
 .importanceBtn{flex:0 0 auto;border:0;background:transparent!important;padding:0 2px;color:#a5a5a5;font-size:14px;line-height:1;cursor:pointer}.importanceBtn.on{color:#e6a400}.importanceBtn:hover{color:#d29200}.itemRow{min-width:0}.itemTitle{white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;word-break:normal!important;display:block}.importantField{margin-top:-3px;color:#6b5a20}.importantField input{accent-color:#e6a400}.month .importanceBtn{font-size:10px;padding:0 1px}
@@ -2767,3 +2767,6 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 .monthCommonToggle[hidden]{display:none!important}
 .monthCommonToggle input{margin:0;width:13px;height:13px;accent-color:#5773c5;cursor:pointer}
 @media(max-width:760px){.monthCommonToggle{font-size:10px;padding:2px 4px;gap:3px}.monthCommonToggle input{width:12px;height:12px}}
+
+/* v2.41: 기본 숨김 속성이 display:block보다 우선하도록 보장 */
+.month .moreEventsBtn[hidden]{display:none!important}

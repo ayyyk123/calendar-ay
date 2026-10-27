@@ -3186,15 +3186,63 @@ function renderWeek(){
   $('#main').innerHTML=scheduleWeekBoard(days,map);
   bindItems(); bindScheduleLanes(); bindWeekdayWidthResizers();
 }
+// v2.41: 월 칸의 실제 남는 높이에 따라 표시 개수 자동 결정.
 function monthCellEventsHtml(date, es){
-  const limit=4;
   const priority=e=>e.kind==='anniversary'?0:e.kind==='appointment'?1:e.kind==='todo'?2:e.kind==='payment'?3:4;
   const ordered=[...(es||[])].filter(e=>!isPreparationDeadlineDuplicate(e)).sort((a,b)=>priority(a)-priority(b));
-  const visible=ordered.slice(0,limit);
-  const hidden=Math.max(0,ordered.length-visible.length);
-  const common=visible.filter(e=>!isPreparationManagedItem(e)&&(e.kind==='anniversary' || e.kind==='appointment')), prep=visible.filter(e=>isPreparationLaneItem(e)), quick=visible.filter(e=>!isPreparationManagedItem(e)&&e.kind==='todo'), payments=visible.filter(e=>!isPreparationManagedItem(e)&&e.kind==='payment'), normal=visible.filter(e=>!isPreparationManagedItem(e)&&e.kind!=='payment' && e.kind!=='appointment' && e.kind!=='anniversary' && e.kind!=='todo');
-  return `${commonTopLaneHtml(common,true)}${prepLaneHtml(prep,true)}${quickLaneHtml(quick,true)}${paymentLaneHtml(payments,true)}${normal.map(e=>eventItemHtml(e,true)).join('')}${hidden?`<button type="button" class="moreEventsBtn" data-more-date="${esc(date)}">+ ${hidden}건</button>`:''}`;
+  const common=ordered.filter(e=>!isPreparationManagedItem(e)&&(e.kind==='anniversary' || e.kind==='appointment'));
+  const prep=ordered.filter(e=>isPreparationLaneItem(e));
+  const quick=ordered.filter(e=>!isPreparationManagedItem(e)&&e.kind==='todo');
+  const payments=ordered.filter(e=>!isPreparationManagedItem(e)&&e.kind==='payment');
+  const normal=ordered.filter(e=>!isPreparationManagedItem(e)&&e.kind!=='payment' && e.kind!=='appointment' && e.kind!=='anniversary' && e.kind!=='todo');
+  return `${commonTopLaneHtml(common,true)}${prepLaneHtml(prep,true)}${quickLaneHtml(quick,true)}${paymentLaneHtml(payments,true)}${normal.map(e=>eventItemHtml(e,true)).join('')}<button type="button" class="moreEventsBtn" data-more-date="${esc(date)}" hidden></button>`;
 }
+// 모든 카드를 배치한 뒤 실제 셀의 높이로 판단한다. 넘치는 경우에만 +N 표시.
+function fitMonthCellEvents(){
+  const root=$('#main');
+  if(!root?.classList.contains('month')) return;
+  for(const cell of root.querySelectorAll('.cell')){
+    const more=cell.querySelector('.moreEventsBtn');
+    if(!more) continue;
+    const items=[...cell.querySelectorAll('.item')];
+    const lanes=[...cell.querySelectorAll('.commonTopLane,.prepLane,.quickLane,.paymentLane,.quickCalGroup')];
+    for(const item of items) item.style.removeProperty('display');
+    for(const lane of lanes) lane.style.removeProperty('display');
+    more.hidden=true;
+    more.textContent='';
+    if(!items.length) continue;
+    const pad=parseFloat(getComputedStyle(cell).paddingBottom)||0;
+    const bottom=cell.getBoundingClientRect().bottom;
+    const last=items[items.length-1];
+    if(last.getBoundingClientRect().bottom<=bottom-pad+0.5) continue;
+    // 버튼 높이를 확보한 상태에서 마지막 일정부터 하나씩 접는다.
+    more.hidden=false;
+    const limit=bottom-Math.max(pad,more.getBoundingClientRect().height+7);
+    let hidden=0;
+    for(let i=items.length-1;i>=0;i--){
+      if(lastVisibleMonthItemBottom(items)<=limit+0.5) break;
+      items[i].style.display='none';
+      hidden++;
+      for(const lane of lanes.slice().reverse()){
+        if(!lane.querySelector('.item:not([style*="display: none"])')) lane.style.display='none';
+      }
+    }
+    more.textContent=`+ ${hidden}건`;
+    more.hidden=hidden===0;
+  }
+}
+function lastVisibleMonthItemBottom(items){
+  for(let i=items.length-1;i>=0;i--){
+    if(items[i].getClientRects().length) return items[i].getBoundingClientRect().bottom;
+  }
+  return -Infinity;
+}
+let monthFitFrame=0;
+function scheduleMonthCellFit(){
+  cancelAnimationFrame(monthFitFrame);
+  monthFitFrame=requestAnimationFrame(()=>{fitMonthCellEvents();});
+}
+window.addEventListener('resize',scheduleMonthCellFit);
 function openDayList(date){
   const map=buildOccurrenceMap(date,date,{calendarIds:focusedCalendarIds(),includeCommon:view!=='month'||!calendarFocusIds.size||state.settings.monthShowCommonWithFocus!==false});
   const h=holidayLabel(date);
@@ -3304,7 +3352,7 @@ function renderMonth(){
     // v2.36: 월간 상단은 1줄. D-day는 날짜 왼쪽, 공휴일과 일기는 오른쪽.
     return `<div class="cell ${cellClass}" data-dropdate="${key}" ondblclick="window.__newEvent?.('${key}')"><div class="mhead monthInlineDateHead"><div class="monthHeadLeft">${ddayMarker}</div><span class="monthDateNumber">${d.getDate()}</span><div class="monthHeadRight">${h?`<span class="holidayName monthInlineHoliday" title="${esc(h)}">${esc(h)}</span>`:''}<button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}" aria-label="${hasDiary?'다이어리 작성됨':'다이어리 미작성'}">${diaryIconHtml(hasDiary)}</button></div></div>${monthCellEventsHtml(key,es)}</div>`;
   }).join('');
-  $('#main').innerHTML=heads+cells; bindItems(); bindWeekdayWidthResizers();
+  $('#main').innerHTML=heads+cells; bindItems(); bindWeekdayWidthResizers(); scheduleMonthCellFit();
 }
 
 const DAY_LANE_HEIGHT_DEFAULTS={common:112,prep:132,quick:112,payment:112,calendar:176};
@@ -4730,7 +4778,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.40',
+    appVersion:'2.41',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
