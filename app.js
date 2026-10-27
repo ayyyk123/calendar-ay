@@ -2786,7 +2786,7 @@ function scheduleLaneHtml(key,title,days,map,cellBuilder,{type='calendar',color=
 }
 function scheduleDateHeader(days){
   // 날짜 헤더 전체도 드롭 영역으로 사용합니다. 요일 헤더 경계는 PC에서 열 너비 조절 손잡이로 사용합니다.
-  return `<div class="scheduleDateGrid"><div class="scheduleDateCorner"></div>${days.map((d,i)=>{const key=ds(d),hasDiary=!!state.diary[key]?.text,h=holidayLabel(key),dow=d.getDay(),dmark=selectedDdayMarkerHtml(key),dayClass=[key===ds(new Date())?'today':'',holidayClass(key),dow===0?'sunday':'',dow===6?'saturday':'',dmark?'ddayTracked':''].filter(Boolean).join(' ');return `<div class="scheduleDateHead ${dayClass}" data-weekday-index="${i}" data-dropdate="${key}" data-date-drop-head="1" title="${key} · 일정을 여기에 놓아 이동"><div class="dayTopLine"><span class="weekdayLabel">${['일','월','화','수','목','금','토'][dow]}</span><span class="dateNum">${d.getDate()}</span><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}" aria-label="${hasDiary?'다이어리 작성됨':'다이어리 미작성'}">${diaryIconHtml(hasDiary)}</button></div><div class="holidayName ${h?'':'holidayEmpty'}" title="${h?esc(h):''}">${h?esc(h):'&nbsp;'}</div>${dmark}<span class="weekdayWidthHandle" data-weekday-resize="${i}" title="좌우로 드래그해 이 요일만 너비 조절 · 더블클릭하면 전체 기본 너비로 초기화"></span></div>`}).join('')}</div>`;
+  return `<div class="scheduleDateGrid"><div class="scheduleDateCorner"></div>${days.map((d,i)=>{const key=ds(d),hasDiary=!!state.diary[key]?.text,h=holidayLabel(key),dow=d.getDay(),dmark=selectedDdayMarkerHtml(key),dayClass=[key===ds(new Date())?'today':'',holidayClass(key),dow===0?'sunday':'',dow===6?'saturday':'',dmark?'ddayTracked':''].filter(Boolean).join(' ');return `<div class="scheduleDateHead ${dayClass}" data-weekday-index="${i}" data-dropdate="${key}" data-date-drop-head="1" title="${key} · 일정을 여기에 놓아 이동"><div class="dayTopLine compactDateTop"><span class="dateHeadLeft">${dmark}</span><span class="dateHeadCenter"><span class="weekdayLabel">${['일','월','화','수','목','금','토'][dow]}</span><span class="dateNum">${d.getDate()}</span></span><span class="dateHeadRight">${h?`<span class="holidayName" title="${esc(h)}">${esc(h)}</span>`:''}<button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${key}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}" aria-label="${hasDiary?'다이어리 작성됨':'다이어리 미작성'}">${diaryIconHtml(hasDiary)}</button></span></div><span class="weekdayWidthHandle" data-weekday-resize="${i}" title="좌우로 드래그해 이 요일만 너비 조절 · 더블클릭하면 전체 기본 너비로 초기화"></span></div>`}).join('')}</div>`;
 }
 function scheduleWeekBoard(days,map){
   const visible=displayCals(),visibleIds=new Set(visible.map(c=>c.id));
@@ -3437,7 +3437,7 @@ function bindDayViewResizers(){
 function renderDay(){
   const d=ds(cursor),map=buildOccurrenceMap(d,d,{calendarIds:focusedCalendarIds()}),hasDiary=!!state.diary[d]?.text;
   const h=holidayLabel(d); setRangeLabel(`${d}${focusSuffix()}`,`${d.slice(5).replace('-', '/')}${compactFocusSuffix()}`); $('#main').className='daySingle';
-  $('#main').innerHTML=`${h?`<div class="dayHolidayBanner">${esc(h)}</div>`:''}${selectedDdayMarkerHtml(d,'dayViewDdayOffset')}<div class="diaryStrip"><button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${d}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}">${diaryIconHtml(hasDiary)} ${hasDiary?'다이어리 보기':'다이어리 작성'}</button></div><div class="dayResizableBoard" data-dropdate="${d}" ondblclick="window.__newEvent?.('${d}')">${dayViewGroupHtml(d,map[d]||[])}</div>`; bindItems(); bindDayViewResizers();
+  $('#main').innerHTML=`<div class="dayCompactTop"><span class="dayCompactDate">${d.slice(5).replace('-', '/')}</span><span class="dayCompactDday">${selectedDdayMarkerHtml(d,'dayViewDdayOffset')}</span><span class="dayCompactRight">${h?`<span class="dayCompactHoliday" title="${esc(h)}">${esc(h)}</span>`:''}<button type="button" class="diaryBtn ${hasDiary?'hasDiary':''}" data-diarydate="${d}" title="${hasDiary?'다이어리 보기 · 작성됨':'다이어리 작성 · 미작성'}">${diaryIconHtml(hasDiary)}</button></span></div><div class="dayResizableBoard" data-dropdate="${d}" ondblclick="window.__newEvent?.('${d}')">${dayViewGroupHtml(d,map[d]||[])}</div>`; bindItems(); bindDayViewResizers();
 }
 function renderList(){
   const start=ds(add(new Date(),-30)),end=ds(add(new Date(),365));
@@ -4713,7 +4713,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.35',
+    appVersion:'2.37',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state

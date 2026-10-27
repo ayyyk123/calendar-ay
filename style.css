@@ -2721,3 +2721,19 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
  .month .monthHeadLeft .selectedDdayMarker,.month .monthHeadRight .monthInlineHoliday{font-size:7px!important;line-height:12px!important}
  .month .monthInlineDateHead .diaryBtn{flex-basis:10px!important;width:10px!important;min-width:10px!important;height:13px!important}
 }
+
+
+/* v2.37: 주/2~4주 날짜 행과 일 화면 상단을 한 줄로 압축 */
+.scheduleDateHead,.scheduleDateHead.ddayTracked{height:22px!important;min-height:22px!important;padding:1px 2px!important;justify-content:center!important}
+.scheduleDateHead .dayTopLine.compactDateTop{display:grid!important;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)!important;width:100%;height:19px!important;min-height:19px!important;padding:0!important;gap:1px!important;align-items:center;overflow:hidden}
+.scheduleDateHead .dateHeadLeft,.scheduleDateHead .dateHeadRight{display:flex;min-width:0;overflow:hidden;align-items:center;gap:2px;height:19px}
+.scheduleDateHead .dateHeadLeft{justify-content:flex-start}.scheduleDateHead .dateHeadRight{justify-content:flex-end}
+.scheduleDateHead .dateHeadCenter{display:flex;align-items:center;justify-content:center;gap:2px;min-width:0;white-space:nowrap}
+.scheduleDateHead .dateHeadLeft .selectedDdayMarker{display:block!important;height:auto!important;min-height:0!important;line-height:14px!important;margin:0!important;padding:0!important;text-align:left!important;font-size:8px!important;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.scheduleDateHead .dateHeadRight .holidayName{height:auto!important;min-height:0!important;line-height:14px!important;margin:0!important;padding:0!important;flex:0 1 auto;font-size:8px!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.scheduleDateHead .dateHeadRight .diaryBtn{position:static!important;display:grid!important;place-items:center;flex:0 0 13px;width:13px!important;height:16px!important;min-width:13px!important;padding:0!important;margin:0!important}
+.scheduleDateHead .dateHeadRight .diaryBtn .diaryGlyph{width:11px;height:11px}
+.daySingle .dayCompactTop{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:7px;min-height:24px;margin:0 0 5px;padding:1px 4px;border-bottom:1px solid #edf0f3}
+.dayCompactDate{font-size:12px;font-weight:700;white-space:nowrap}.dayCompactDday{min-width:0;overflow:hidden}.dayCompactDday .dayViewDdayOffset{display:block;min-width:0;margin:0!important;padding:0!important;border-radius:0;background:transparent;line-height:16px;font-size:10px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;text-align:center}
+.dayCompactRight{display:flex;align-items:center;justify-content:flex-end;gap:6px;min-width:0}.dayCompactHoliday{color:#d33;font-size:10px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dayCompactRight .diaryBtn{padding:1px 3px!important;min-width:22px;height:20px;line-height:18px}
+@media(max-width:760px){.scheduleDateHead,.scheduleDateHead.ddayTracked{height:20px!important;min-height:20px!important;padding:0 1px!important}.scheduleDateHead .dayTopLine.compactDateTop{height:18px!important;min-height:18px!important}.scheduleDateHead .dateHeadLeft .selectedDdayMarker,.scheduleDateHead .dateHeadRight .holidayName{font-size:7px!important;line-height:12px!important}.scheduleDateHead .dateHeadRight .diaryBtn{flex-basis:10px!important;min-width:10px!important;width:10px!important}.scheduleDateHead .dateHeadRight .diaryBtn .diaryGlyph{width:9px;height:9px}.daySingle .dayCompactTop{margin-bottom:3px;min-height:21px}.dayCompactHoliday{font-size:9px}}
