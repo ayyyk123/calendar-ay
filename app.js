@@ -1624,7 +1624,7 @@ function groupedCalendarHtml(section,items,rowBuilder,emptyText){
   return groups.join('');
 }
 
-// v2.60: 특정 반복업무 한 건만 보여주는 월별 배치 미리보기.
+// v2.61: 특정 반복업무 한 건만 보여주는 월별 배치 미리보기.
 let recurringPreviewId=null;
 let recurringPreviewCursor=null;
 function openRecurringPreview(id){
@@ -1675,7 +1675,7 @@ $('#recurringPreviewPrev').onclick=()=>{recurringPreviewCursor=new Date(recurrin
 $('#recurringPreviewNext').onclick=()=>{recurringPreviewCursor=new Date(recurringPreviewCursor.getFullYear(),recurringPreviewCursor.getMonth()+1,1);renderRecurringPreview();};
 $('#recurringPreviewClose').onclick=()=>closeDialog($('#recurringPreviewDlg'));
 
-// v2.60 — 종료된 반복일정은 삭제하지 않고 별도 목록으로 분류한다.
+// v2.61 — 종료된 반복일정은 삭제하지 않고 별도 목록으로 분류한다.
 function isArchivedRecurring260(e){
   if((e.repeat||'none')==='none') return false;
   const rule=normalizedRule(e), today=ds(new Date());
@@ -3429,7 +3429,9 @@ function renderMultiWeek(weeks=2){
 function updateMonthCommonToggle(){
   const label=$('#monthCommonToggleLabel'), box=$('#monthCommonToggle');
   if(!label||!box) return;
-  label.hidden=!(view==='month'&&calendarFocusIds.size>0);
+  label.hidden=(view!=='month');
+  box.disabled=(calendarFocusIds.size===0);
+  label.title=calendarFocusIds.size===0?'특정 캘린더를 선택하면 공통일정 표시를 선택할 수 있습니다.':'선택한 캘린더와 공통일정을 함께 표시합니다.';
   box.checked=state.settings.monthShowCommonWithFocus!==false;
 }
 $('#monthCommonToggle')?.addEventListener('change',e=>{
@@ -4884,7 +4886,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.60',
+    appVersion:'2.61',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state

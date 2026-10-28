@@ -3066,6 +3066,10 @@ body,button,input,select,textarea{font-family:var(--ui-font);font-weight:500}
 .recurringPreviewNote{font-size:11px;color:#6b7280;margin:8px 0 0}
 @media(max-width:600px){.recurringPreviewDay{min-height:49px}.previewDayMarker{font-size:9px}.recurringPreviewPanel{padding:8px}}
 
-/* v2.60 archived recurring */
+/* v2.61 archived recurring */
 .archivedRecurringGroup .fixedGroupHead{background:#f3f5f7;color:#596575}
 .archivedRecurringGroup .recurringFixed{opacity:.82}
+
+/* v2.61: 월 보기 공통일정 옵션을 항상 표시하되 전체보기에서는 비활성화 */
+#sidebar #monthCommonToggleLabel:has(input:disabled){opacity:.65;cursor:default}
+#sidebar #monthCommonToggleLabel input:disabled{cursor:default}
