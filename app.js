@@ -1536,15 +1536,28 @@ function manualPlacementSortKey(x){
   const dates=state.events.filter(e=>e.fixedId===x.id && (e.date||'').startsWith(month)).map(e=>e.date).filter(Boolean).sort();
   return dates[0] || '9999-12-31';
 }
+// v2.57: 일정 한 회차를 다른 날짜로 옮기면 기존 회차가 excludedDates에
+// 기록되고 새 단일 일정이 detachedFromRepeatId로 연결된다. 월별 집계는
+// 실제 이동 후 날짜의 완료 기록도 포함해야 한다. 과거 저장 데이터도 재집계한다.
 function recurringMonthProgress(e){
   const {startKey,endKey}=currentMonthRange();
   const starts=generateOccurrenceStarts(e,startKey,endKey).filter(d=>{
-    const k=ds(d); return k>=startKey && k<=endKey && !(e.excludedDates||[]).includes(k);
+    const k=ds(d);
+    return k>=startKey && k<=endKey && !(e.excludedDates||[]).includes(k);
   });
-  const total=starts.length;
-  if(!total) return {total:0,done:0,label:'이번 달 해당 없음',complete:false};
   const doneSet=new Set(e.doneDates||[]);
-  const done=starts.reduce((n,d)=>n+(doneSet.has(ds(d))?1:0),0);
+  let total=starts.length;
+  let done=starts.reduce((n,d)=>n+(doneSet.has(ds(d))?1:0),0);
+  // 이동된 회차는 반복 원본에 더 이상 속하지 않지만 원본 업무의 실적이다.
+  // 이동된 날짜를 기준으로 집계하며, 완료/미완료 모두 반영한다.
+  const moved=state.events.filter(x=>
+    x.id!==e.id && String(x.detachedFromRepeatId||'')===String(e.id) &&
+    (x.repeat||'none')==='none' &&
+    typeof x.date==='string' && x.date>=startKey && x.date<=endKey
+  );
+  total+=moved.length;
+  done+=moved.filter(x=>isDone(x)).length;
+  if(!total) return {total:0,done:0,label:'이번 달 해당 없음',complete:false};
   if(done===total) return {total,done,label:`✓ 이번 달 완료 ${done}/${total}`,complete:true};
   return {total,done,label:`이번 달 ${done}/${total} 완료`,complete:false};
 }
@@ -4785,7 +4798,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.56',
+    appVersion:'2.57',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
