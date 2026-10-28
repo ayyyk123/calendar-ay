@@ -2324,7 +2324,7 @@ function openPreparationPlan(id,focusDate=''){
     const note=String(entry.text||'').trim(), done=preparationEntryDone(e,entry.key), missed=preparationEntryMissed(e,entry.key);
     const rule=entry.ruleLabel&&entry.type!=='auto'?`<small class="prepPlanRule">${esc(entry.ruleLabel)}${entry.moved?' · 이동':''}</small>`:(entry.moved?`<small class="prepPlanRule">이동</small>`:'');
     const focused=activePrepPlanDate&&entry.date===activePrepPlanDate;
-    return `<div class="prepPlanRow ${done?'done':''} ${missed?'missed':''} ${focused?'focused':''}"><div class="prepPlanStatus"><button type="button" class="prepPlanCheck" data-prep-plan-check="${esc(entry.key)}" title="${done?'완료 해제':'완료 처리'}">${done?'☑':'☐'}</button><button type="button" class="prepPlanMissed ${missed?'on':''}" data-prep-plan-missed="${esc(entry.key)}" title="${missed?'못함 해제':'못함 처리'}">${missed?'☑':'☐'}</button></div><div class="prepPlanDate">${esc(preparationDateLabel(entry.date))}<small>${esc(entry.date)}</small>${rule}</div><div class="prepPlanText ${note?'':'muted'}">${esc(note||'계획 미입력')}</div></div>`;
+    return `<div class="prepPlanRow ${done?'done':''} ${missed?'missed':''} ${focused?'focused':''}"><div class="prepPlanStatus"><button type="button" class="prepPlanCheck" data-prep-plan-check="${esc(entry.key)}" title="${done?'완료 해제':missed?'못함 해제 후 완료 선택 가능':'완료 처리'}" ${missed?'disabled aria-disabled="true"':''}>${done?'☑':'☐'}</button><button type="button" class="prepPlanMissed ${missed?'on':''}" data-prep-plan-missed="${esc(entry.key)}" title="${missed?'못함 해제':done?'완료 해제 후 못함 선택 가능':'못함 처리'}" ${done?'disabled aria-disabled="true"':''}>${missed?'☑':'☐'}</button></div><div class="prepPlanDate">${esc(preparationDateLabel(entry.date))}${focused?'<span class="prepPlanSelectedBadge">선택한 날짜</span>':''}<small>${esc(entry.date)}</small>${rule}</div><div class="prepPlanText ${note?'':'muted'}">${esc(note||'계획 미입력')}</div></div>`;
   });
   if(!rows.length) rows.push(`<div class="prepPlanRow"><span class="prepPlanCheckSpacer"></span><div class="prepPlanDate">준비일정</div><div class="prepPlanText muted">등록된 준비 일정이 없습니다.</div></div>`);
   const deadline=e.prepDeadline||e.date, deadlineFocused=activePrepPlanDate&&deadline===activePrepPlanDate;
@@ -2333,11 +2333,24 @@ function openPreparationPlan(id,focusDate=''){
   $('#prepPlanList').innerHTML=rows.join('');
   $('#prepPlanList').onclick=ev=>{
     const doneBtn=ev.target.closest('[data-prep-plan-check]');
-    if(doneBtn){ ev.preventDefault(); ev.stopPropagation(); togglePreparationDone(e.id,doneBtn.dataset.prepPlanCheck||''); return; }
+    if(doneBtn){ ev.preventDefault(); ev.stopPropagation(); if(doneBtn.disabled) return; togglePreparationDone(e.id,doneBtn.dataset.prepPlanCheck||''); return; }
     const missedBtn=ev.target.closest('[data-prep-plan-missed]');
-    if(missedBtn){ ev.preventDefault(); ev.stopPropagation(); togglePreparationMissed(e.id,missedBtn.dataset.prepPlanMissed||''); }
+    if(missedBtn){ ev.preventDefault(); ev.stopPropagation(); if(missedBtn.disabled) return; togglePreparationMissed(e.id,missedBtn.dataset.prepPlanMissed||''); }
   };
   openDialog($('#prepPlanDlg'));
+  // 선택한 날짜가 목록 아래에 있어도 팝업 안에서 바로 보이도록 이동한다.
+  if(activePrepPlanDate){
+    requestAnimationFrame(()=>{
+      const dlg=$('#prepPlanDlg');
+      const form=dlg?.querySelector('form');
+      const target=dlg?.querySelector('.prepPlanRow.focused');
+      if(!dlg?.open || !form || !target) return;
+      const containerRect=form.getBoundingClientRect();
+      const targetRect=target.getBoundingClientRect();
+      const position=form.scrollTop+targetRect.top-containerRect.top;
+      form.scrollTop=Math.max(0,position-Math.max(16,(form.clientHeight-target.offsetHeight)/2));
+    });
+  }
 }
 $('#closePrepPlan').onclick=()=>closeDialog($('#prepPlanDlg'));
 $('#closePrepPlanBottom').onclick=()=>closeDialog($('#prepPlanDlg'));
@@ -2995,35 +3008,54 @@ function fitAllScheduleLaneHeights(){
     const cells=[...lane.querySelectorAll('.scheduleLaneCell')];
     const side=lane.querySelector('.scheduleLaneSide');
     const grid=lane.querySelector('.scheduleLaneGrid');
-
-    // 자동맞춤은 현재 높이에 절대 의존하지 않아야 한다.
-    // CSS의 height transition이 살아 있으면 기준 높이로 바꾼 직후에도 이전 높이에서 애니메이션 중인 값을
-    // scrollHeight가 읽어, 자동맞춤을 누를 때마다 그 값 + 여유폭만큼 커지는 누적 오류가 생긴다.
-    // 측정하는 동안 transition을 완전히 끄고 동일한 40px 기준 상태에서 매번 새로 측정한다.
-    const prevGridTransition=grid?.style.transition||'';
-    const prevSideTransition=side?.style.transition||'';
-    if(grid) grid.style.setProperty('transition','none','important');
-    if(side) side.style.setProperty('transition','none','important');
-    lane.style.setProperty('--lane-h',`${LANE_MIN_HEIGHT}px`);
-    void lane.offsetHeight;
-    if(grid) void grid.offsetHeight;
-
-    const cellNeed=Math.max(0,...cells.map(measureLaneCellContentHeight));
-    // 자동맞춤에서는 왼쪽 세로 캘린더명 높이를 기준에서 제외한다.
-    // 빈 구역/일정 1개 구역이 이름 길이 때문에 불필요하게 커지지 않도록 한다.
-    const h=Math.max(LANE_MIN_HEIGHT,Math.min(2400,Math.ceil(cellNeed+4)));
-    state.settings.laneHeights[key]=h;
-    lane.style.setProperty('--lane-h',`${h}px`);
-    void lane.offsetHeight;
-
-    // 최종 높이를 즉시 확정한 뒤 기존 transition 설정만 되돌린다.
-    if(grid){
-      if(prevGridTransition) grid.style.transition=prevGridTransition;
-      else grid.style.removeProperty('transition');
+    if(!grid||!cells.length) return;
+    // v2.63: 측정할 때 기존 고정높이 및 내부 스크롤의 영향을 완전히 제거한다.
+    // 스크롤된 칸의 getBoundingClientRect() 좌표만으로 계산하면 실제 내용이 잘린다.
+    const elements=[grid,...cells];
+    const saved=elements.map(el=>({el,style:el.getAttribute('style')}));
+    const sideTransition=side?.style.transition||'';
+    try{
+      grid.style.setProperty('transition','none','important');
+      grid.style.setProperty('height','auto','important');
+      grid.style.setProperty('min-height','0px','important');
+      cells.forEach(cell=>{
+        cell.scrollTop=0;
+        cell.style.setProperty('height','auto','important');
+        cell.style.setProperty('min-height','0px','important');
+        cell.style.setProperty('overflow-y','visible','important');
+      });
+      void grid.offsetHeight;
+      const need=Math.max(0,...cells.map(cell=>{
+        const cs=getComputedStyle(cell);
+        const border=(parseFloat(cs.borderTopWidth)||0)+(parseFloat(cs.borderBottomWidth)||0);
+        return Math.max(cell.scrollHeight,measureLaneCellContentHeight(cell))+border;
+      }));
+      // 여유 높이를 추가해 소수점 반올림, 글꼴 렌더링에 따른 스크롤을 막는다.
+      const h=Math.max(LANE_MIN_HEIGHT,Math.min(2400,Math.ceil(need+12)));
+      state.settings.laneHeights[key]=h;
+    }finally{
+      saved.forEach(({el,style})=>{
+        if(style===null) el.removeAttribute('style');
+        else el.setAttribute('style',style);
+      });
+      lane.style.setProperty('--lane-h',`${state.settings.laneHeights[key]||LANE_MIN_HEIGHT}px`);
+      if(side){
+        if(sideTransition) side.style.transition=sideTransition;
+        else side.style.removeProperty('transition');
+      }
     }
-    if(side){
-      if(prevSideTransition) side.style.transition=prevSideTransition;
-      else side.style.removeProperty('transition');
+  });
+  // 실제 크기로 한 번 더 검사해 숨은 내용이 남은 칸은 추가 보정한다.
+  void document.body.offsetHeight;
+  lanes.forEach(lane=>{
+    const grid=lane.querySelector('.scheduleLaneGrid');
+    if(!grid) return;
+    const key=lane.dataset.laneKey||'';
+    const excess=Math.max(0,...[...lane.querySelectorAll('.scheduleLaneCell')].map(cell=>cell.scrollHeight-cell.clientHeight));
+    if(excess>1){
+      const h=Math.min(2400,(state.settings.laneHeights[key]||LANE_MIN_HEIGHT)+Math.ceil(excess)+8);
+      state.settings.laneHeights[key]=h;
+      lane.style.setProperty('--lane-h',`${h}px`);
     }
   });
   save({rerender:false});
@@ -4886,7 +4918,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.61',
+    appVersion:'2.64',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state

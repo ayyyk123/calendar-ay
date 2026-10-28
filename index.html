@@ -4,17 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
-  <title>캘린더 v2.61</title>
-  <link rel="manifest" href="manifest.json?v=2.61">
+  <title>캘린더 v2.64</title>
+  <link rel="manifest" href="manifest.json?v=2.64">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="icon-180.png">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="style.css?v=2.61">
+  <link rel="stylesheet" href="style.css?v=2.64">
 </head>
 <body>
 <header>
-  <div class="brand"><b>캘린더</b><small> v2.61</small></div>
+  <div class="brand"><b>캘린더</b><small> v2.64</small></div>
   <div id="saveBadge" class="saveBadge loading" title="Firebase 저장 상태"><span class="saveDot"></span><span id="saveBadgeText">Firebase 확인 중</span></div>
   <button id="manualSaveBtn" class="manualSaveBtn iconOnlyBtn" type="button" title="현재 데이터를 Firebase에 즉시 저장" aria-label="최신자료 저장">💾</button>
   <button id="sidebarToggle" class="mobileOnly" type="button" aria-label="메뉴">☰</button>
@@ -143,16 +143,46 @@
 
 <dialog id="eventDlg">
   <form id="eventForm">
-    <div class="eventDialogTitleLine"><h3 id="eventTitle">일정 등록</h3><span id="eventOccurrenceDate" class="eventOccurrenceDate"></span></div>
+    <div class="eventDialogTitleLine">
+      <h3 id="eventTitle">일정 등록</h3>
+      <span id="eventOccurrenceDate" class="eventOccurrenceDate"></span>
+      <label id="eventDoneWrap" class="eventDoneWrap hidden"><input type="checkbox" id="eventDone"> <span id="eventDoneText">완료</span></label>
+    </div>
     <input type="hidden" id="eid">
-    <label id="eventDoneWrap" class="eventDoneWrap hidden"><input type="checkbox" id="eventDone"> <span id="eventDoneText">완료</span></label>
-    <label>제목<input id="title" required></label>
-    <label class="check importantField"><input type="checkbox" id="important"> ★ 중요 일정</label>
-    <label>캘린더<select id="cal"></select></label>
-    <div class="row">
+    <div class="eventNameRow">
+      <label>제목<input id="title" required></label>
+      <label class="check importantField" title="중요 일정"><input type="checkbox" id="important" aria-label="중요 일정"> <span aria-hidden="true">★</span></label>
+      <label>캘린더<select id="cal"></select></label>
+    </div>
+    <div class="row eventDateRow">
       <label>날짜<input type="date" id="date" required></label>
       <label>종료일<input type="date" id="endDate"></label>
     </div>
+    <div class="row eventDurationRow">
+      <div class="durationField">
+        <label>예상 소요시간
+          <div class="durationInputs"><input type="number" id="hoursH" min="0" max="24" step="1" value="1"><span>h</span><input type="number" id="hoursM" min="0" max="59" step="5" value="0"><span>분</span></div>
+        </label>
+        <div class="eventDurationChecks">
+          <label class="check durationSkip"><input type="checkbox" id="noDuration"> 소요시간 미체크</label>
+          <label class="check eventAllDay"><input type="checkbox" id="allDay" checked> 종일 일정</label>
+        </div>
+        <small id="durationAutoHint" class="hint hidden"></small>
+      </div>
+      <label class="eventKindField">종류<select id="kind"><option value="event">일정</option><option value="appointment">예약,약속</option><option value="todo">Quick</option><option value="habit">습관/루틴</option><option value="anniversary">기념일/D-Day</option><option value="payment">납부일정</option></select></label>
+    </div>
+    <div class="row timeRow eventTimeRow" id="timeFields">
+      <label>시작<input type="time" id="start"></label>
+      <label>종료<input type="time" id="end"></label>
+    </div>
+    <div id="paymentFields" class="paymentFields hidden">
+      <div class="row">
+        <label>납부 금액<input type="number" id="paymentAmount" min="0" step="1" placeholder="0"></label>
+        <label>납부수단 / 카드·계좌<input id="paymentMethod" placeholder="예: 국민카드 · 신한 1234"></label>
+      </div>
+      <p class="hint">납부일정은 예상 소요시간을 계산하지 않습니다. 달력의 체크박스로 날짜별 납부완료 여부를 표시할 수 있습니다.</p>
+    </div>
+    <div class="eventOptionsGrid">
     <div id="prepFields" class="prepFields">
       <label class="check prepEnable"><input type="checkbox" id="prepEnabled"> 기한에 맞춘 준비일정 사용</label>
       <div id="prepDetails" class="prepDetails hidden">
@@ -212,33 +242,13 @@
         </div>
       </div>
     </div>
-    <label class="check"><input type="checkbox" id="allDay" checked> 종일 일정</label>
-    <div class="row timeRow" id="timeFields">
-      <label>시작<input type="time" id="start"></label>
-      <label>종료<input type="time" id="end"></label>
-    </div>
-    <div class="row">
-      <div class="durationField">
-        <label>예상 소요시간
-          <div class="durationInputs"><input type="number" id="hoursH" min="0" max="24" step="1" value="1"><span>h</span><input type="number" id="hoursM" min="0" max="59" step="5" value="0"><span>분</span></div>
-        </label>
-        <label class="check durationSkip"><input type="checkbox" id="noDuration"> 소요시간 미체크</label><small id="durationAutoHint" class="hint hidden"></small>
-      </div>
-      <label>종류<select id="kind"><option value="event">일정</option><option value="appointment">예약,약속</option><option value="todo">Quick</option><option value="habit">습관/루틴</option><option value="anniversary">기념일/D-Day</option><option value="payment">납부일정</option></select></label>
-    </div>
-    <div id="paymentFields" class="paymentFields hidden">
-      <div class="row">
-        <label>납부 금액<input type="number" id="paymentAmount" min="0" step="1" placeholder="0"></label>
-        <label>납부수단 / 카드·계좌<input id="paymentMethod" placeholder="예: 국민카드 · 신한 1234"></label>
-      </div>
-      <p class="hint">납부일정은 예상 소요시간을 계산하지 않습니다. 달력의 체크박스로 날짜별 납부완료 여부를 표시할 수 있습니다.</p>
-    </div>
     <div id="availabilityBlockFields" class="availabilityBlockFields">
       <label class="check"><input type="checkbox" id="availabilityBlock"> 이 일정이 있는 날 가용시간 차단</label>
       <div id="availabilityTargetWrap" class="availabilityTargetWrap hidden">
         <label>가용시간을 0h로 만들 캘린더<select id="availabilityTarget"></select></label>
         <p class="hint">예: 헬스장을 2일마다 반복으로 등록하고 개인업무를 선택하면, 헬스장 발생일에는 개인업무와 모든 부속캘린더가 공유하는 가용시간이 0h가 됩니다. 특정 발생일을 다른 날로 옮기면 원래 날짜는 복구되고 이동한 날짜가 차단됩니다.</p>
       </div>
+    </div>
     </div>
     <label>장소<input id="place"></label>
     <label>반복<select id="repeat"><option value="none">없음</option><option value="daily">매일</option><option value="weekly">매주</option><option value="monthly">매월</option><option value="yearly">매년</option></select></label>
@@ -542,6 +552,6 @@
 </div>
 
 <dialog id="recurringPreviewDlg" class="recurringPreviewDialog"><div class="recurringPreviewPanel"><div class="recurringPreviewTop"><strong id="recurringPreviewTitle"></strong><button id="recurringPreviewClose" type="button" aria-label="닫기">✕</button></div><div class="recurringPreviewNav"><button type="button" id="recurringPreviewPrev" aria-label="이전 달">‹</button><b id="recurringPreviewMonth"></b><button type="button" id="recurringPreviewNext" aria-label="다음 달">›</button></div><div id="recurringPreviewContent"></div></div></dialog>
-<script type="module" src="app.js?v=2.61"></script>
+<script type="module" src="app.js?v=2.64"></script>
 </body>
 </html>
