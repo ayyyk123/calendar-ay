@@ -1814,9 +1814,13 @@ function renderPayments(){
   const allowed=pf==='all'?null:new Set([pf,...descendants(pf).map(c=>c.id)]);
   const payments=state.events.filter(e=>e.kind==='payment' && (!allowed||allowed.has(e.calId)));
   const collapsed=!!state.settings?.fixedPanelsCollapsed?.payment;
+  const archivedPayments=payments.filter(isArchivedRecurring260);
+  const activePayments=payments.filter(e=>!isArchivedRecurring260(e));
+  const archiveRows=[];
   const byCal=new Map();
   const push=(calId,sortKey,html)=>{ if(!byCal.has(calId)) byCal.set(calId,[]); byCal.get(calId).push({sortKey,html}); };
   for(const e of payments){
+    const isArchived=archivedPayments.includes(e);
     const starts=generateOccurrenceStarts(e,startKey,endKey)
       .map(ds)
       .filter(k=>k>=startKey && k<=endKey && !(e.excludedDates||[]).includes(k))
@@ -1828,12 +1832,12 @@ function renderPayments(){
         const c=cal(e.calId);
         const amount=Number(e.paymentAmount)>0?`₩${Number(e.paymentAmount).toLocaleString('ko-KR')}`:'금액 미입력';
         const method=e.paymentMethod?` · ${esc(e.paymentMethod)}`:'';
-        push(e.calId,occ,`<div class="paymentRow ${done?'paid':''}" data-eid="${esc(e.id)}" data-occ="${esc(occ)}" style="border-left-color:${esc(c.color)}"><button type="button" class="paymentCheck" title="${done?'납부완료 취소':'납부완료 체크'}">${done?'☑':'☐'}</button><button type="button" class="paymentOpen"><b>${e.important?'★ ':''}${esc(e.title)}</b><small>${esc(occ)} · ${amount}${method}${(e.repeat||'none')!=='none'?` · ${esc(repeatRuleLabel(e))}`:''}</small></button></div>`);
+        (isArchived ? (sortKey,html)=>archiveRows.push({sortKey,html}) : (sortKey,html)=>push(e.calId,sortKey,html))(occ,`<div class="paymentRow ${done?'paid':''}" data-eid="${esc(e.id)}" data-occ="${esc(occ)}" style="border-left-color:${esc(c.color)}"><button type="button" class="paymentCheck" title="${done?'납부완료 취소':'납부완료 체크'}">${done?'☑':'☐'}</button><button type="button" class="paymentOpen"><b>${e.important?'★ ':''}${esc(e.title)}</b><small>${esc(occ)} · ${amount}${method}${(e.repeat||'none')!=='none'?` · ${esc(repeatRuleLabel(e))}`:''}</small></button></div>`);
       }
     }else{
       const next=nextOccurrenceFor(e,ds(new Date()),740);
       const c=cal(e.calId);
-      push(e.calId,next||'9999-12-31',`<div class="paymentRow paymentNoMonth" data-eid="${esc(e.id)}" data-occ="${esc(next||e.date)}" style="border-left-color:${esc(c.color)}"><span class="paymentCheck muted">·</span><button type="button" class="paymentOpen"><b>${e.important?'★ ':''}${esc(e.title)}</b><small>이번 달 해당 없음${next?` · 다음 ${esc(next)}`:''} · ${esc(repeatRuleLabel(e))}</small></button></div>`);
+      (isArchived ? (sortKey,html)=>archiveRows.push({sortKey,html}) : (sortKey,html)=>push(e.calId,sortKey,html))(next||'9999-12-31',`<div class="paymentRow paymentNoMonth" data-eid="${esc(e.id)}" data-occ="${esc(next||e.date)}" style="border-left-color:${esc(c.color)}"><span class="paymentCheck muted">·</span><button type="button" class="paymentOpen"><b>${e.important?'★ ':''}${esc(e.title)}</b><small>${(e.excludedDates||[]).some(d=>d>=startKey&&d<=endKey)?'이번 달 삭제됨':'이번 달 해당 없음'}${next?` · 다음 ${esc(next)}`:''} · ${esc(repeatRuleLabel(e))}</small></button></div>`);
     }
   }
   const groups=[];
@@ -1845,7 +1849,7 @@ function renderPayments(){
   }
   for(const [id,rows] of byCal){ rows.sort((a,b)=>a.sortKey.localeCompare(b.sortKey)); groups.push(sidebarCalendarGroupHtml('payment',cal(id),rows.map(r=>r.html).join(''),rows.length)); }
   const html=groups.join('')||'<div class="empty compactEmpty">등록된 납부일정이 없습니다.</div>';
-  box.innerHTML=`<div class="paymentPanel ${collapsed?'collapsed':''}">${html}</div>`;
+  box.innerHTML=`<div class="paymentPanel ${collapsed?'collapsed':''}">${html}</div><details class="archivedPaymentPanel" style="margin-top:8px;border:1px solid #d6dce5;padding:7px"><summary style="cursor:pointer;font-weight:600">종료된 납부일정 (${archivedPayments.length})</summary><div style="margin-top:6px">${archiveRows.sort((a,b)=>a.sortKey.localeCompare(b.sortKey)).map(r=>r.html).join('')||'종료된 납부일정 없음'}</div></details>`;
   box.classList.toggle('collapsed',collapsed);
   const toggle=$('#togglePayment'); if(toggle){ toggle.textContent=collapsed?'▸':'▾'; toggle.title=collapsed?'납부일정 펼치기':'납부일정 접기'; }
   $$('.paymentRow').forEach(row=>{
@@ -3028,10 +3032,10 @@ function fitAllScheduleLaneHeights(){
       const need=Math.max(0,...cells.map(cell=>{
         const cs=getComputedStyle(cell);
         const border=(parseFloat(cs.borderTopWidth)||0)+(parseFloat(cs.borderBottomWidth)||0);
-        return Math.max(cell.scrollHeight,measureLaneCellContentHeight(cell))+border;
+        return measureLaneCellContentHeight(cell)+border;
       }));
       // 여유 높이를 추가해 소수점 반올림, 글꼴 렌더링에 따른 스크롤을 막는다.
-      const h=Math.max(LANE_MIN_HEIGHT,Math.min(2400,Math.ceil(need+12)));
+      const h=Math.max(LANE_MIN_HEIGHT,Math.min(2400,Math.ceil(need+4)));
       state.settings.laneHeights[key]=h;
     }finally{
       saved.forEach(({el,style})=>{
@@ -3095,7 +3099,7 @@ function bindScheduleLanes(){
     e.stopPropagation(); const key=btn.dataset.laneToggle; state.settings.laneCollapsed=state.settings.laneCollapsed||{}; state.settings.laneCollapsed[key]=!state.settings.laneCollapsed[key]; save();
   });
   $$('[data-lane-resize]').forEach(handle=>{
-    handle.ondblclick=e=>{ e.preventDefault(); const key=handle.dataset.laneResize; const type=key==='common'?'common':key==='prep'?'prep':key==='quick'?'quick':key==='payment'?'payment':'calendar'; state.settings.laneHeights=state.settings.laneHeights||{}; delete state.settings.laneHeights[key]; save(); };
+    handle.ondblclick=e=>{ e.preventDefault(); const key=handle.dataset.laneResize; const type=key==='common'?'common':key==='prep'?'prep':key==='quick'?'quick':key==='payment'?'payment':'calendar'; state.settings.laneHeights=state.settings.laneHeights||{}; fitAllScheduleLaneHeights(); };
     handle.onpointerdown=e=>{
       if(window.matchMedia('(max-width:760px)').matches) return;
       e.preventDefault(); e.stopPropagation();
