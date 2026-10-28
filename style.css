@@ -3129,3 +3129,6 @@ body,button,input,select,textarea{font-family:var(--ui-font);font-weight:500}
 @media(max-width:430px){
   #eventForm .eventDialogTitleLine{top:-14px;margin:-14px -14px 0;padding:10px 14px}
 }
+
+/* v2.67: 종료된 납부일정 제목을 다른 사이드바 항목과 동일한 크기로 */
+.archivedPaymentPanel > summary {font-size:11px !important;font-weight:600 !important;line-height:1.45 !important;}
