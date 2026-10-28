@@ -3032,3 +3032,36 @@ button,input,select,textarea{font-weight:500}
 :root{--ui-font:"Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",sans-serif}
 body,button,input,select,textarea{font-family:var(--ui-font);font-weight:500}
 #main .itemTitle,.month .itemTitle{font-weight:600!important}
+
+/* v2.58 — 종료된 반복일정은 접힌 보관함에 표시하고 시각적으로 구분 */
+.archivedRecurringGroup .fixedGroupHead{background:#f3f5f7;color:#5b6472}
+.archivedRecurringGroup .recurringFixed{opacity:.78}
+
+/* v2.59 반복업무: 제목은 배치 달력, 연필은 수정 */
+.recurringFixed{display:flex;align-items:stretch;gap:3px;padding:0!important;min-width:0}
+.recurringInspectBtn{flex:1;min-width:0;padding:5px 7px;text-align:left;border:0!important;border-radius:0!important;background:transparent;color:inherit;cursor:pointer}
+.recurringInspectBtn b,.recurringInspectBtn small,.recurringInspectBtn .monthProgress{display:block;overflow:hidden;text-overflow:ellipsis}
+.recurringEditBtn{flex:0 0 25px;border:0!important;border-left:1px solid #e1e5ea!important;border-radius:0!important;background:#fff;color:#677187;cursor:pointer;padding:1px;font-size:14px}
+.recurringInspectBtn:hover,.recurringEditBtn:hover{background:#f1f4f9}
+.recurringPreviewDialog{max-width:min(94vw,570px);width:540px;border:1px solid #cbd5e1;border-radius:2px!important;padding:0;background:#fff;color:#1b2430}
+.recurringPreviewDialog::backdrop{background:rgba(20,26,36,.3)}
+.recurringPreviewPanel{padding:13px}
+.recurringPreviewTop,.recurringPreviewNav{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.recurringPreviewTop{margin-bottom:10px}
+.recurringPreviewTop strong{font-size:14px}
+.recurringPreviewTop button,.recurringPreviewNav button{width:28px;height:27px;border:1px solid #d3d9e0;border-radius:0;background:#fff;cursor:pointer}
+.recurringPreviewNav{justify-content:center;margin:6px 0 12px}
+.recurringPreviewNav b{min-width:105px;text-align:center}
+.recurringPreviewWeekdays,.recurringPreviewGrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}
+.recurringPreviewWeekdays span{text-align:center;font-size:11px;padding:6px 0;background:#f3f5f7;border:1px solid #e5e8ec}
+.recurringPreviewDay{min-width:0;min-height:60px;border:1px solid #e9edf2;padding:5px 3px;display:flex;flex-direction:column;gap:6px}
+.recurringPreviewDay.other{background:#fafafa;color:#a4acb6}
+.previewDayNumber{font-weight:600;font-size:12px}
+.previewDayMarker{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:1px solid #e1e5ea;padding:2px 1px;text-align:center;background:#f5f7fa}
+.status-done .previewDayMarker{color:#16804a;background:#e9f7ef;border-color:#abd8bb}
+.status-failed .previewDayMarker{color:#b83b37;background:#fff0ef;border-color:#e9b0ab}
+.status-deleted .previewDayMarker{color:#7f8792;background:#f3f4f6}
+.status-planned .previewDayMarker{color:#375bb7;background:#edf2ff}
+.recurringPreviewLegend{display:flex;gap:13px;flex-wrap:wrap;font-size:11px;color:#586576;margin-top:11px}
+.recurringPreviewNote{font-size:11px;color:#6b7280;margin:8px 0 0}
+@media(max-width:600px){.recurringPreviewDay{min-height:49px}.previewDayMarker{font-size:9px}.recurringPreviewPanel{padding:8px}}

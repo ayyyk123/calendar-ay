@@ -1536,7 +1536,7 @@ function manualPlacementSortKey(x){
   const dates=state.events.filter(e=>e.fixedId===x.id && (e.date||'').startsWith(month)).map(e=>e.date).filter(Boolean).sort();
   return dates[0] || '9999-12-31';
 }
-// v2.57: 일정 한 회차를 다른 날짜로 옮기면 기존 회차가 excludedDates에
+// v2.58: 일정 한 회차를 다른 날짜로 옮기면 기존 회차가 excludedDates에
 // 기록되고 새 단일 일정이 detachedFromRepeatId로 연결된다. 월별 집계는
 // 실제 이동 후 날짜의 완료 기록도 포함해야 한다. 과거 저장 데이터도 재집계한다.
 function recurringMonthProgress(e){
@@ -1557,7 +1557,16 @@ function recurringMonthProgress(e){
   );
   total+=moved.length;
   done+=moved.filter(x=>isDone(x)).length;
-  if(!total) return {total:0,done:0,label:'이번 달 해당 없음',complete:false};
+  if(!total){
+    // 원래 생성되어야 했던 월 회차가 사용자의 삭제로 제외된 경우만 '삭제됨'.
+    // 날짜 이동은 detachedFromRepeatId 연결을 확인해 삭제로 오인하지 않는다.
+    const scheduled=generateOccurrenceStarts(e,startKey,endKey).map(ds).filter(k=>k>=startKey&&k<=endKey);
+    const excluded=new Set(e.excludedDates||[]);
+    const movedOrigins=new Set(state.events.filter(x=>String(x.detachedFromRepeatId||'')===String(e.id)).map(x=>x.detachedOccurrence||x.detachedOriginalDate||x.originalOccurrenceDate||x.originalDate||x.movedFromDate).filter(Boolean));
+    const removed=scheduled.filter(k=>excluded.has(k)&&!movedOrigins.has(k));
+    if(removed.length) return {total:0,done:0,label:`이번 달 삭제됨 (${removed.length}건)`,complete:false};
+    return {total:0,done:0,label:'이번 달 해당 없음',complete:false};
+  }
   if(done===total) return {total,done,label:`✓ 이번 달 완료 ${done}/${total}`,complete:true};
   return {total,done,label:`이번 달 ${done}/${total} 완료`,complete:false};
 }
@@ -1614,6 +1623,57 @@ function groupedCalendarHtml(section,items,rowBuilder,emptyText){
   return groups.join('');
 }
 
+// v2.59: 특정 반복업무 한 건만 보여주는 월별 배치 미리보기.
+let recurringPreviewId=null;
+let recurringPreviewCursor=null;
+function openRecurringPreview(id){
+  if(!state.events.some(e=>String(e.id)===String(id)))return;
+  recurringPreviewId=id;
+  recurringPreviewCursor=new Date(cursor.getFullYear(),cursor.getMonth(),1);
+  renderRecurringPreview();
+  openDialog($('#recurringPreviewDlg'));
+}
+function recurringPreviewEntries(e,start,end){
+  const byDate=new Map();
+  const addEntry=(date,status)=>{
+    if(!date||date<start||date>end)return;
+    const prior=byDate.get(date);
+    const rank={deleted:0,planned:1,failed:2,done:3};
+    if(!prior||rank[status]>rank[prior])byDate.set(date,status);
+  };
+  const excluded=new Set(e.excludedDates||[]),done=new Set(e.doneDates||[]);
+  for(const d of generateOccurrenceStarts(e,start,end)){
+    const k=ds(d);
+    const moved=state.events.some(x=>String(x.detachedFromRepeatId||'')===String(e.id)&&x.detachedOccurrence===k);
+    if(!moved)addEntry(k,excluded.has(k)?'deleted':done.has(k)?'done':'planned');
+  }
+  for(const x of state.events){
+    if(String(x.detachedFromRepeatId||'')!==String(e.id))continue;
+    addEntry(x.date,x.failed||x.notDone||x.skipped?'failed':isDone(x)?'done':'planned');
+  }
+  return byDate;
+}
+function renderRecurringPreview(){
+  const e=state.events.find(x=>String(x.id)===String(recurringPreviewId));
+  const box=$('#recurringPreviewContent');if(!box||!e)return;
+  const date=recurringPreviewCursor||new Date();
+  const y=date.getFullYear(),m=date.getMonth(),first=new Date(y,m,1);
+  const s=startWeek(first),last=new Date(y,m+1,0),weekCount=Math.ceil(((first.getDay()+6)%7+last.getDate())/7);
+  const begin=ds(s),end=ds(add(s,weekCount*7-1));
+  const items=recurringPreviewEntries(e,begin,end);
+  const names=['월','화','수','목','금','토','일'];
+  const cells=Array.from({length:weekCount*7},(_,i)=>{
+    const d=add(s,i),k=ds(d),st=items.get(k),other=d.getMonth()!==m;
+    return `<div class="recurringPreviewDay ${other?'other':''} ${st?'status-'+st:''}" title="${k}${st?' · '+({done:'완료',planned:'예정',failed:'못함',deleted:'삭제된 회차'}[st]):''}"><span class="previewDayNumber">${d.getDate()}</span>${st?`<span class="previewDayMarker">${{done:'✓ 완료',planned:'● 배치',failed:'✕ 못함',deleted:'— 삭제'}[st]}</span>`:''}</div>`;
+  }).join('');
+  $('#recurringPreviewTitle').textContent=e.title;
+  $('#recurringPreviewMonth').textContent=`${y}년 ${m+1}월`;
+  box.innerHTML=`<div class="recurringPreviewWeekdays">${names.map(x=>`<span>${x}</span>`).join('')}</div><div class="recurringPreviewGrid">${cells}</div><div class="recurringPreviewLegend"><span>● 예정</span><span>✓ 완료</span><span>✕ 못함</span><span>— 삭제</span></div><p class="recurringPreviewNote">선택한 반복업무만 표시합니다. 날짜를 옮긴 회차도 이동 후 날짜에 표시돼요.</p>`;
+}
+$('#recurringPreviewPrev').onclick=()=>{recurringPreviewCursor=new Date(recurringPreviewCursor.getFullYear(),recurringPreviewCursor.getMonth()-1,1);renderRecurringPreview();};
+$('#recurringPreviewNext').onclick=()=>{recurringPreviewCursor=new Date(recurringPreviewCursor.getFullYear(),recurringPreviewCursor.getMonth()+1,1);renderRecurringPreview();};
+$('#recurringPreviewClose').onclick=()=>closeDialog($('#recurringPreviewDlg'));
+
 function renderFixed(){
   const f=selectedFixedFilter||'all';
   const month=`${cursor.getFullYear()}-${pad(cursor.getMonth()+1)}`;
@@ -1628,7 +1688,7 @@ function renderFixed(){
     const c=cal(e.calId), rule=repeatRuleLabel(e);
     const kindLabel={event:'일정',appointment:'예약,약속',todo:'Quick',habit:'습관/루틴',anniversary:'기념일/D-Day',payment:'납부일정'}[e.kind]||'일정';
     const progress=e.kind==='anniversary'?{label:'완료체크 대상 아님',complete:false}:recurringMonthProgress(e);
-    return `<div class="fixed recurringFixed ${progress.complete?'monthComplete':'monthPending'}" data-eid="${esc(e.id)}" style="border-left-color:${esc(c.color)}" title="${esc(`${calendarPath(c.id)} · ${rule} · ${durationLabel(e)} · ${progress.label}`)}"><b>${e.important?'★ ':''}${esc(e.title)}</b><small>${esc(kindLabel)} · ${esc(rule)} · ${esc(durationLabel(e))}</small><span class="monthProgress ${progress.complete?'complete':''}">${esc(progress.label)}</span></div>`;
+    return `<div class="fixed recurringFixed ${progress.complete?'monthComplete':'monthPending'}" data-eid="${esc(e.id)}" style="border-left-color:${esc(c.color)}" title="${esc(`${calendarPath(c.id)} · ${rule} · ${durationLabel(e)} · ${progress.label}`)}"><button type="button" class="recurringInspectBtn" title="이 반복업무만 월 달력에서 보기"><b>${e.important?'★ ':''}${esc(e.title)}</b><small>${esc(kindLabel)} · ${esc(rule)} · ${esc(durationLabel(e))}</small><span class="monthProgress ${progress.complete?'complete':''}">${esc(progress.label)}</span></button><button type="button" class="recurringEditBtn" title="반복업무 수정" aria-label="${esc(e.title)} 수정">✎</button></div>`;
   },'자동반복 일정이 없습니다.');
 
   const manualRows=groupedCalendarHtml('manual',manual,x=>{
@@ -1660,7 +1720,10 @@ function renderFixed(){
       <div class="fixedGroupBody ${collapsed.manual?'collapsed':''}" data-fixed-panel="manual">${manualRows}</div>
     </div>`;
 
-  $$('.recurringFixed').forEach(x=>{ x.ondblclick=()=>openEvent(null,x.dataset.eid); x.onclick=()=>openEvent(null,x.dataset.eid); });
+  $$('.recurringFixed').forEach(x=>{
+    x.querySelector('.recurringInspectBtn')?.addEventListener('click',()=>openRecurringPreview(x.dataset.eid));
+    x.querySelector('.recurringEditBtn')?.addEventListener('click',ev=>{ev.stopPropagation();openEvent(null,x.dataset.eid);});
+  });
   $$('.manualFixed').forEach(x=>{
     if(x.dataset.used!=='1'){
       x.ondragstart=e=>{
@@ -4798,7 +4861,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.57',
+    appVersion:'2.59',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
@@ -4839,7 +4902,7 @@ $('#restoreBackupBtn').onclick=()=>$('#restoreFile').click();
 $('#restoreFile').onchange=e=>restoreBackupFile(e.target.files?.[0]);
 
 // Native dialog cancel/ESC never saves. Explicit cancel buttons above only close dialogs.
-['eventDlg','repeatEditDlg','repeatDeleteDlg','repeatMoveDlg','carryDlg','calDlg','fixedDlg','diaryDlg','searchDlg','settingsDlg'].forEach(id=>{
+['eventDlg','repeatEditDlg','repeatDeleteDlg','repeatMoveDlg','carryDlg','calDlg','fixedDlg','diaryDlg','searchDlg','settingsDlg','recurringPreviewDlg'].forEach(id=>{
   const d=$(`#${id}`); d.addEventListener('cancel',()=>{});
 });
 
