@@ -3065,3 +3065,7 @@ body,button,input,select,textarea{font-family:var(--ui-font);font-weight:500}
 .recurringPreviewLegend{display:flex;gap:13px;flex-wrap:wrap;font-size:11px;color:#586576;margin-top:11px}
 .recurringPreviewNote{font-size:11px;color:#6b7280;margin:8px 0 0}
 @media(max-width:600px){.recurringPreviewDay{min-height:49px}.previewDayMarker{font-size:9px}.recurringPreviewPanel{padding:8px}}
+
+/* v2.60 archived recurring */
+.archivedRecurringGroup .fixedGroupHead{background:#f3f5f7;color:#596575}
+.archivedRecurringGroup .recurringFixed{opacity:.82}

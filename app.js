@@ -427,7 +427,8 @@ function normalizeState(raw){
         manual: !!s.settings?.fixedPanelsCollapsed?.manual,
         flexible: !!s.settings?.fixedPanelsCollapsed?.flexible,
         purchase: !!s.settings?.fixedPanelsCollapsed?.purchase,
-        payment: !!s.settings?.fixedPanelsCollapsed?.payment
+        payment: !!s.settings?.fixedPanelsCollapsed?.payment,
+        archivedRecurring: s.settings?.fixedPanelsCollapsed?.archivedRecurring !== false
       },
       sidebarCalendarGroupsCollapsed: {
         recurring: (s.settings?.sidebarCalendarGroupsCollapsed?.recurring && typeof s.settings.sidebarCalendarGroupsCollapsed.recurring==='object') ? {...s.settings.sidebarCalendarGroupsCollapsed.recurring} : {},
@@ -1623,7 +1624,7 @@ function groupedCalendarHtml(section,items,rowBuilder,emptyText){
   return groups.join('');
 }
 
-// v2.59: 특정 반복업무 한 건만 보여주는 월별 배치 미리보기.
+// v2.60: 특정 반복업무 한 건만 보여주는 월별 배치 미리보기.
 let recurringPreviewId=null;
 let recurringPreviewCursor=null;
 function openRecurringPreview(id){
@@ -1674,22 +1675,40 @@ $('#recurringPreviewPrev').onclick=()=>{recurringPreviewCursor=new Date(recurrin
 $('#recurringPreviewNext').onclick=()=>{recurringPreviewCursor=new Date(recurringPreviewCursor.getFullYear(),recurringPreviewCursor.getMonth()+1,1);renderRecurringPreview();};
 $('#recurringPreviewClose').onclick=()=>closeDialog($('#recurringPreviewDlg'));
 
+// v2.60 — 종료된 반복일정은 삭제하지 않고 별도 목록으로 분류한다.
+function isArchivedRecurring260(e){
+  if((e.repeat||'none')==='none') return false;
+  const rule=normalizedRule(e), today=ds(new Date());
+  if(rule.endType==='date' && rule.until) return rule.until < today;
+  if(rule.endType==='count'){
+    const dates=generateOccurrenceStarts(e,e.date,today);
+    const limit=Math.max(1,Number(rule.count)||10);
+    return dates.length>=limit && ds(dates[limit-1])<today;
+  }
+  return false;
+}
+
 function renderFixed(){
   const f=selectedFixedFilter||'all';
   const month=`${cursor.getFullYear()}-${pad(cursor.getMonth()+1)}`;
   const allowed=f==='all'?null:new Set([f,...descendants(f).map(c=>c.id)]);
   const recurring=state.events.filter(e=>(e.repeat||'none')!=='none' && e.kind!=='payment' && e.kind!=='anniversary' && (!allowed||allowed.has(e.calId)))
     .sort((a,b)=>occurrenceSortKey(a).localeCompare(occurrenceSortKey(b)) || String(a.title||'').localeCompare(String(b.title||''),'ko'));
+  const archivedRecurring=recurring.filter(isArchivedRecurring260);
+  const activeRecurring=recurring.filter(e=>!isArchivedRecurring260(e));
   const manual=state.fixed.filter(x=>!allowed||allowed.has(x.calId))
     .sort((a,b)=>manualPlacementSortKey(a).localeCompare(manualPlacementSortKey(b)) || String(a.name||'').localeCompare(String(b.name||''),'ko'));
   const collapsed=state.settings.fixedPanelsCollapsed||{recurring:false,manual:false};
 
-  const recurringRows=groupedCalendarHtml('recurring',recurring,e=>{
+  const recurringRowBuilder=e=>{
     const c=cal(e.calId), rule=repeatRuleLabel(e);
     const kindLabel={event:'일정',appointment:'예약,약속',todo:'Quick',habit:'습관/루틴',anniversary:'기념일/D-Day',payment:'납부일정'}[e.kind]||'일정';
     const progress=e.kind==='anniversary'?{label:'완료체크 대상 아님',complete:false}:recurringMonthProgress(e);
     return `<div class="fixed recurringFixed ${progress.complete?'monthComplete':'monthPending'}" data-eid="${esc(e.id)}" style="border-left-color:${esc(c.color)}" title="${esc(`${calendarPath(c.id)} · ${rule} · ${durationLabel(e)} · ${progress.label}`)}"><button type="button" class="recurringInspectBtn" title="이 반복업무만 월 달력에서 보기"><b>${e.important?'★ ':''}${esc(e.title)}</b><small>${esc(kindLabel)} · ${esc(rule)} · ${esc(durationLabel(e))}</small><span class="monthProgress ${progress.complete?'complete':''}">${esc(progress.label)}</span></button><button type="button" class="recurringEditBtn" title="반복업무 수정" aria-label="${esc(e.title)} 수정">✎</button></div>`;
-  },'자동반복 일정이 없습니다.');
+  };
+  const recurringRows=groupedCalendarHtml('recurring',activeRecurring,recurringRowBuilder,'진행 중인 자동반복 일정이 없습니다.');
+  const archiveRows=groupedCalendarHtml('recurring',archivedRecurring,recurringRowBuilder,'종료된 자동반복 일정이 없습니다.');
+  if(typeof collapsed.archivedRecurring!=='boolean') collapsed.archivedRecurring=true;
 
   const manualRows=groupedCalendarHtml('manual',manual,x=>{
     const c=cal(x.calId);
@@ -1712,9 +1731,13 @@ function renderFixed(){
 
   $('#fixedList').innerHTML=`
     <div class="fixedGroup">
-      <button type="button" class="fixedGroupHead" data-fixed-toggle="recurring" aria-expanded="${collapsed.recurring?'false':'true'}"><span>자동반복 <em>달력에 자동 배치</em></span><span class="fixedGroupMeta">${recurring.length}건 ${collapsed.recurring?'▸':'▾'}</span></button>
+      <button type="button" class="fixedGroupHead" data-fixed-toggle="recurring" aria-expanded="${collapsed.recurring?'false':'true'}"><span>자동반복 <em>달력에 자동 배치</em></span><span class="fixedGroupMeta">${activeRecurring.length}건 ${collapsed.recurring?'▸':'▾'}</span></button>
       <div class="fixedGroupBody ${collapsed.recurring?'collapsed':''}" data-fixed-panel="recurring">${recurringRows}</div>
     </div>
+    ${archivedRecurring.length?`<div class="fixedGroup archivedRecurringGroup">
+      <button type="button" class="fixedGroupHead" data-fixed-toggle="archivedRecurring" aria-expanded="${collapsed.archivedRecurring?'false':'true'}"><span>종료된 반복일정 <em>과거 기록 유지</em></span><span class="fixedGroupMeta">${archivedRecurring.length}건 ${collapsed.archivedRecurring?'▸':'▾'}</span></button>
+      <div class="fixedGroupBody ${collapsed.archivedRecurring?'collapsed':''}" data-fixed-panel="archivedRecurring">${archiveRows}</div>
+    </div>`:''}
     <div class="fixedGroup">
       <button type="button" class="fixedGroupHead" data-fixed-toggle="manual" aria-expanded="${collapsed.manual?'false':'true'}"><span>날짜 지정 배치 <em>드래그해서 넣기</em></span><span class="fixedGroupMeta">${manual.length}건 ${collapsed.manual?'▸':'▾'}</span></button>
       <div class="fixedGroupBody ${collapsed.manual?'collapsed':''}" data-fixed-panel="manual">${manualRows}</div>
@@ -4861,7 +4884,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.59',
+    appVersion:'2.60',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
