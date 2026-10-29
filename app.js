@@ -81,7 +81,7 @@ const defaultState = () => ({
   purchases: [],
   diary: {},
   actualWork: {},
-  settings: { hiddenCalendars: [], weekdayWidths:[100,100,100,100,100,100,100], weekdayWidthMode:'ratio', weekdayWidthReference:0, fixedPanelsCollapsed: { recurring:false, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','dday','diary'], sidebarSectionsCollapsed:{}, laneHeights:{}, laneCollapsed:{}, laneLabelWidth:72, mobileSectionsCollapsed:{}, dayLaneHeights:{}, dayLaneManual:{}, workloadRange:'week', weekViewMode:'detailed', monthShowCommonWithFocus:true, selectedDdayId:'' }
+  settings: { hiddenCalendars: [], weekdayWidths:[100,100,100,100,100,100,100], weekdayWidthMode:'ratio', weekdayWidthReference:0, fixedPanelsCollapsed: { recurring:false, archivedRecurring:true, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, archivedRecurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','dday','diary'], sidebarSectionsCollapsed:{}, laneHeights:{}, laneCollapsed:{}, laneLabelWidth:72, mobileSectionsCollapsed:{}, dayLaneHeights:{}, dayLaneManual:{}, workloadRange:'week', weekViewMode:'detailed', monthShowCommonWithFocus:true, selectedDdayId:'' }
 });
 
 let state = defaultState();
@@ -432,6 +432,7 @@ function normalizeState(raw){
       },
       sidebarCalendarGroupsCollapsed: {
         recurring: (s.settings?.sidebarCalendarGroupsCollapsed?.recurring && typeof s.settings.sidebarCalendarGroupsCollapsed.recurring==='object') ? {...s.settings.sidebarCalendarGroupsCollapsed.recurring} : {},
+        archivedRecurring: (s.settings?.sidebarCalendarGroupsCollapsed?.archivedRecurring && typeof s.settings.sidebarCalendarGroupsCollapsed.archivedRecurring==='object') ? {...s.settings.sidebarCalendarGroupsCollapsed.archivedRecurring} : {},
         manual: (s.settings?.sidebarCalendarGroupsCollapsed?.manual && typeof s.settings.sidebarCalendarGroupsCollapsed.manual==='object') ? {...s.settings.sidebarCalendarGroupsCollapsed.manual} : {},
         flexible: (s.settings?.sidebarCalendarGroupsCollapsed?.flexible && typeof s.settings.sidebarCalendarGroupsCollapsed.flexible==='object') ? {...s.settings.sidebarCalendarGroupsCollapsed.flexible} : {},
         payment: (s.settings?.sidebarCalendarGroupsCollapsed?.payment && typeof s.settings.sidebarCalendarGroupsCollapsed.payment==='object') ? {...s.settings.sidebarCalendarGroupsCollapsed.payment} : {}
@@ -1578,6 +1579,20 @@ function manualMonthProgress(placed){
   return {label:placed.length>1?`이번 달 ${done}/${placed.length} 완료`:'이번 달 미완료',complete:false};
 }
 
+// v2.74: restore last archive collapse choice even when an older Firebase snapshot arrives.
+function archivedRecurringLocalKey(){
+  return `calendar-archive-collapsed-v274:${currentUser?.uid||'local'}`;
+}
+function readArchivedRecurringLocalState(){
+  try{
+    const v=localStorage.getItem(archivedRecurringLocalKey());
+    return v==='true'?true:v==='false'?false:null;
+  }catch(_){return null;}
+}
+function writeArchivedRecurringLocalState(value){
+  try{localStorage.setItem(archivedRecurringLocalKey(),String(!!value));}catch(_){}
+}
+
 function sidebarCalendarCollapseMap(section){
   state.settings.sidebarCalendarGroupsCollapsed=state.settings.sidebarCalendarGroupsCollapsed||{recurring:{},archivedRecurring:{},manual:{},flexible:{},payment:{}};
   state.settings.sidebarCalendarGroupsCollapsed[section]=state.settings.sidebarCalendarGroupsCollapsed[section]||{};
@@ -1586,11 +1601,16 @@ function sidebarCalendarCollapseMap(section){
 function sidebarCalendarGroupHtml(section,c,bodyHtml,count){
   const collapsed=!!sidebarCalendarCollapseMap(section)[c.id];
   const path=calendarPath(c.id);
+  const manualCalendarButton=section==='manual'
+    ? `<button type="button" class="manualCalPreviewBtn" data-manual-preview-cal="${esc(c.id)}" title="${esc(path)}의 날짜 지정 배치만 달력으로 보기" aria-label="${esc(path)} 배치 달력 보기">▦</button>` : '';
   return `<div class="sidebarCalGroup ${collapsed?'collapsed':''}" style="--group-color:${esc(c.color)}">
-    <button type="button" class="sidebarCalGroupHead" data-sidebar-cal-toggle="${esc(section)}" data-cal-id="${esc(c.id)}" aria-expanded="${collapsed?'false':'true'}" title="${esc(path)} 접기/펴기">
-      <span class="sidebarCalGroupTitle"><i class="dot" style="background:${esc(c.color)}"></i><span>${esc(path)}</span></span>
-      <span class="sidebarCalGroupMeta">${count}건 ${collapsed?'▸':'▾'}</span>
-    </button>
+    <div class="sidebarCalGroupToolbar">
+      <button type="button" class="sidebarCalGroupHead" data-sidebar-cal-toggle="${esc(section)}" data-cal-id="${esc(c.id)}" aria-expanded="${collapsed?'false':'true'}" title="${esc(path)} 접기/펴기">
+        <span class="sidebarCalGroupTitle"><i class="dot" style="background:${esc(c.color)}"></i><span>${esc(path)}</span></span>
+        <span class="sidebarCalGroupMeta">${count}건 ${collapsed?'▸':'▾'}</span>
+      </button>
+      ${manualCalendarButton}
+    </div>
     <div class="sidebarCalGroupBody">${bodyHtml}</div>
   </div>`;
 }
@@ -1627,6 +1647,7 @@ function groupedCalendarHtml(section,items,rowBuilder,emptyText){
 // v2.61: 특정 반복업무 한 건만 보여주는 월별 배치 미리보기.
 let recurringPreviewId=null;
 let manualPreviewMode=false;
+let manualPreviewCalId='';
 let recurringPreviewCursor=null;
 function openRecurringPreview(id){
   if(!state.events.some(e=>String(e.id)===String(id)))return;
@@ -1636,9 +1657,16 @@ function openRecurringPreview(id){
   renderRecurringPreview();
   openDialog($('#recurringPreviewDlg'));
 }
-function openManualPlacementPreview(){
+function manualPreviewCalendars(){
+  const ids=new Set((state.fixed||[]).map(f=>String(f.calId||'')));
+  return cals().filter(c=>ids.has(String(c.id)));
+}
+function openManualPlacementPreview(calId=''){
   manualPreviewMode=true;
   recurringPreviewId=null;
+  const available=manualPreviewCalendars();
+  // When opened from the global header, show the first calendar, not a mixed list.
+  manualPreviewCalId=available.some(c=>String(c.id)===String(calId))?String(calId):(available[0]?.id||'');
   recurringPreviewCursor=new Date(cursor.getFullYear(),cursor.getMonth(),1);
   renderRecurringPreview();
   openDialog($('#recurringPreviewDlg'));
@@ -1649,18 +1677,31 @@ function renderManualPlacementPreview(){
   const first=new Date(y,m,1),s=startWeek(first),last=new Date(y,m+1,0);
   const weeks=Math.ceil(((first.getDay()+6)%7+last.getDate())/7);
   const begin=ds(s),end=ds(add(s,weeks*7-1));
-  const fixedMap=new Map((state.fixed||[]).map(f=>[String(f.id),f]));
+  const available=manualPreviewCalendars();
+  if(!available.some(c=>String(c.id)===String(manualPreviewCalId)))manualPreviewCalId=available[0]?.id||'';
+  const chosen=available.find(c=>String(c.id)===String(manualPreviewCalId));
+  // Only source templates in the selected calendar are considered. This works even
+  // when an individual placed occurrence has been moved to another date.
+  const relevantFixedIds=new Set((state.fixed||[])
+    .filter(f=>String(f.calId||'')===String(manualPreviewCalId))
+    .map(f=>String(f.id)));
   const byDay=new Map();
-  state.events.filter(e=>e.fixedId && fixedMap.has(String(e.fixedId)) && e.date>=begin && e.date<=end)
+  state.events.filter(e=>e.fixedId && relevantFixedIds.has(String(e.fixedId)) &&
+    typeof e.date==='string' && e.date>=begin && e.date<=end)
     .forEach(e=>{const list=byDay.get(e.date)||[];list.push(e);byDay.set(e.date,list);});
   const days=Array.from({length:weeks*7},(_,i)=>{
     const d=add(s,i),k=ds(d),other=d.getMonth()!==m;
     const entries=byDay.get(k)||[];
-    return `<div class="recurringPreviewDay ${other?'other':''}" style="min-height:78px;overflow:hidden"><span class="previewDayNumber">${d.getDate()}</span>${entries.map(e=>`<div style="font-size:10px;line-height:1.35;margin-top:3px;padding:2px 3px;border-left:3px solid ${esc(cal(e.calId).color)};background:#f4f6fa;overflow-wrap:anywhere" title="${esc(e.title)}">${isDone(e)?'✓ ':''}${esc(e.title)}</div>`).join('')}</div>`;
+    return `<div class="recurringPreviewDay ${other?'other':''}" style="min-height:78px;overflow:hidden"><span class="previewDayNumber">${d.getDate()}</span>${entries.map(e=>`<div class="manualPreviewItem" style="border-left-color:${esc(cal(e.calId).color)}" title="${esc(e.title)}">${isDone(e)?'✓ ':''}${esc(e.title)}</div>`).join('')}</div>`;
   }).join('');
-  $('#recurringPreviewTitle').textContent='날짜 지정 배치 일정';
+  $('#recurringPreviewTitle').textContent=`날짜 지정 배치 · ${chosen?calendarPath(chosen.id):'캘린더 선택'}`;
   $('#recurringPreviewMonth').textContent=`${y}년 ${m+1}월`;
-  box.innerHTML=`<div class="recurringPreviewWeekdays">${['월','화','수','목','금','토','일'].map(x=>`<span>${x}</span>`).join('')}</div><div class="recurringPreviewGrid">${days}</div><p class="recurringPreviewNote">날짜 지정 배치 업무만 표시합니다.</p>`;
+  const options=available.map(c=>`<option value="${esc(c.id)}" ${String(c.id)===String(manualPreviewCalId)?'selected':''}>${esc(calendarPath(c.id))}</option>`).join('');
+  box.innerHTML=`<label class="manualPreviewFilter">캘린더별 보기 <select id="manualPreviewCalSelect" aria-label="날짜 지정 배치 캘린더 선택">${options}</select></label><div class="recurringPreviewWeekdays">${['월','화','수','목','금','토','일'].map(x=>`<span>${x}</span>`).join('')}</div><div class="recurringPreviewGrid">${days}</div><p class="recurringPreviewNote">${chosen?esc(calendarPath(chosen.id))+'의 ':''}날짜 지정 배치 일정만 표시합니다. 다른 캘린더의 일정은 표시하지 않습니다.</p>`;
+  box.querySelector('#manualPreviewCalSelect')?.addEventListener('change',ev=>{
+    manualPreviewCalId=ev.target.value;
+    renderManualPlacementPreview();
+  });
 }
 function recurringPreviewEntries(e,start,end){
   const byDate=new Map();
@@ -1737,6 +1778,8 @@ function renderFixed(){
   };
   const recurringRows=groupedCalendarHtml('recurring',activeRecurring,recurringRowBuilder,'진행 중인 자동반복 일정이 없습니다.');
   const archiveRows=groupedCalendarHtml('archivedRecurring',archivedRecurring,recurringRowBuilder,'종료된 자동반복 일정이 없습니다.');
+  const localArchivedCollapsed=readArchivedRecurringLocalState();
+  if(localArchivedCollapsed!==null) collapsed.archivedRecurring=localArchivedCollapsed;
   if(typeof collapsed.archivedRecurring!=='boolean') collapsed.archivedRecurring=true;
 
   const manualRows=groupedCalendarHtml('manual',manual,x=>{
@@ -1789,11 +1832,20 @@ function renderFixed(){
     }
     x.ondblclick=()=>openFixed(x.dataset.fid);
   });
-  $('#fixedList .manualPreviewCalendarBtn')?.addEventListener('click',openManualPlacementPreview);
+  $('#fixedList .manualPreviewCalendarBtn')?.addEventListener('click',ev=>{
+    ev.stopPropagation();openManualPlacementPreview();
+  });
+  $('#fixedList').querySelectorAll('[data-manual-preview-cal]').forEach(btn=>{
+    btn.addEventListener('click',ev=>{
+      ev.stopPropagation();
+      openManualPlacementPreview(btn.dataset.manualPreviewCal);
+    });
+  });
   $$('[data-fixed-toggle]').forEach(btn=>btn.onclick=()=>{
     const key=btn.dataset.fixedToggle;
     state.settings.fixedPanelsCollapsed=state.settings.fixedPanelsCollapsed||{};
     state.settings.fixedPanelsCollapsed[key]=!state.settings.fixedPanelsCollapsed[key];
+    if(key==='archivedRecurring') writeArchivedRecurringLocalState(state.settings.fixedPanelsCollapsed[key]);
     save();
   });
   bindSidebarCalendarGroupToggles($('#fixedList'));
@@ -4964,7 +5016,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.65',
+    appVersion:'2.74',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state

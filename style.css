@@ -3136,3 +3136,11 @@ body,button,input,select,textarea{font-family:var(--ui-font);font-weight:500}
 /* v2.68: compact archived payment heading */
 #sidebar .archivedPaymentPanel > summary {font-size:10px !important;font-weight:500 !important;line-height:1.3 !important;padding:1px 0 !important;}
 \n.manualPreviewHeader{display:flex;align-items:stretch;position:relative}.manualPreviewHeader .fixedGroupHead{flex:1;min-width:0}.manualPreviewCalendarBtn{order:2;flex:none;margin:3px 5px 3px 0;padding:0 7px;border:1px solid #cbd3de;background:#fff;color:#35465c;cursor:pointer;font-size:14px}.manualPreviewCalendarBtn:hover{background:#eaf0fa}\n
+/* v2.74: independent per-calendar date-placement preview controls */
+.sidebarCalGroupToolbar{display:flex;align-items:stretch;min-width:0}
+.sidebarCalGroupToolbar>.sidebarCalGroupHead{flex:1;min-width:0}
+.sidebarCalGroupToolbar>.manualCalPreviewBtn{flex:0 0 26px;align-self:center;height:24px;margin:2px 4px 2px 0;padding:0;border:1px solid #d8dfe9;border-radius:0;background:#fff;color:#46617e;font-size:13px;line-height:1;cursor:pointer}
+.sidebarCalGroupToolbar>.manualCalPreviewBtn:hover{background:#ebf2fb}
+.manualPreviewFilter{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:600;margin:4px 0 10px}
+.manualPreviewFilter select{flex:1;min-width:0;border:1px solid #cbd5e1;border-radius:0;background:#fff;padding:6px;font:inherit}
+.manualPreviewItem{font-size:10px;line-height:1.35;margin-top:3px;padding:2px 3px;border-left:3px solid #c9d2df;background:#f4f6fa;overflow-wrap:anywhere;min-width:0}
