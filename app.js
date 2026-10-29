@@ -1579,7 +1579,7 @@ function manualMonthProgress(placed){
 }
 
 function sidebarCalendarCollapseMap(section){
-  state.settings.sidebarCalendarGroupsCollapsed=state.settings.sidebarCalendarGroupsCollapsed||{recurring:{},manual:{},flexible:{},payment:{}};
+  state.settings.sidebarCalendarGroupsCollapsed=state.settings.sidebarCalendarGroupsCollapsed||{recurring:{},archivedRecurring:{},manual:{},flexible:{},payment:{}};
   state.settings.sidebarCalendarGroupsCollapsed[section]=state.settings.sidebarCalendarGroupsCollapsed[section]||{};
   return state.settings.sidebarCalendarGroupsCollapsed[section];
 }
@@ -1626,13 +1626,41 @@ function groupedCalendarHtml(section,items,rowBuilder,emptyText){
 
 // v2.61: 특정 반복업무 한 건만 보여주는 월별 배치 미리보기.
 let recurringPreviewId=null;
+let manualPreviewMode=false;
 let recurringPreviewCursor=null;
 function openRecurringPreview(id){
   if(!state.events.some(e=>String(e.id)===String(id)))return;
+  manualPreviewMode=false;
   recurringPreviewId=id;
   recurringPreviewCursor=new Date(cursor.getFullYear(),cursor.getMonth(),1);
   renderRecurringPreview();
   openDialog($('#recurringPreviewDlg'));
+}
+function openManualPlacementPreview(){
+  manualPreviewMode=true;
+  recurringPreviewId=null;
+  recurringPreviewCursor=new Date(cursor.getFullYear(),cursor.getMonth(),1);
+  renderRecurringPreview();
+  openDialog($('#recurringPreviewDlg'));
+}
+function renderManualPlacementPreview(){
+  const box=$('#recurringPreviewContent');if(!box)return;
+  const date=recurringPreviewCursor||new Date(),y=date.getFullYear(),m=date.getMonth();
+  const first=new Date(y,m,1),s=startWeek(first),last=new Date(y,m+1,0);
+  const weeks=Math.ceil(((first.getDay()+6)%7+last.getDate())/7);
+  const begin=ds(s),end=ds(add(s,weeks*7-1));
+  const fixedMap=new Map((state.fixed||[]).map(f=>[String(f.id),f]));
+  const byDay=new Map();
+  state.events.filter(e=>e.fixedId && fixedMap.has(String(e.fixedId)) && e.date>=begin && e.date<=end)
+    .forEach(e=>{const list=byDay.get(e.date)||[];list.push(e);byDay.set(e.date,list);});
+  const days=Array.from({length:weeks*7},(_,i)=>{
+    const d=add(s,i),k=ds(d),other=d.getMonth()!==m;
+    const entries=byDay.get(k)||[];
+    return `<div class="recurringPreviewDay ${other?'other':''}" style="min-height:78px;overflow:hidden"><span class="previewDayNumber">${d.getDate()}</span>${entries.map(e=>`<div style="font-size:10px;line-height:1.35;margin-top:3px;padding:2px 3px;border-left:3px solid ${esc(cal(e.calId).color)};background:#f4f6fa;overflow-wrap:anywhere" title="${esc(e.title)}">${isDone(e)?'✓ ':''}${esc(e.title)}</div>`).join('')}</div>`;
+  }).join('');
+  $('#recurringPreviewTitle').textContent='날짜 지정 배치 일정';
+  $('#recurringPreviewMonth').textContent=`${y}년 ${m+1}월`;
+  box.innerHTML=`<div class="recurringPreviewWeekdays">${['월','화','수','목','금','토','일'].map(x=>`<span>${x}</span>`).join('')}</div><div class="recurringPreviewGrid">${days}</div><p class="recurringPreviewNote">날짜 지정 배치 업무만 표시합니다.</p>`;
 }
 function recurringPreviewEntries(e,start,end){
   const byDate=new Map();
@@ -1655,6 +1683,7 @@ function recurringPreviewEntries(e,start,end){
   return byDate;
 }
 function renderRecurringPreview(){
+  if(manualPreviewMode){renderManualPlacementPreview();return;}
   const e=state.events.find(x=>String(x.id)===String(recurringPreviewId));
   const box=$('#recurringPreviewContent');if(!box||!e)return;
   const date=recurringPreviewCursor||new Date();
@@ -1707,7 +1736,7 @@ function renderFixed(){
     return `<div class="fixed recurringFixed ${progress.complete?'monthComplete':'monthPending'}" data-eid="${esc(e.id)}" style="border-left-color:${esc(c.color)}" title="${esc(`${calendarPath(c.id)} · ${rule} · ${durationLabel(e)} · ${progress.label}`)}"><button type="button" class="recurringInspectBtn" title="이 반복업무만 월 달력에서 보기"><b>${e.important?'★ ':''}${esc(e.title)}</b><small>${esc(kindLabel)} · ${esc(rule)} · ${esc(durationLabel(e))}</small><span class="monthProgress ${progress.complete?'complete':''}">${esc(progress.label)}</span></button><button type="button" class="recurringEditBtn" title="반복업무 수정" aria-label="${esc(e.title)} 수정">✎</button></div>`;
   };
   const recurringRows=groupedCalendarHtml('recurring',activeRecurring,recurringRowBuilder,'진행 중인 자동반복 일정이 없습니다.');
-  const archiveRows=groupedCalendarHtml('recurring',archivedRecurring,recurringRowBuilder,'종료된 자동반복 일정이 없습니다.');
+  const archiveRows=groupedCalendarHtml('archivedRecurring',archivedRecurring,recurringRowBuilder,'종료된 자동반복 일정이 없습니다.');
   if(typeof collapsed.archivedRecurring!=='boolean') collapsed.archivedRecurring=true;
 
   const manualRows=groupedCalendarHtml('manual',manual,x=>{
@@ -1739,7 +1768,7 @@ function renderFixed(){
       <div class="fixedGroupBody ${collapsed.archivedRecurring?'collapsed':''}" data-fixed-panel="archivedRecurring">${archiveRows}</div>
     </div>`:''}
     <div class="fixedGroup">
-      <button type="button" class="fixedGroupHead" data-fixed-toggle="manual" aria-expanded="${collapsed.manual?'false':'true'}"><span>날짜 지정 배치 <em>드래그해서 넣기</em></span><span class="fixedGroupMeta">${manual.length}건 ${collapsed.manual?'▸':'▾'}</span></button>
+      <div class="manualPreviewHeader"><button type="button" class="manualPreviewCalendarBtn" title="날짜 지정 배치 일정만 월 달력으로 보기" aria-label="날짜 지정 배치 달력 보기">▦</button><button type="button" class="fixedGroupHead" data-fixed-toggle="manual" aria-expanded="${collapsed.manual?'false':'true'}"><span>날짜 지정 배치 <em>드래그해서 넣기</em></span><span class="fixedGroupMeta">${manual.length}건 ${collapsed.manual?'▸':'▾'}</span></button>
       <div class="fixedGroupBody ${collapsed.manual?'collapsed':''}" data-fixed-panel="manual">${manualRows}</div>
     </div>`;
 
@@ -1760,6 +1789,7 @@ function renderFixed(){
     }
     x.ondblclick=()=>openFixed(x.dataset.fid);
   });
+  $('#fixedList .manualPreviewCalendarBtn')?.addEventListener('click',openManualPlacementPreview);
   $$('[data-fixed-toggle]').forEach(btn=>btn.onclick=()=>{
     const key=btn.dataset.fixedToggle;
     state.settings.fixedPanelsCollapsed=state.settings.fixedPanelsCollapsed||{};
