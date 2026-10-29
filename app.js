@@ -1835,6 +1835,18 @@ function renderPayments(){
         (isArchived ? (sortKey,html)=>archiveRows.push({sortKey,html}) : (sortKey,html)=>push(e.calId,sortKey,html))(occ,`<div class="paymentRow ${done?'paid':''}" data-eid="${esc(e.id)}" data-occ="${esc(occ)}" style="border-left-color:${esc(c.color)}"><button type="button" class="paymentCheck" title="${done?'납부완료 취소':'납부완료 체크'}">${done?'☑':'☐'}</button><button type="button" class="paymentOpen"><b>${e.important?'★ ':''}${esc(e.title)}</b><small>${esc(occ)} · ${amount}${method}${(e.repeat||'none')!=='none'?` · ${esc(repeatRuleLabel(e))}`:''}</small></button></div>`);
       }
     }else{
+      // 이동된 반복 납부 회차가 이번 달에 있으면 원본의 제외 회차를
+      // 별도의 '이번 달 삭제됨' 행으로 중복 표시하지 않는다.
+      const movedThisMonth=state.events.some(x=>
+        String(x.detachedFromRepeatId||'')===String(e.id) &&
+        (x.repeat||'none')==='none' && x.kind==='payment' &&
+        String(x.date||'')>=startKey && String(x.date||'')<=endKey
+      );
+      if(movedThisMonth) continue;
+      // 현재 표시 중인 월에 예정 회차도 삭제 기록도 없으면 목록에 표시하지 않는다.
+      // 미래 납부일을 '이번 달 해당 없음'으로 미리 나열하지 않는다.
+      const deletedThisMonth=(e.excludedDates||[]).some(d=>d>=startKey && d<=endKey);
+      if(!isArchived && !deletedThisMonth) continue;
       const next=nextOccurrenceFor(e,ds(new Date()),740);
       const c=cal(e.calId);
       (isArchived ? (sortKey,html)=>archiveRows.push({sortKey,html}) : (sortKey,html)=>push(e.calId,sortKey,html))(next||'9999-12-31',`<div class="paymentRow paymentNoMonth" data-eid="${esc(e.id)}" data-occ="${esc(next||e.date)}" style="border-left-color:${esc(c.color)}"><span class="paymentCheck muted">·</span><button type="button" class="paymentOpen"><b>${e.important?'★ ':''}${esc(e.title)}</b><small>${(e.excludedDates||[]).some(d=>d>=startKey&&d<=endKey)?'이번 달 삭제됨':'이번 달 해당 없음'}${next?` · 다음 ${esc(next)}`:''} · ${esc(repeatRuleLabel(e))}</small></button></div>`);
