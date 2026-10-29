@@ -1579,7 +1579,7 @@ function manualMonthProgress(placed){
   return {label:placed.length>1?`이번 달 ${done}/${placed.length} 완료`:'이번 달 미완료',complete:false};
 }
 
-// v2.74: restore last archive collapse choice even when an older Firebase snapshot arrives.
+// v2.75: restore last archive collapse choice even when an older Firebase snapshot arrives.
 function archivedRecurringLocalKey(){
   return `calendar-archive-collapsed-v274:${currentUser?.uid||'local'}`;
 }
@@ -1811,7 +1811,7 @@ function renderFixed(){
       <div class="fixedGroupBody ${collapsed.archivedRecurring?'collapsed':''}" data-fixed-panel="archivedRecurring">${archiveRows}</div>
     </div>`:''}
     <div class="fixedGroup">
-      <div class="manualPreviewHeader"><button type="button" class="manualPreviewCalendarBtn" title="날짜 지정 배치 일정만 월 달력으로 보기" aria-label="날짜 지정 배치 달력 보기">▦</button><button type="button" class="fixedGroupHead" data-fixed-toggle="manual" aria-expanded="${collapsed.manual?'false':'true'}"><span>날짜 지정 배치 <em>드래그해서 넣기</em></span><span class="fixedGroupMeta">${manual.length}건 ${collapsed.manual?'▸':'▾'}</span></button>
+      <button type="button" class="fixedGroupHead" data-fixed-toggle="manual" aria-expanded="${collapsed.manual?'false':'true'}"><span>날짜 지정 배치 <em>드래그해서 넣기</em></span><span class="fixedGroupMeta">${manual.length}건 ${collapsed.manual?'▸':'▾'}</span></button>
       <div class="fixedGroupBody ${collapsed.manual?'collapsed':''}" data-fixed-panel="manual">${manualRows}</div>
     </div>`;
 
@@ -1831,9 +1831,6 @@ function renderFixed(){
       x.ondragend=()=>{ activeDrag=null; x.classList.remove('dragging'); $$('.dropReady').forEach(el=>el.classList.remove('dropReady')); };
     }
     x.ondblclick=()=>openFixed(x.dataset.fid);
-  });
-  $('#fixedList .manualPreviewCalendarBtn')?.addEventListener('click',ev=>{
-    ev.stopPropagation();openManualPlacementPreview();
   });
   $('#fixedList').querySelectorAll('[data-manual-preview-cal]').forEach(btn=>{
     btn.addEventListener('click',ev=>{
