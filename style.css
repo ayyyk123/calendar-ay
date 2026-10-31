@@ -3175,3 +3175,112 @@ body,button,input,select,textarea{font-family:var(--ui-font);font-weight:500}
   font-size:12px;
   line-height:1;
 }
+
+/* v2.76: mobile date range LEFT, all view switch buttons RIGHT on SAME row.
+   Prevent the long title-only row from pushing List/2-week/dropdown off-screen. */
+@media (max-width:760px){
+  header nav {
+    grid-area:nav!important;
+    display:flex!important;
+    flex-direction:row!important;
+    flex-wrap:nowrap!important;
+    justify-content:space-between!important;
+    align-items:center!important;
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+    gap:5px!important;
+    padding:0!important;
+    margin:0!important;
+    overflow:visible!important;
+  }
+  header nav #range {
+    display:block!important;
+    flex:0 1 92px!important;
+    width:auto!important;
+    max-width:92px!important;
+    min-width:0!important;
+    margin:0!important;
+    padding:0!important;
+    text-align:left!important;
+    line-height:1.25!important;
+    font-size:11px!important;
+    white-space:nowrap!important;
+    overflow:hidden!important;
+    text-overflow:clip!important;
+    align-self:center!important;
+  }
+  header nav #currentViewWrap {
+    display:flex!important;
+    position:relative!important;
+    top:auto!important;
+    left:auto!important;
+    right:auto!important;
+    transform:none!important;
+    flex:1 1 auto!important;
+    min-width:0!important;
+    max-width:calc(100% - 92px)!important;
+    margin:0!important;
+    align-items:center!important;
+  }
+  header nav .primaryViewButtons {
+    display:flex!important;
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+    flex-wrap:nowrap!important;
+    align-items:stretch!important;
+    gap:0!important;
+    border:1px solid #cbd0d8!important;
+  }
+  header nav .primaryViewBtn {
+    display:flex!important;
+    flex:1 1 0!important;
+    width:0!important;
+    min-width:0!important;
+    height:32px!important;
+    padding:0 1px!important;
+    border:0!important;
+    border-right:1px solid #cbd0d8!important;
+    border-radius:0!important;
+    justify-content:center!important;
+    align-items:center!important;
+    white-space:nowrap!important;
+    font-size:11px!important;
+    line-height:30px!important;
+  }
+  header nav #extraViewMenuToggle {
+    display:flex!important;
+    justify-content:center!important;
+    align-items:center!important;
+    flex:0 0 19px!important;
+    min-width:0!important;
+    width:19px!important;
+    height:32px!important;
+    padding:0!important;
+    font-size:11px!important;
+    border:0!important;
+    border-radius:0!important;
+  }
+  header nav .primaryViewBtn.on {
+    background:#6758e9!important;
+    color:#fff!important;
+    border-color:#6758e9!important;
+  }
+  header nav #currentViewMenu {
+    left:auto!important;
+    right:0!important;
+    top:calc(100% + 4px)!important;
+  }
+}
+@media (max-width:390px){
+  header nav #range{flex-basis:77px!important;max-width:77px!important;font-size:10px!important;letter-spacing:-.04em!important}
+  header nav #currentViewWrap{max-width:calc(100% - 77px)!important}
+  header nav .primaryViewBtn{font-size:10px!important}
+  header nav #extraViewMenuToggle{flex-basis:16px!important;width:16px!important}
+}
+
+/* v2.77: individual repeated occurrence date editing */
+.eventRecurringDateHint{background:#f4f6fb;border:1px solid #dce2ee;color:#354258;font-size:11px;line-height:1.5;padding:6px 8px;margin:-2px 0 8px;}
+.repeatEditDateChange{font-size:12px;color:#4a3aac;font-weight:650;background:#f0edff;padding:8px 10px;border-left:3px solid #6859d8;margin:7px 0;}
+@media(max-width:760px){.eventRecurringDateHint{font-size:10.5px;padding:5px 6px;}}

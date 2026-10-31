@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '2.33',
+  version: '2.77',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -353,7 +353,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '2.33',
+    version: '2.77',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -1579,7 +1579,7 @@ function manualMonthProgress(placed){
   return {label:placed.length>1?`이번 달 ${done}/${placed.length} 완료`:'이번 달 미완료',complete:false};
 }
 
-// v2.75: restore last archive collapse choice even when an older Firebase snapshot arrives.
+// v2.77: restore last archive collapse choice even when an older Firebase snapshot arrives.
 function archivedRecurringLocalKey(){
   return `calendar-archive-collapsed-v274:${currentUser?.uid||'local'}`;
 }
@@ -4233,7 +4233,8 @@ function openEvent(date,id,options={}){
   const occLabel=$('#eventOccurrenceDate'); if(occLabel) occLabel.textContent=e?activeEventOccurrence:'';
   eventSpanDaysDraft=e?Math.max(0,diffDays(e.date,e.endDate||e.date)):0;
   $('#eid').value=e?.id||''; $('#title').value=e?.title||''; $('#important').checked=!!e?.important; $('#cal').value=e?.calId||requestedCalId||cals()[0]?.id||'';
-  $('#date').value=e?.date||date||ds(cursor); $('#endDate').value=e?.endDate||e?.date||date||ds(cursor);
+  const editingRecurring=!!e && (e.repeat||'none')!=='none';
+  $('#date').value=editingRecurring?activeEventOccurrence:(e?.date||date||ds(cursor)); $('#endDate').value=e?.endDate||e?.date||date||ds(cursor);
   $('#allDay').checked=e?.allDay??true; $('#start').value=e?.start||''; $('#end').value=e?.end||''; setDurationInputs(e?.hours??1); $('#noDuration').checked=paymentPreset?true:(e ? !!e.noDuration : true);
   $('#kind').value=e?.kind||(paymentPreset?'payment':(quickPreset?'todo':(commonPreset?'appointment':(recurringPreset?'todo':'event')))); $('#place').value=e?.place||''; $('#repeat').value=e?.repeat||(paymentPreset?'monthly':(recurringPreset?'weekly':'none')); lastRepeatFormType=$('#repeat').value; $('#memo').value=e?.memo||'';
   // 새 일정은 이전에 열었던 일정의 준비/마감 정보를 절대 이어받지 않는다.
@@ -4292,6 +4293,8 @@ function openEvent(date,id,options={}){
   }
   $('#carryEvent').classList.toggle('hidden',!e || e.kind==='anniversary' || e.kind==='payment' || (occurrenceView&&isDone(occurrenceView)));
   updateAllDayUI(); updateKindUI(); setRepeatRule(e||{date:$('#date').value,repeat:$('#repeat').value,repeatRule:null}); updateDurationMode(); updatePrepUI();
+  showRecurringDateEditHint(e,activeEventOccurrence);
+  openedRecurringRuleFingerprint=editingRecurring?recurrenceRuleFormFingerprint():'';
   openDialog($('#eventDlg'));
   if(options?.prepFocusDate){
     requestAnimationFrame(()=>requestAnimationFrame(()=>{
@@ -4307,6 +4310,42 @@ function openDialog(d){ if(!d.open) d.showModal(); }
 function closeDialog(d){ if(d.open) d.close(); }
 
 
+let openedRecurringRuleFingerprint = '';
+function recurrenceRuleFormFingerprint(){
+  const checked=$$('#weeklyOptions input[type=checkbox]:checked').map(x=>x.value).sort();
+  return JSON.stringify([
+    $('#repeat').value,$('#repeatInterval').value,checked,
+    $('#monthlyMode').value,$('#monthlyMonthEnd').checked,
+    $('#yearlyCalendar').value,$('#yearlyMonth').value,$('#yearlyDay').value,
+    $('#lunarMonth').value,$('#lunarDay').value,$('#lunarLeap').checked,
+    $('#repeatEndType').value,$('#repeatEndDate').value,$('#repeatCount').value
+  ]);
+}
+function showRecurringDateEditHint(old,occ){
+  const isRecurring=!!old && (old.repeat||'none')!=='none';
+  const hint=$('#eventRecurringDateHint');
+  hint?.classList.toggle('hidden',!isRecurring);
+  const startLabel=$('#eventStartDateLabel'),endLabel=$('#eventEndDateLabel');
+  if(startLabel) startLabel.textContent=isRecurring?'선택한 회차 날짜':'날짜';
+  if(endLabel) endLabel.textContent=isRecurring?'반복 종료일':'종료일';
+  if(isRecurring && hint){
+    hint.textContent=`반복 시작일 ${old.date} · 선택한 회차 ${occ} · 날짜를 변경한 뒤 저장하면 이동 범위를 선택할 수 있습니다.`;
+  }
+}
+function applyWholeRecurringFormEdit(old,obj,occ,target,ruleEdited){
+  const delta=diffDays(occ,target);
+  // Dates and completion histories must move together; never overwrite shifted histories.
+  if(delta) moveRecurringWholeSeries(old,target,occ);
+  const movedDate=old.date,movedEndDate=old.endDate,movedRule=old.repeatRule;
+  const records={
+    excludedDates:old.excludedDates,doneDates:old.doneDates,
+    checklistDoneByDate:cleanedChecklistDoneMap(old.checklistDoneByDate,obj.checklist),
+    orderByDate:old.orderByDate,done:old.done,
+    carryoverHistory:old.carryoverHistory
+  };
+  Object.assign(old,obj,{...records,date:movedDate,endDate:movedEndDate,
+    repeatRule:ruleEdited?obj.repeatRule:movedRule});
+}
 let pendingRepeatEdit=null;
 function repeatEditOccurrenceOnly(old,obj,occ){
   const originalSpan=Math.max(0,diffDays(old.date,old.endDate||old.date));
@@ -4317,6 +4356,7 @@ function repeatEditOccurrenceOnly(old,obj,occ){
   old.excludedDates=Array.isArray(old.excludedDates)?old.excludedDates:[];
   if(!old.excludedDates.includes(occ)) old.excludedDates.push(occ);
   const done=(old.doneDates||[]).includes(occ);
+  old.doneDates=(old.doneDates||[]).filter(d=>d!==occ);
   const doneIds=Array.isArray(obj.checklistDoneByDate?.[occ])?[...obj.checklistDoneByDate[occ]]:[];
   const detached={...structuredClone(old),...structuredClone(obj),id:uid(),date:targetDate,endDate:targetEnd,repeat:'none',repeatRule:null,excludedDates:[],done,doneDates:[],checklistDoneByDate:doneIds.length?{[targetDate]:doneIds}:{},orderByDate:{},repeatOrder:0,fixedId:null,detachedFromRepeatId:old.id,detachedOccurrence:occ};
   detached.carryoverHistory=[];
@@ -4358,22 +4398,33 @@ function finishRepeatEdit(){
   pendingRepeatEdit=null; activeEventOccurrence=null;
   closeDialog($('#repeatEditDlg')); closeDialog($('#eventDlg')); save();
 }
-function requestRepeatEditScope(old,obj){
+function requestRepeatEditScope(old,obj,chosenDate,ruleEdited=false){
   const occ=activeEventOccurrence||old.date;
-  pendingRepeatEdit={id:old.id,occ,obj};
-  $('#repeatEditInfo').textContent=`${occ} 반복 일정의 수정 범위를 선택하세요.`;
+  pendingRepeatEdit={id:old.id,occ,obj,chosenDate:chosenDate||occ,ruleEdited};
+  $('#repeatEditInfo').textContent=`선택한 회차: ${occ} · 수정 적용 범위를 선택하세요.`;
+  const target=$('#repeatEditDateChange');
+  if(target){
+    target.classList.toggle('hidden',!chosenDate||chosenDate===occ);
+    target.textContent=chosenDate&&chosenDate!==occ?`날짜 이동: ${occ} → ${chosenDate}`:'';
+  }
   openDialog($('#repeatEditDlg'));
 }
 $('#eventForm').onsubmit=e=>{
   e.preventDefault();
   const id=$('#eid').value, old=state.events.find(x=>x.id===id);
   const repeat=$('#repeat').value;
+  const isRecurringEdit=!!old && (old.repeat||'none')!=='none';
+  const selectedOcc=isRecurringEdit?(activeEventOccurrence||old.date):'';
+  const chosenDate=$('#date').value;
+  const recurringDelta=isRecurringEdit?diffDays(selectedOcc,chosenDate):0;
+  const changedRepeatRule=isRecurringEdit && openedRecurringRuleFingerprint!==recurrenceRuleFormFingerprint();
   const internalEndDate=internalEventEndDateFromForm();
+  const comparisonAnchor=isRecurringEdit?old.date:chosenDate;
   if(repeat==='none' && $('#endDate').value && $('#endDate').value<$('#date').value){ alert('종료일은 시작일보다 빠를 수 없습니다.'); return; }
-  if(repeat!=='none' && $('#repeatEndType').value==='date' && $('#endDate').value && $('#endDate').value<$('#date').value){ alert('반복 종료 날짜는 시작 날짜보다 빠를 수 없습니다.'); return; }
+  if(repeat!=='none' && $('#repeatEndType').value==='date' && $('#endDate').value && $('#endDate').value<comparisonAnchor){ alert('반복 종료 날짜는 시작 날짜보다 빠를 수 없습니다.'); return; }
   if(!$('#allDay').checked && $('#start').value && $('#end').value && $('#end').value<=$('#start').value && $('#date').value===internalEndDate){ alert('종료 시간은 시작 시간보다 늦어야 합니다.'); return; }
   if($('#repeat').value!=='none' && $('#repeatEndType').value==='date' && !$('#repeatEndDate').value){ alert('반복 종료 날짜를 선택하세요.'); return; }
-  if($('#repeat').value!=='none' && $('#repeatEndType').value==='date' && $('#repeatEndDate').value<$('#date').value){ alert('반복 종료 날짜는 시작 날짜보다 빠를 수 없습니다.'); return; }
+  if($('#repeat').value!=='none' && $('#repeatEndType').value==='date' && $('#repeatEndDate').value<comparisonAnchor){ alert('반복 종료 날짜는 시작 날짜보다 빠를 수 없습니다.'); return; }
   if($('#repeat').value==='yearly' && $('#yearlyCalendar').value==='lunar' && !lunarFormatter){ alert('현재 브라우저에서는 음력 날짜 변환을 지원하지 않습니다.'); return; }
   const prepEnabled=!!$('#prepEnabled').checked && !['anniversary','payment'].includes($('#kind').value);
   if(prepEnabled && $('#repeat').value!=='none'){ alert('준비기간이 있는 기한 일정은 반복 없음으로 등록해 주세요.'); return; }
@@ -4396,13 +4447,22 @@ $('#eventForm').onsubmit=e=>{
     done:old?.done||false, doneDates:old?.doneDates||[], excludedDates:old?.excludedDates||[], fixedId:old?.fixedId||null
   };
   if(!obj.title) return;
+  if(isRecurringEdit){
+    // Form date denotes clicked occurrence, NOT the recurrence's original anchor.
+    // The existing scoped-edit helpers expect a shifted series anchor instead.
+    obj.date=shiftedDateString(old.date,recurringDelta);
+    obj.endDate=shiftedDateString(old.endDate||old.date,recurringDelta);
+    if(repeat!=='none' && !changedRepeatRule){
+      obj.repeatRule=recurringDelta?shiftRepeatRuleForAnchor(old,selectedOcc,chosenDate):structuredClone(old.repeatRule);
+    }
+  }
   if(checklist.length){
     const preview={...(old||{}),...obj};
     if(repeat==='none') obj.done=checklistProgress({...preview,_occurrenceStart:obj.date},obj.date).complete;
     else obj.doneDates=(obj.doneDates||[]).filter(date=>checklistProgress({...preview,_occurrenceStart:date},date).complete);
   }
-  if(id && old && (old.repeat||'none')!=='none'){
-    requestRepeatEditScope(old,obj);
+  if(isRecurringEdit){
+    requestRepeatEditScope(old,obj,chosenDate,changedRepeatRule);
     return;
   }
   if(id) state.events[state.events.findIndex(x=>x.id===id)]={...old,...obj}; else state.events.push(obj);
@@ -4414,11 +4474,14 @@ $('#editOccurrenceOnly').onclick=()=>{
 };
 $('#editFutureSeries').onclick=()=>{
   const p=pendingRepeatEdit, old=p&&state.events.find(x=>x.id===p.id); if(!p||!old) return;
-  repeatEditFuture(old,p.obj,p.occ); finishRepeatEdit();
+  if(p.occ<=old.date) applyWholeRecurringFormEdit(old,p.obj,p.occ,p.chosenDate,p.ruleEdited);
+  else repeatEditFuture(old,p.obj,p.occ);
+  finishRepeatEdit();
 };
 $('#editWholeSeries').onclick=()=>{
   const p=pendingRepeatEdit, old=p&&state.events.find(x=>x.id===p.id); if(!p||!old) return;
-  const idx=state.events.findIndex(x=>x.id===old.id); state.events[idx]={...old,...p.obj}; finishRepeatEdit();
+  applyWholeRecurringFormEdit(old,p.obj,p.occ,p.chosenDate,p.ruleEdited);
+  finishRepeatEdit();
 };
 $('#cancelRepeatEdit').onclick=()=>{ pendingRepeatEdit=null; closeDialog($('#repeatEditDlg')); };
 $('#cancelEvent').onclick=()=>{ activeEventOccurrence=null; closeDialog($('#eventDlg')); };
@@ -4570,6 +4633,11 @@ if($('#prepDailyRows')){
 }
 
 $('#date').onchange=()=>{
+  const editing=state.events.find(x=>x.id===$('#eid').value);
+  if(editing && (editing.repeat||'none')!=='none'){
+    // Selected occurrence has its own date. Do not silently edit the repeat rule/end.
+    updateDurationMode(); return;
+  }
   if($('#prepEnabled').checked){ $('#prepDeadline').value=$('#date').value; $('#endDate').value=$('#date').value; renderPrepDailyRows(); }
   if(!$('#endDate').value || $('#endDate').value<$('#date').value) $('#endDate').value=$('#date').value;
   const d=parse($('#date').value), lp=lunarPartsFromSolar(d);
