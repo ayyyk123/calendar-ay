@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '2.77',
+  version: '2.78',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -353,7 +353,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '2.77',
+    version: '2.78',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -1060,6 +1060,11 @@ function preparationProgress(e){
   const missed=entries.filter(x=>preparationEntryMissed(e,x.key)).length;
   return {done,missed,total};
 }
+// 마감 표시와 준비계획 팝업은 같은 완료 기준을 사용한다.
+// 완료 기록은 준비항목별 prepDone에 그대로 두고, 원본의 done 플래그를 임의로 변경하지 않는다.
+function preparationComplete(e,progress=preparationProgress(e)){
+  return progress.total>0 && progress.done===progress.total && progress.missed===0;
+}
 function preparationDates(e){
   return [...new Set(preparationEntries(e).map(x=>x.date))].sort();
 }
@@ -1296,7 +1301,13 @@ function checklistHtml(e,compact=false){
 }
 function eventItemHtml(e, compact=false){
   const c=cal(e.calId), purchaseDue=!!e._purchaseDue, purchaseLinked=purchaseDue||e.sourceType==='purchase', prepDay=!!e._prepDay, prepDeadlineDay=prepDay && (e._renderDate||e._prepDate||e.date)===(e.prepDeadline||e.date), deadlineItem=isPreparationDeadlineOccurrence(e);
-  const done=prepDay?preparationEntryDone(e,e._prepKey):isDone(e), missed=prepDay?preparationEntryMissed(e,e._prepKey):false, checkable=e.kind!=='anniversary' && !prepDay;
+  const deadlineProgress=deadlineItem?preparationProgress(e):null;
+  const deadlineComplete=!!deadlineProgress && preparationComplete(e,deadlineProgress);
+  // 준비일정이 있는 마감 카드는 팝업에서 모든 준비항목을 완료했을 때만 완료 표시한다.
+  // 준비항목이 전혀 없는 일정은 기존의 수동 완료 상태를 유지한다.
+  const done=prepDay?preparationEntryDone(e,e._prepKey)
+    :deadlineItem && deadlineProgress.total>0?deadlineComplete:isDone(e);
+  const missed=prepDay?preparationEntryMissed(e,e._prepKey):false, checkable=e.kind!=='anniversary' && !prepDay;
   const recurring=(e.repeat||'none')!=='none';
   const payment=e.kind==='payment';
   const checklist=prepDay?[]:checklistItems(e), checklistState=prepDay?{done:0,total:0}:checklistProgress(e);
@@ -1335,7 +1346,7 @@ function eventItemHtml(e, compact=false){
   const repeatBadge=!prepDay&&recurring?`<span class="repeatMark" title="${esc(repeatRuleLabel(e))}">↻</span>`:'';
   const carryBadge=inLabel?`<span class="carryBadge carryIn" title="${esc(inLabel)}">↪</span>`:'';
   const amountInline=!prepDay&&payment&&Number(e.paymentAmount)>0?`<span class="inlineMeta">₩${Number(e.paymentAmount).toLocaleString('ko-KR')}</span>`:'';
-  return `<div class="item ${done?'done':''} ${missed?'prepMissedItem':''} kind-${esc(e.kind||'event')} ${recurring&&!prepDay?'recurringItem':''} ${payment&&!prepDay?'paymentItem':''} ${e.fixedId?'manualPlacedItem':''} ${e.flexibleId?'flexiblePlacedItem':''} ${inLabel?'carriedIn':''} ${outRecord?'carriedOut':''} ${prepDay?'prepDayItem':''} ${prepDeadlineDay?'prepDeadlineDayItem':''} ${deadlineItem?'prepDeadlineItem':''}" draggable="${drag}" data-eid="${esc(e.id)}" data-occurrence="${esc(e._occurrenceStart||e.date)}" data-render-date="${esc(renderDate)}" data-cal-id="${esc(e.calId)}" data-lane="${payment?'payment':'work'}" data-prep-day="${prepDay?'1':''}" data-prep-key="${prepDay?esc(e._prepKey||''):''}" data-prep-source-date="${prepDay?esc(e._prepSourceDate||''):''}" data-prep-type="${prepDay?esc(e._prepType||''):''}" data-prep-rule-id="${prepDay?esc(e._prepRuleId||''):''}" data-prep-event="${e.prepEnabled?'1':''}" data-purchase-due="${purchaseDue?'1':''}" data-purchase-id="${purchaseDue?esc(e.purchaseId||''):''}" style="--item-color:${esc(c.color)};border-left-color:${esc(c.color)}">
+  return `<div class="item ${done?'done':''} ${missed?'prepMissedItem':''} kind-${esc(e.kind||'event')} ${recurring&&!prepDay?'recurringItem':''} ${payment&&!prepDay?'paymentItem':''} ${e.fixedId?'manualPlacedItem':''} ${e.flexibleId?'flexiblePlacedItem':''} ${inLabel?'carriedIn':''} ${outRecord?'carriedOut':''} ${prepDay?'prepDayItem':''} ${prepDeadlineDay?'prepDeadlineDayItem':''} ${deadlineItem?'prepDeadlineItem':''} ${deadlineItem&&deadlineComplete?'prepDeadlineComplete':''}" draggable="${drag}" data-eid="${esc(e.id)}" data-occurrence="${esc(e._occurrenceStart||e.date)}" data-render-date="${esc(renderDate)}" data-cal-id="${esc(e.calId)}" data-lane="${payment?'payment':'work'}" data-prep-day="${prepDay?'1':''}" data-prep-key="${prepDay?esc(e._prepKey||''):''}" data-prep-source-date="${prepDay?esc(e._prepSourceDate||''):''}" data-prep-type="${prepDay?esc(e._prepType||''):''}" data-prep-rule-id="${prepDay?esc(e._prepRuleId||''):''}" data-prep-event="${e.prepEnabled?'1':''}" data-purchase-due="${purchaseDue?'1':''}" data-purchase-id="${purchaseDue?esc(e.purchaseId||''):''}" style="--item-color:${esc(c.color)};border-left-color:${esc(c.color)}">
     <div class="itemRow">${dragHandle}${!prepDay&&e.important?`<button type="button" class="importanceBtn on" data-action="importance" aria-label="중요 표시 해제" title="중요 표시 해제">★</button>`:''}${mainCheck}${missed?`<span class="prepMissedMark" title="못함">✕</span>`:''}<div class="itemTitle" title="${esc(tooltip)}">${timePrefix}<span class="durationPrefix">${esc(durationPrefix)}</span>${!prepDay&&payment?'₩ ':(!checkable&&!prepDay?kindPrefix(e):'')}${esc(shownTitle)}</div>${amountInline}${repeatBadge}${carryBadge}${checklistButton}</div>
     ${expanded?checklistHtml(e,false):''}
   </div>`;
@@ -2408,7 +2419,7 @@ function openPreparationPlan(id,focusDate=''){
   const entries=preparationEntries(e);
   $('#prepPlanTitle').textContent=e.title;
   const prepProgress=preparationProgress(e);
-  const prepComplete=prepProgress.total>0 && prepProgress.done===prepProgress.total && prepProgress.missed===0;
+  const prepComplete=preparationComplete(e,prepProgress);
   const prepDlg=$('#prepPlanDlg'), completeBadge=$('#prepPlanCompleteBadge');
   prepDlg?.classList.toggle('complete',prepComplete);
   if(completeBadge) completeBadge.classList.toggle('hidden',!prepComplete);
@@ -2800,7 +2811,8 @@ function togglePreparationDone(id,key){
   else{ e.prepDone[key]=true; delete e.prepMissed[key]; }
   save({rerender:false});
   if($('#prepPlanDlg')?.open && activePrepPlanId===id) openPreparationPlan(id,activePrepPlanDate);
-  else render();
+  // 팝업이 열린 동안에도 바깥 달력의 마감 카드 상태를 즉시 새로 그린다.
+  render();
 }
 function togglePreparationMissed(id,key){
   const e=state.events.find(x=>x.id===id && x.prepEnabled); if(!e || !key) return;
@@ -2810,7 +2822,8 @@ function togglePreparationMissed(id,key){
   if(e.prepMissed[key]){
     delete e.prepMissed[key];
     save({rerender:false});
-    if($('#prepPlanDlg')?.open && activePrepPlanId===id) openPreparationPlan(id,activePrepPlanDate); else render();
+    if($('#prepPlanDlg')?.open && activePrepPlanId===id) openPreparationPlan(id,activePrepPlanDate);
+    render();
     return;
   }
   e.prepMissed[key]=true;
@@ -2818,6 +2831,7 @@ function togglePreparationMissed(id,key){
   pendingPrepMissed={id,key,date:entry?.date||'',text:String(entry?.text||'').trim()};
   save({rerender:false});
   if($('#prepPlanDlg')?.open && activePrepPlanId===id) openPreparationPlan(id,activePrepPlanDate);
+  render();
   const label=[entry?.date,entry?.text].filter(Boolean).join(' · ');
   $('#prepMissedInfo').textContent=label?`${label} — 못함으로 기록했습니다.`:'못함으로 기록했습니다.';
   openDialog($('#prepMissedDlg'));
