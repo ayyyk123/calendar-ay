@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '2.84',
+  version: '2.86',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -354,7 +354,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '2.84',
+    version: '2.86',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -1115,8 +1115,9 @@ function hasPreparationEntryOnDeadline(e){
   return preparationEntries(e).some(x=>x.date===e.prepDeadline);
 }
 function isPreparationManagedItem(e){ return !!e?._prepDay || isPreparationDeadlineOccurrence(e); }
-function isPreparationLaneItem(e){ return !!e?._prepDay || (isPreparationDeadlineOccurrence(e) && !hasPreparationEntryOnDeadline(e)); }
-function isPreparationDeadlineDuplicate(e){ return isPreparationDeadlineOccurrence(e) && hasPreparationEntryOnDeadline(e); }
+// 마감일 당일로 준비업무를 옮겨도 마감 일정은 별개의 카드로 표시한다.
+// 준비업무와 마감일은 다른 목적의 일정이므로 중복으로 취급하면 안 된다.
+function isPreparationLaneItem(e){ return !!e?._prepDay || isPreparationDeadlineOccurrence(e); }
 
 function purchaseEventCalendarId(){
   return topLevelCals()[0]?.id || state.calendars[0]?.id || '';
@@ -3426,7 +3427,7 @@ function renderWeek(){
 // v2.45: 월 칸의 실제 남는 높이에 따라 표시 개수 자동 결정.
 function monthCellEventsHtml(date, es){
   const priority=e=>e.kind==='anniversary'?0:e.kind==='appointment'?1:e.kind==='todo'?2:e.kind==='payment'?3:4;
-  const ordered=[...(es||[])].filter(e=>!isPreparationDeadlineDuplicate(e)).sort((a,b)=>priority(a)-priority(b));
+  const ordered=[...(es||[])].sort((a,b)=>priority(a)-priority(b));
   const common=ordered.filter(e=>!isPreparationManagedItem(e)&&(e.kind==='anniversary' || e.kind==='appointment'));
   const prep=ordered.filter(e=>isPreparationLaneItem(e));
   const quick=ordered.filter(e=>!isPreparationManagedItem(e)&&e.kind==='todo');
@@ -3492,7 +3493,7 @@ $('#closeDayList').onclick=()=>closeDialog($('#dayListDlg'));
 // v2.46: 주간 압축 보기에서도 영역 순서(공통→준비→Quick→납부→캘린더)를 유지한다.
 // 같은 캘린더에 속하는 일반 일정은 사용자 설정 캘린더 순서대로 모아서 보여준다.
 function orderedMultiWeekEvents(es){
-  const events=(es||[]).filter(e=>!isPreparationDeadlineDuplicate(e));
+  const events=(es||[]);
   const calPositions=new Map(cals().map((c,i)=>[c.id,i]));
   const laneRank=e=>{
     if(!isPreparationManagedItem(e)&&(e.kind==='anniversary'||e.kind==='appointment')) return 0;
@@ -3815,7 +3816,7 @@ function isAdorableCalendar(calId){
   const root=adorableRoot(), top=topAncestor(calId);
   return !!root && !!top && top.id===root.id;
 }
-// v2.84 · 반복 요일과 업무 분류는 별도로 선택합니다.
+// v2.86 · 반복 요일과 업무 분류는 별도로 선택합니다.
 // 기존 daily/today 값은 구 데이터 호환용으로 해석하며 신규 값은 daily/weekly/monthly/off 입니다.
 const WM_GROUPS=[['daily','일업무'],['weekly','주업무'],['monthly','월업무'],['extra','추가업무']];
 function defaultMemoGroupForRepeat(repeat){
@@ -3835,10 +3836,14 @@ function memoTaskPlacement(e){
 function workMemoGroup(e){
   if(!e || !isAdorableCalendar(e.calId))return 'off';
   if(e._prepDay || e._purchaseDue)return 'extra';
+  // 날짜 지정 배치 업무는 월별로 한 번씩 배치되는 업무입니다.
+  // 배치 후 생성된 개별 일정의 repeat='none' 때문에 '추가업무'로 분류하지 않습니다.
+  // 이월한 업무는 원래 업무 분류를 우선해서 유지합니다.
   if(e.memoOriginalDate){
     if(['daily','weekly','monthly','extra'].includes(e.memoOriginalCategory))return e.memoOriginalCategory;
     if(e.memoFromDaily)return 'daily';
   }
+  if(e.fixedId && state.fixed.some(f=>String(f.id)===String(e.fixedId)))return 'monthly';
   if((e.repeat||'none')==='none')return e.memoCategory==='off'?'off':'extra';
   // 일업무를 월~목에만 반복 설정해도 일업무로 표시합니다.
   const category=memoTaskPlacement(e);
@@ -4029,6 +4034,15 @@ function workMemoDayCard(date){
 }
 function renderWorkMemoPanel(){
   const panel=$('#workMemoPanel');if(!panel||!workMemoVisible)return;
+  // 완료 체크 후 다시 그리더라도 날짜 칸마다 스크롤 위치를 유지합니다.
+  // 브라우저 전체 스크롤과 날짜별 내부 스크롤은 별개의 영역입니다.
+  const board=$('#wmBoard');
+  const boardScroll=board?{top:board.scrollTop,left:board.scrollLeft}:null;
+  const dayScrolls=new Map();
+  board?.querySelectorAll('[data-wm-date]').forEach(card=>{
+    const area=card.querySelector('.wmDayScroll');
+    if(area)dayScrolls.set(card.dataset.wmDate,{top:area.scrollTop,left:area.scrollLeft});
+  });
   const days=workMemoBoardDays();
   const dates=Array.from({length:days},(_,i)=>ds(add(parse(workMemoDate),i)));
   $('#wmBoardRange').textContent=`${workMemoShortDate(dates[0])} – ${workMemoShortDate(dates[dates.length-1])}`;
@@ -4039,6 +4053,11 @@ function renderWorkMemoPanel(){
   const settings=$('#wmDailySettings');settings.classList.toggle('hidden',!workMemoSettingsShown);
   if(workMemoSettingsShown)settings.innerHTML=workMemoDailySettingsHtml();
   $('#wmSettingsBtn').setAttribute('aria-expanded',String(workMemoSettingsShown));
+  board?.querySelectorAll('[data-wm-date]').forEach(card=>{
+    const saved=dayScrolls.get(card.dataset.wmDate),area=card.querySelector('.wmDayScroll');
+    if(saved&&area){area.scrollTop=saved.top;area.scrollLeft=saved.left;}
+  });
+  if(boardScroll&&board){board.scrollTop=boardScroll.top;board.scrollLeft=boardScroll.left;}
 }
 function workMemoToggleTask(key,date=workMemoDate){
   const row=workMemoTasks(date).find(x=>x.key===key);if(!row)return;
@@ -4845,7 +4864,7 @@ function repeatEditFuture(old,obj,occ){
   state.events.push(future);
 }
 
-// v2.84: 사이드바에서 수정한 반복업무는 '지정일 이후'에만 적용합니다.
+// v2.86: 사이드바에서 수정한 반복업무는 '지정일 이후'에만 적용합니다.
 // 과거 회차의 원본 ID와 각 날짜 완료·제외·체크리스트 기록을 유지하고,
 // 변경 적용일 이후에 실제로 발생하는 첫 회차부터 새 시리즈로 분리합니다.
 function nextSeriesOccurrenceFromDate(old,from){
@@ -5641,7 +5660,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.84',
+    appVersion:'2.86',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
