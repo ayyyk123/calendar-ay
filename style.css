@@ -3433,7 +3433,7 @@ header .views > #workMemoOpenBtn{width:68px!important;min-width:68px!important;m
 .wmConfigRow .wmConfigMeta{display:block;font-size:10px;margin-top:3px;color:#7d8da0}
 @media(max-width:480px){.wmConfigRow select{min-width:108px;max-width:120px;font-size:11px}}
 
-/* v2.83: 반복업무 과거 기록 보존 + 지정 날짜부터 설정 적용 */
+/* v2.84: 반복업무 과거 기록 보존 + 지정 날짜부터 설정 적용 */
 .sidebarSeriesApply{display:grid;gap:10px;margin:12px 0;padding:12px;border:1px solid #d6e1f1;border-radius:7px;background:#f7faff}
 .sidebarSeriesApply.hidden{display:none!important}
 .sidebarSeriesApply label{display:grid;gap:6px;font-size:13px}
@@ -3442,3 +3442,14 @@ header .views > #workMemoOpenBtn{width:68px!important;min-width:68px!important;m
 .sidebarSeriesApply button{width:100%;min-height:42px;font-weight:700}
 #repeatEditDlg .scopeActions.hidden{display:none!important}
 #eventForm input.seriesAnchorReadonly{background:#f3f5f8;color:#687383;cursor:not-allowed}
+
+/* v2.84 · 업무 분류별 묶음과 완료 상태를 명확히 구분 */
+.dailySummaryBtn.wmGroupSummary{background:#f3f5f8!important;color:#3b4d63!important;border:1px solid #cfd7e2!important;border-left:3px solid #8796aa!important;border-radius:4px!important;padding:5px 7px!important;font-weight:650!important}
+.dailySummaryBtn.wmGroupSummary .wmGroupMark{font-style:normal;font-weight:800;color:#8391a4;margin-right:2px}
+.dailySummaryBtn.wmGroupSummary.completed{background:#eef8f0!important;color:#246443!important;border-color:#a9cfb5!important;border-left-color:#3d985c!important}
+.dailySummaryBtn.wmGroupSummary.completed .wmGroupMark{color:#228c4b}
+.dailySummaryBtn.wmGroupSummary.pending .wmGroupMark{color:#9aa6b5}
+.wmSection-daily .wmSectionTitle{border-left:3px solid #6f91bd}
+.wmSection-weekly .wmSectionTitle{border-left:3px solid #947fc0}
+.wmSection-monthly .wmSectionTitle{border-left:3px solid #c39b67}
+.wmSection-extra .wmSectionTitle{border-left:3px solid #799b8b}

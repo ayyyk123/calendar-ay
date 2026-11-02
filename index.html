@@ -4,17 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
-  <title>캘린더 v2.83</title>
-  <link rel="manifest" href="manifest.json?v=2.83">
+  <title>캘린더 v2.84</title>
+  <link rel="manifest" href="manifest.json?v=2.84">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="icon-180.png">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="style.css?v=2.83">
+  <link rel="stylesheet" href="style.css?v=2.84">
 </head>
 <body>
 <header>
-  <div class="brand"><b>캘린더</b><small> v2.83</small></div>
+  <div class="brand"><b>캘린더</b><small> v2.84</small></div>
   <div id="saveBadge" class="saveBadge loading" title="Firebase 저장 상태"><span class="saveDot"></span><span id="saveBadgeText">Firebase 확인 중</span></div>
   <button id="manualSaveBtn" class="manualSaveBtn iconOnlyBtn" type="button" title="현재 데이터를 Firebase에 즉시 저장" aria-label="최신자료 저장">💾</button>
   <button id="sidebarToggle" class="mobileOnly" type="button" aria-label="메뉴">☰</button>
@@ -255,7 +255,7 @@
     <label>장소<input id="place"></label>
     <label>반복<select id="repeat"><option value="none">없음</option><option value="daily">매일</option><option value="weekly">매주</option><option value="monthly">매월</option><option value="yearly">매년</option></select></label>
 
-    <div id="memoDailyWrap" class="wmDailyOptIn hidden"><label for="memoTaskPlacement"><b>업무 메모 표시 위치</b></label><select id="memoTaskPlacement" aria-label="업무 메모 표시 위치"><option value="off">업무 메모에 반영 안 함</option><option value="daily">매일업무</option><option value="today">오늘의 할 일</option></select><small id="memoTaskPlacementHint">월~목처럼 일부 요일만 반복돼도 매일업무로 분류할 수 있습니다.</small></div>
+    <div id="memoDailyWrap" class="wmDailyOptIn hidden"><label for="memoTaskPlacement"><b>업무 분류 선택</b></label><select id="memoTaskPlacement" aria-label="업무 분류 선택"><option value="off">업무 메모에 반영 안 함</option><option value="daily">일업무</option><option value="weekly">주업무</option><option value="monthly">월업무</option></select><small id="memoTaskPlacementHint">반복 요일과 별개로 일업무·주업무·월업무를 선택하세요. 하루만 등록한 업무는 추가업무가 됩니다.</small></div>
     <div id="repeatDetails" class="repeatBox hidden">
       <div class="row" id="intervalRow">
         <label>반복 간격<input type="number" id="repeatInterval" min="1" max="99" value="1"></label>
@@ -578,6 +578,6 @@
  <div id="wmDailySettings" class="wmDailySettings hidden"></div>
  <div id="wmBoard" class="wmBoard" aria-label="날짜별 업무"></div>
 </div>
-<script type="module" src="app.js?v=2.83"></script>
+<script type="module" src="app.js?v=2.84"></script>
 </body>
 </html>
