@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '2.80',
+  version: '2.81',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -354,7 +354,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '2.80',
+    version: '2.81',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -368,6 +368,7 @@ function normalizeState(raw){
       availabilityTargetCalId:typeof e.availabilityTargetCalId==='string'?e.availabilityTargetCalId:'',
       repeat:e.repeat||'none',
       memoDaily:!!e.memoDaily,
+      ...(typeof e.memoEnabled==='boolean' ? {memoEnabled:e.memoEnabled} : {}),
       repeatRule:e.repeatRule||null,
       paymentAmount:Math.max(0,Number(e.paymentAmount)||0),
       paymentMethod:typeof e.paymentMethod==='string'?e.paymentMethod:'',
@@ -3785,7 +3786,7 @@ function renderList(){
   bindItems();
 }
 
-// v2.80 · 날짜별 업무 메모. 기존 event / prep / purchase 원본과 완료 상태를 공유합니다.
+// v2.81 · 날짜별 업무 메모. 기존 event / prep / purchase 원본과 완료 상태를 공유합니다.
 let workMemoVisible=false;
 let workMemoDate=ds(new Date());
 const workMemoMissedDates=new Set();
@@ -3809,10 +3810,25 @@ function isAdorableCalendar(calId){
   const root=adorableRoot(), top=topAncestor(calId);
   return !!root && !!top && top.id===root.id;
 }
+// Saved before v2.81: daily tasks retained their explicit memoDaily choice;
+// weekly/monthly/yearly events were importable by default. New recurring events
+// store memoEnabled explicitly so unchecked means excluded even after reload.
+function isMemoRecurrenceEnabled(e){
+  if(typeof e?.memoEnabled==='boolean')return e.memoEnabled;
+  return e?.repeat==='daily'?!!e.memoDaily:true;
+}
+function isMemoVisibleEvent(e){
+  if(!e || !isAdorableCalendar(e.calId))return false;
+  // Moved occurrences retain their original memo tracking.
+  if(e.memoFromDaily && e.memoOriginalDate)return true;
+  if(e._prepDay || e._purchaseDue)return true;
+  if(typeof e.memoEnabled==='boolean')return e.memoEnabled;
+  return e.repeat==='daily'?!!e.memoDaily:true;
+}
 function isMemoDaily(e){
   if(!e || !isAdorableCalendar(e.calId) || e._prepDay || e._purchaseDue || e.prepEnabled || ['payment','anniversary','appointment'].includes(e.kind))return false;
-  if(e.memoFromDaily && e.memoOriginalDate) return true;
-  if(!e.memoDaily || e.repeat!=='daily')return false;
+  if(e.memoFromDaily && e.memoOriginalDate)return true;
+  if(e.repeat!=='daily' || !isMemoRecurrenceEnabled(e))return false;
   return Number(normalizedRule(e).interval||1)===1 && (e._occurrenceStart||e.date)===(e._renderDate||e.date);
 }
 function isUnselectedDailyOccurrence(e){
@@ -3852,10 +3868,16 @@ function workMemoTasks(date,includeAll=false){
     seen.add(key);
     rows.push({key,kind,e,title:workMemoTitle(e),done:workMemoIsDone(e),originDate:e.memoOriginalDate||'',sourceDate:date});
   }
-  events.filter(isMemoDaily).forEach(e=>push(e,'daily'));
-  events.filter(e=>e.memoOriginalDate&&!isMemoDaily(e)).forEach(e=>push(e,'import'));
-  for(const entry of note.imports){const e=byRef.get(entry.key);if(e && !isUnselectedDailyOccurrence(e))push(e,'import',entry.key);}
-  if(includeAll)events.filter(e=>!isMemoDaily(e) && !isUnselectedDailyOccurrence(e)).forEach(e=>push(e,'import'));
+  // Calendar is the single source of tasks: no manual import is required.
+  // The same occurrence ID is used for the memo and calendar checkbox.
+  events.filter(e=>isMemoDaily(e) && isMemoVisibleEvent(e)).forEach(e=>push(e,'daily'));
+  events.filter(e=>isMemoVisibleEvent(e) && !isMemoDaily(e)).forEach(e=>push(e,'import'));
+  // Older memo imports remain in storage for backward compatibility; only
+  // still-existing, opted-in calendar events can be displayed.
+  for(const entry of note.imports){
+    const e=byRef.get(entry.key);
+    if(e && isMemoVisibleEvent(e) && !isUnselectedDailyOccurrence(e))push(e,isMemoDaily(e)?'daily':'import',entry.key);
+  }
   for(const x of note.custom){
     if(x.movedTo)continue;
     const key=`custom|${x.id}`;
@@ -3930,7 +3952,7 @@ const workMemoMissedByDate=new Map();
 let workMemoSettingsShown=false;
 function workMemoDailySettingsHtml(){
   const all=state.events.filter(e=>isAdorableCalendar(e.calId) && e.repeat==='daily' && Number(normalizedRule(e).interval||1)===1 && !e.prepEnabled && !['payment','anniversary','appointment'].includes(e.kind));
-  return `<div class="wmDailyConfig"><div class="wmDailyConfigTitle">아도라블 매일 반복업무 <small>${all.filter(e=>e.memoDaily).length}/${all.length}개 메모 반영</small></div>${all.map(e=>`<label class="wmConfigRow"><input type="checkbox" data-wm-optin="${esc(e.id)}" ${e.memoDaily?'checked':''}><span>${esc(e.title)}</span><small>${esc(calendarPath(e.calId))}</small></label>`).join('')||'<div class="wmEmpty">아도라블에 매일 반복업무가 없어.</div>'}<p class="wmInfo">체크한 업무만 메모에 나타나고 달력에서는 ‘매일업무 0/10’처럼 묶어서 보여줘. 체크 해제하면 달력에 개별 일정으로 남아.</p></div>`;
+  return `<div class="wmDailyConfig"><div class="wmDailyConfigTitle">아도라블 매일 반복업무 <small>${all.filter(e=>isMemoRecurrenceEnabled(e)).length}/${all.length}개 메모 반영</small></div>${all.map(e=>`<label class="wmConfigRow"><input type="checkbox" data-wm-optin="${esc(e.id)}" ${isMemoRecurrenceEnabled(e)?'checked':''}><span>${esc(e.title)}</span><small>${esc(calendarPath(e.calId))}</small></label>`).join('')||'<div class="wmEmpty">아도라블에 매일 반복업무가 없어.</div>'}<p class="wmInfo">체크한 업무만 메모에 나타나고 달력에서는 ‘매일업무 0/10’처럼 묶어서 보여줘. 체크 해제하면 달력에 개별 일정으로 남아.</p></div>`;
 }
 function workMemoDayCard(date){
   const n=workMemoDay(date),rows=workMemoTasks(date),daily=rows.filter(x=>x.kind==='daily'),others=rows.filter(x=>x.kind!=='daily');
@@ -3947,10 +3969,10 @@ function workMemoDayCard(date){
   }
   return `<article class="wmDayCard ${today?'wmTodayCard':''}" data-wm-date="${date}">
     <div class="wmDayHead"><div><strong>${Number(date.slice(5,7))}/${Number(date.slice(8,10))} <span>(${wd})</span></strong>${today?'<em>오늘</em>':''}</div><small>${progress}/${rows.length} 완료</small></div>
-    <div class="wmDayScroll"><div class="wmDayActions"><button type="button" data-wm-load="${date}">오늘 할 일 불러오기</button><button type="button" data-wm-missed-toggle="${date}" class="${workMemoMissedDates.has(date)?'active':''}">전날 못한 일 ${workMemoMissedDates.has(date)?'접기':'불러오기'}</button></div><div class="wmInfo" data-wm-info="${date}">아도라블 일정만 가져와.</div>
+    <div class="wmDayScroll"><div class="wmDayActions"><button type="button" data-wm-missed-toggle="${date}" class="${workMemoMissedDates.has(date)?'active':''}">전날 못한 일 ${workMemoMissedDates.has(date)?'접기':'불러오기'}</button></div><div class="wmInfo" data-wm-info="${date}">아도라블 캘린더 일정 자동 반영 · 추가/수정은 캘린더에서</div>
     ${missed}
     <section class="wmSection"><div class="wmSectionTitle">매일업무 <b>${stat}</b></div>${list(daily)}</section>
-    <section class="wmSection"><div class="wmSectionTitle">오늘의 할 일 <b>${others.filter(x=>x.done).length}/${others.length}</b></div>${list(others)}<div class="wmNew"><input data-wm-new="${date}" placeholder="할 일 직접 추가"><button type="button" data-wm-add="${date}">추가</button></div></section>
+    <section class="wmSection"><div class="wmSectionTitle">오늘의 할 일 <b>${others.filter(x=>x.done).length}/${others.length}</b></div>${list(others)}</section>
     ${n.movedOut.length?`<details class="wmHistory"><summary>다른 날짜로 옮긴 일 ${n.movedOut.length}건</summary>${n.movedOut.map(x=>`<div>${esc(x.title)} → ${esc(workMemoShortDate(x.toDate))}</div>`).join('')}</details>`:''}
     <section class="wmSection wmNoteSection"><div class="wmSectionTitle">메모</div><textarea data-wm-note="${date}" placeholder="그날의 메모를 자유롭게 작성">${esc(n.freeText)}</textarea></section>
     </div></article>`;
@@ -3967,14 +3989,6 @@ function renderWorkMemoPanel(){
   const settings=$('#wmDailySettings');settings.classList.toggle('hidden',!workMemoSettingsShown);
   if(workMemoSettingsShown)settings.innerHTML=workMemoDailySettingsHtml();
   $('#wmSettingsBtn').setAttribute('aria-expanded',String(workMemoSettingsShown));
-}
-function workMemoImportToday(date=workMemoDate){
-  const note=workMemoDay(date),existing=new Set(note.imports.map(x=>x.key));
-  const rows=workMemoEvents(date).filter(x=>!isMemoDaily(x) && !isUnselectedDailyOccurrence(x));let added=0;
-  rows.forEach(e=>{const key=workMemoRef(e);if(existing.has(key)||note.movedOut.some(x=>x.key===key))return;note.imports.push({key,title:workMemoTitle(e)});existing.add(key);added++;});
-  save();
-  const info=$(`[data-wm-date="${date}"] [data-wm-info]`);
-  if(info)info.textContent=added?`${added}건을 불러왔어.`:'이미 모든 아도라블 일정을 불러왔어.';
 }
 function workMemoToggleTask(key,date=workMemoDate){
   const row=workMemoTasks(date).find(x=>x.key===key);if(!row)return;
@@ -4075,21 +4089,18 @@ function initWorkMemo(){
   $('#wmSettingsBtn')?.addEventListener('click',()=>{workMemoSettingsShown=!workMemoSettingsShown;renderWorkMemoPanel();});
   window.addEventListener('resize',()=>{if(workMemoVisible && workMemoBoardDays()!==Number($('#wmBoard')?.style.getPropertyValue('--wm-columns')||0))renderWorkMemoPanel();});
   panel?.addEventListener('change',e=>{
-    const flag=e.target.closest('[data-wm-optin]');if(flag){const obj=state.events.find(x=>x.id===flag.dataset.wmOptin);if(obj){obj.memoDaily=!!flag.checked;save();}return;}
+    const flag=e.target.closest('[data-wm-optin]');if(flag){const obj=state.events.find(x=>x.id===flag.dataset.wmOptin);if(obj){obj.memoDaily=!!flag.checked;obj.memoEnabled=!!flag.checked;save();}return;}
     const checkbox=e.target.closest('[data-wm-check]');if(checkbox){const date=checkbox.closest('[data-wm-date]')?.dataset.wmDate;if(date)workMemoToggleTask(checkbox.dataset.wmCheck,date);}
   });
   panel?.addEventListener('click',e=>{
     const btn=e.target.closest('button');if(!btn)return;
     const date=btn.closest('[data-wm-date]')?.dataset.wmDate;
-    if(btn.dataset.wmLoad){workMemoImportToday(btn.dataset.wmLoad);return;}
     if(btn.dataset.wmMissedToggle){const d=btn.dataset.wmMissedToggle;workMemoMissedDates.has(d)?workMemoMissedDates.delete(d):workMemoMissedDates.add(d);renderWorkMemoPanel();return;}
-    if(btn.dataset.wmAdd){const field=panel.querySelector(`[data-wm-new="${btn.dataset.wmAdd}"]`),title=field?.value.trim();if(!title)return;workMemoDay(btn.dataset.wmAdd).custom.push({id:uid(),title,done:false,originDate:'',movedTo:''});save();return;}
     if(btn.dataset.wmToday!==undefined || btn.dataset.wmMove!==undefined){
       const i=Number(btn.dataset.wmToday??btn.dataset.wmMove),dest=btn.dataset.wmToday!==undefined?date:btn.closest('.wmMissed')?.querySelector('input[type=date]')?.value;
       workMemoMoveMissed(i,dest,date);return;
     }
   });
-  panel?.addEventListener('keydown',e=>{if(e.target.matches('[data-wm-new]')&&e.key==='Enter'){e.preventDefault();panel.querySelector(`[data-wm-add="${e.target.dataset.wmNew}"]`)?.click();}});
   panel?.addEventListener('input',e=>{
     const area=e.target.closest('[data-wm-note]');if(!area)return;
     workMemoDay(area.dataset.wmNote).freeText=area.value;
@@ -4247,10 +4258,14 @@ function syncRepeatEndFromTop(){
   updateRepeatEndUI();
 }
 function updateMemoDailyOptIn(){
-  const wrap=$('#memoDailyWrap'); if(!wrap)return;
-  const eligible=$('#repeat')?.value==='daily' && Number($('#repeatInterval')?.value||1)===1 && isAdorableCalendar($('#cal')?.value) && !['payment','anniversary','appointment'].includes($('#kind')?.value) && !$('#prepEnabled')?.checked;
+  const wrap=$('#memoDailyWrap');if(!wrap)return;
+  const repeat=$('#repeat')?.value;
+  const eligible=repeat!=='none' && isAdorableCalendar($('#cal')?.value) && !$('#prepEnabled')?.checked;
+  const grouped=repeat==='daily' && Number($('#repeatInterval')?.value||1)===1 && !['payment','anniversary','appointment'].includes($('#kind')?.value);
   wrap.classList.toggle('hidden',!eligible);
   $('#memoDailyOptIn').disabled=!eligible;
+  const hint=$('#memoDailyOptInHint');
+  if(hint)hint.textContent=grouped?'체크 시 업무 메모의 매일업무로 자동 표시 · 달력에서는 묶어서 표시':'체크 시 해당 날짜의 오늘의 할 일에 자동 표시 · 달력 일정은 그대로 유지';
 }
 function updateRepeatUI(){
   const type=$('#repeat').value, date=$('#date').value||ds(new Date()), d=parse(date);
@@ -4578,7 +4593,7 @@ function openEvent(date,id,options={}){
   $('#eventTitle').textContent=e?'일정 수정':(paymentPreset?'납부일정 추가':(quickPreset?'Quick 추가':(commonPreset?'공통일정 추가':(recurringPreset?'자동반복 업무 추가':'일정 등록'))));
   const occLabel=$('#eventOccurrenceDate'); if(occLabel) occLabel.textContent=e?activeEventOccurrence:'';
   eventSpanDaysDraft=e?Math.max(0,diffDays(e.date,e.endDate||e.date)):0;
-  $('#memoDailyOptIn').checked=!!e?.memoDaily;
+  $('#memoDailyOptIn').checked=e?isMemoRecurrenceEnabled(e):true;
   $('#eid').value=e?.id||''; $('#title').value=e?.title||''; $('#important').checked=!!e?.important; $('#cal').value=e?.calId||requestedCalId||cals()[0]?.id||'';
   const editingRecurring=!!e && (e.repeat||'none')!=='none';
   $('#date').value=editingRecurring?activeEventOccurrence:(e?.date||date||ds(cursor)); $('#endDate').value=e?.endDate||e?.date||date||ds(cursor);
@@ -4790,6 +4805,9 @@ $('#eventForm').onsubmit=e=>{
     availabilityBlock:!['payment','anniversary'].includes($('#kind').value) && !!$('#availabilityBlock').checked,
     availabilityTargetCalId:(!['payment','anniversary'].includes($('#kind').value) && $('#availabilityBlock').checked)?($('#availabilityTarget').value||defaultAvailabilityTargetForSelectedCalendar()):'',
     repeat, repeatRule:repeat==='none'?null:getRepeatRule(), memo:$('#memo').value,
+    // A new calendar task is picked up immediately by the board. For recurring
+    // tasks, this explicit choice also controls daily summary grouping.
+    memoEnabled: repeat!=='none' && isAdorableCalendar($('#cal').value) ? !!$('#memoDailyOptIn').checked : null,
     memoDaily: repeat==='daily' && Number($('#repeatInterval').value||1)===1 && isAdorableCalendar($('#cal').value) && !!$('#memoDailyOptIn').checked,
     checklist, checklistDoneByDate, orderByDate:old?.orderByDate||{},
     done:old?.done||false, doneDates:old?.doneDates||[], excludedDates:old?.excludedDates||[], fixedId:old?.fixedId||null
@@ -5429,7 +5447,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.80',
+    appVersion:'2.81',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state

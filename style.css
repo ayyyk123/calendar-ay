@@ -3418,3 +3418,7 @@ body.wmBoardActive{overflow:hidden}
 /* 화면이 좁아져도 업무 버튼의 글자가 잘리지 않게 보장 */
 header .views > #workMemoOpenBtn{width:68px!important;min-width:68px!important;max-width:68px!important;flex:0 0 68px!important;display:inline-flex!important;justify-content:center!important;align-items:center!important;gap:3px!important;overflow:visible!important;padding:0 5px!important}
 @media(max-width:760px){header .views > #workMemoOpenBtn{width:55px!important;min-width:55px!important;max-width:55px!important;flex-basis:55px!important;font-size:11px!important;gap:2px!important;padding:0 3px!important}header .views > #workMemoOpenBtn span{font-size:13px!important;margin:0!important}}
+
+/* v2.81 · task entry is calendar-only; memo board only mirrors registered tasks */
+.wmDayCard .wmDayActions button{max-width:none}
+.wmDailyOptIn{margin:6px 0 10px}
