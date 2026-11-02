@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '2.87',
+  version: '2.88',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -354,7 +354,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '2.87',
+    version: '2.88',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -3821,7 +3821,7 @@ function isAdorableCalendar(calId){
   const root=adorableRoot(), top=topAncestor(calId);
   return !!root && !!top && top.id===root.id;
 }
-// v2.87 · 반복 요일과 업무 분류는 별도로 선택합니다.
+// v2.88 · 반복 요일과 업무 분류는 별도로 선택합니다.
 // 기존 daily/today 값은 구 데이터 호환용으로 해석하며 신규 값은 daily/weekly/monthly/off 입니다.
 const WM_GROUPS=[['daily','일업무'],['weekly','주업무'],['monthly','월업무'],['extra','추가업무']];
 function defaultMemoGroupForRepeat(repeat){
@@ -4028,21 +4028,27 @@ function compactDailyEventsInCalendar(){
     const label=moved.length?`${done}/${count}/${total}`:`${done}/${count}`;
     const complete=count>0 && done===count;
     const name=WM_GROUPS.find(x=>x[0]===kind)?.[1]||'업무';
-    const button=document.createElement('button');button.type='button';
-    button.className=`dailySummaryBtn wmGroupSummary wmGroup-${kind} ${complete?'completed':'pending'}`;
-    button.dataset.dailySummary=date;button.dataset.workGroup=kind;
-    button.title=`${date} ${name} 목록 · 완료 ${done} / 남은 업무 ${count}${moved.length?` / 원래 ${total}`:''}`;
-    button.innerHTML=`<span><i class="wmGroupMark" aria-hidden="true">${complete?'✓':'○'}</i> ${name}</span><b>${label}</b>`;
+    // 이름과 숫자는 서로 다른 동작: 이름은 해당 날짜의 업무 화면, 숫자는 상세 팝업.
+    // button 안에 button을 중첩하지 않도록 묶음 컨테이너는 div로 구성합니다.
+    const summary=document.createElement('div');
+    summary.className=`dailySummaryBtn wmGroupSummary wmGroup-${kind} ${complete?'completed':'pending'}`;
+    summary.dataset.dailySummary=date;summary.dataset.workGroup=kind;
+    summary.innerHTML=`<button type="button" class="wmGroupNameBtn" data-wm-summary-open="${esc(date)}" title="${esc(name)} · ${esc(date)} 업무 화면으로 이동"><i class="wmGroupMark" aria-hidden="true">${complete?'✓':'○'}</i><span>${esc(name)}</span></button><button type="button" class="wmGroupCountBtn" data-wm-summary-list="${esc(date)}" title="${esc(name)} ${esc(label)} · 상세 목록 열기">${esc(label)}</button>`;
     const first=rows[0].node;
     const host=first.closest('.laneOrderedItem, .mobileCalendarEvent')||first;
-    host.parentElement?.insertBefore(button,host);
+    host.parentElement?.insertBefore(summary,host);
     for(const {node} of rows){
       const wrap=node.closest('.laneOrderedItem, .mobileCalendarEvent');
       if(wrap)wrap.remove();else node.remove();
     }
   }
-  root.querySelectorAll('[data-daily-summary]').forEach(btn=>btn.addEventListener('click',e=>{
-    e.preventDefault();e.stopPropagation();openWorkGroupPopup(btn.dataset.dailySummary,btn.dataset.workGroup);
+  root.querySelectorAll('[data-daily-summary]').forEach(group=>group.addEventListener('click',e=>{
+    const open=e.target.closest('[data-wm-summary-open]');
+    const list=e.target.closest('[data-wm-summary-list]');
+    if(!open&&!list)return;
+    e.preventDefault();e.stopPropagation();
+    if(open){closeWorkGroupPopup();openWorkMemo(group.dataset.dailySummary);}
+    else openWorkGroupPopup(group.dataset.dailySummary,group.dataset.workGroup);
   }));
 }
 function workMemoBoardDays(){
@@ -4969,7 +4975,7 @@ function repeatEditFuture(old,obj,occ){
   state.events.push(future);
 }
 
-// v2.87: 사이드바에서 수정한 반복업무는 '지정일 이후'에만 적용합니다.
+// v2.88: 사이드바에서 수정한 반복업무는 '지정일 이후'에만 적용합니다.
 // 과거 회차의 원본 ID와 각 날짜 완료·제외·체크리스트 기록을 유지하고,
 // 변경 적용일 이후에 실제로 발생하는 첫 회차부터 새 시리즈로 분리합니다.
 function nextSeriesOccurrenceFromDate(old,from){

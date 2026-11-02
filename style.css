@@ -3475,3 +3475,59 @@ header .views > #workMemoOpenBtn{width:68px!important;min-width:68px!important;m
 .wmPopupTaskActions button{border:1px solid #bdd1e6;border-radius:3px;background:#eef5ff;color:#24588e;font-size:11px;padding:3px 10px;cursor:pointer}
 .wmGroupPopupEmpty{padding:15px 5px;color:#8b97a6;font-size:12px}
 @media(max-width:760px){.wmGroupPopup{max-height:65dvh}.wmNewTaskForm button{font-size:11px;padding:6px}}
+
+
+/* v2.88: 달력 업무 묶음 이름/수치 각각 클릭 & 팝업 행 가로 정렬 */
+.dailySummaryBtn.wmGroupSummary{
+  display:flex!important;align-items:stretch!important;justify-content:space-between!important;
+  flex-wrap:nowrap!important;gap:3px!important;min-width:0!important;
+  padding:1px 3px!important;cursor:default!important;
+}
+.wmGroupSummary .wmGroupNameBtn,.wmGroupSummary .wmGroupCountBtn{
+  appearance:none;-webkit-appearance:none;background:transparent!important;border:0!important;
+  border-radius:3px!important;margin:0!important;box-shadow:none!important;
+  color:inherit!important;cursor:pointer!important;font-weight:inherit!important;
+  font-family:inherit!important;line-height:1.3!important;
+}
+.wmGroupSummary .wmGroupNameBtn{
+  display:flex!important;flex:1 1 auto!important;align-items:center!important;
+  justify-content:flex-start!important;gap:3px!important;min-width:0!important;
+  text-align:left!important;padding:3px 2px!important;
+}
+.wmGroupSummary .wmGroupNameBtn>span{
+  min-width:0!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;
+}
+.wmGroupSummary .wmGroupNameBtn .wmGroupMark{flex:0 0 auto!important;margin-right:0!important}
+.wmGroupSummary .wmGroupCountBtn{
+  flex:0 0 auto!important;white-space:nowrap!important;text-align:right!important;
+  padding:3px 3px!important;font-variant-numeric:tabular-nums;
+}
+.wmGroupSummary .wmGroupNameBtn:hover,.wmGroupSummary .wmGroupCountBtn:hover{background:rgba(56,105,167,.10)!important}
+.wmGroupSummary .wmGroupNameBtn:focus-visible,.wmGroupSummary .wmGroupCountBtn:focus-visible{outline:2px solid #397cc4!important;outline-offset:-1px}
+
+/* 체크박스에 공통 input width:100%가 적용되어 업무명이 세로로 깨지는 오류 수정 */
+#wmGroupPopup .wmGroupPopupList{min-width:0!important;box-sizing:border-box!important}
+#wmGroupPopup .wmPopupTask{box-sizing:border-box!important;min-width:0!important;padding:8px 10px!important}
+#wmGroupPopup .wmPopupTaskMain{
+  display:grid!important;grid-template-columns:17px minmax(0,1fr)!important;
+  gap:9px!important;align-items:start!important;min-width:0!important;width:100%!important;
+  line-height:1.5!important;
+}
+#wmGroupPopup .wmPopupTaskMain input[type=checkbox]{
+  box-sizing:border-box!important;width:17px!important;min-width:17px!important;max-width:17px!important;
+  height:17px!important;margin:2px 0 0!important;padding:0!important;
+  display:block!important;flex:none!important;
+}
+#wmGroupPopup .wmPopupTaskMain>span{
+  min-width:0!important;max-width:100%!important;width:auto!important;
+  white-space:normal!important;word-break:keep-all!important;
+  overflow-wrap:anywhere!important;line-height:1.5!important;
+  text-align:left!important;
+}
+#wmGroupPopup .wmPopupTaskActions{flex-wrap:wrap!important;min-width:0!important}
+#wmGroupPopup .wmPopupTaskActions input[type=date]{width:143px!important;max-width:100%!important;flex:0 1 143px!important}
+#wmGroupPopup .wmPopupTaskActions button{width:auto!important;flex:0 0 auto!important}
+/* Fixed-width click targets: override generic button width:100%. */
+.wmGroupSummary .wmGroupNameBtn,.wmGroupSummary .wmGroupCountBtn{width:auto!important;max-width:100%!important;box-sizing:border-box!important}
+.wmGroupSummary .wmGroupNameBtn{min-width:0!important}
+.wmGroupSummary .wmGroupCountBtn{min-width:max-content!important}
