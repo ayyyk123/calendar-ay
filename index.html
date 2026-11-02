@@ -4,17 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
-  <title>캘린더 v2.78</title>
-  <link rel="manifest" href="manifest.json?v=2.78">
+  <title>캘린더 v2.79</title>
+  <link rel="manifest" href="manifest.json?v=2.79">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="icon-180.png">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="style.css?v=2.78">
+  <link rel="stylesheet" href="style.css?v=2.79">
 </head>
 <body>
 <header>
-  <div class="brand"><b>캘린더</b><small> v2.78</small></div>
+  <div class="brand"><b>캘린더</b><small> v2.79</small></div>
   <div id="saveBadge" class="saveBadge loading" title="Firebase 저장 상태"><span class="saveDot"></span><span id="saveBadgeText">Firebase 확인 중</span></div>
   <button id="manualSaveBtn" class="manualSaveBtn iconOnlyBtn" type="button" title="현재 데이터를 Firebase에 즉시 저장" aria-label="최신자료 저장">💾</button>
   <button id="sidebarToggle" class="mobileOnly" type="button" aria-label="메뉴">☰</button>
@@ -44,6 +44,7 @@
     
   </nav>
   <div class="views">
+    <button id="workMemoOpenBtn" class="workMemoOpenBtn" type="button" title="오늘의 업무 메모" aria-label="오늘의 업무 메모 열기">☑ 업무메모</button>
     <a id="naverMailShortcut" class="naverMailShortcut" href="https://memo.naver.com/" target="_blank" rel="noopener noreferrer" title="네이버 메모" aria-label="네이버 메모"><span aria-hidden="true">📝</span></a>
     <a id="accountBookShortcut" class="accountBookShortcut" href="https://ayyyk123.github.io/accont-book/" target="_blank" rel="noopener noreferrer" title="가계부 열기" aria-label="가계부 열기"><span aria-hidden="true">💛</span></a>
     <button id="diaryMainShortcut" class="diaryMainShortcut" type="button" title="다이어리로" aria-label="다이어리로"><span class="diaryGlyph open" aria-hidden="true"></span></button>
@@ -554,6 +555,21 @@
 </div>
 
 <dialog id="recurringPreviewDlg" class="recurringPreviewDialog"><div class="recurringPreviewPanel"><div class="recurringPreviewTop"><strong id="recurringPreviewTitle"></strong><button id="recurringPreviewClose" type="button" aria-label="닫기">✕</button></div><div class="recurringPreviewNav"><button type="button" id="recurringPreviewPrev" aria-label="이전 달">‹</button><b id="recurringPreviewMonth"></b><button type="button" id="recurringPreviewNext" aria-label="다음 달">›</button></div><div id="recurringPreviewContent"></div></div></dialog>
-<script type="module" src="app.js?v=2.78"></script>
+
+<div id="workMemoPanel" class="wmPanel hidden" role="region" aria-label="오늘의 업무 메모">
+  <div id="wmDragHandle" class="wmTop"><div><b>☑ 오늘의 업무 메모</b><small id="wmDateLabel"></small></div><div class="wmTopRight"><span id="wmProgress">0/0 완료</span><button type="button" id="wmClose" title="닫기">✕</button></div></div>
+  <div class="wmContent">
+    <div class="wmDateBar"><input id="wmDate" type="date" aria-label="업무 메모 날짜"><button id="wmToday" type="button">오늘</button></div>
+    <div class="wmActions"><button id="wmLoadToday" type="button">📅 오늘 할 일 불러오기</button><button id="wmLoadMissed" type="button">↪ 전날 못한 일 불러오기</button></div>
+    <div id="wmImportInfo" class="wmInfo">매일 반복업무는 자동 표시돼. 다른 일정은 불러오기를 눌러줘.</div>
+    <div id="wmMissedArea" class="wmMissedArea hidden"></div>
+    <section class="wmSection"><div class="wmSectionTitle">매일 반복업무 <span id="wmDailyMeta"></span></div><div id="wmDailyRows"></div></section>
+    <section class="wmSection"><div class="wmSectionTitle">오늘의 일정 · 직접 작성</div><div id="wmImportedRows"></div><div class="wmNew"><input id="wmNewTask" placeholder="오늘 할 일 직접 작성"><button id="wmAdd" type="button">추가</button></div></section>
+    <div id="wmMovedHistory" class="wmHistory"></div>
+    <section class="wmSection"><div class="wmSectionTitle">자유 메모</div><textarea id="wmFreeText" rows="4" placeholder="참고 사항, 메모 등을 자유롭게 작성"></textarea></section>
+    <div class="wmFoot">체크 상태는 캘린더와 연동 · 날짜별 작성 내용은 Firebase에 저장</div>
+  </div>
+</div>
+<script type="module" src="app.js?v=2.79"></script>
 </body>
 </html>

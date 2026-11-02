@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '2.78',
+  version: '2.79',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -81,6 +81,7 @@ const defaultState = () => ({
   purchases: [],
   diary: {},
   actualWork: {},
+  workMemos: {},
   settings: { hiddenCalendars: [], weekdayWidths:[100,100,100,100,100,100,100], weekdayWidthMode:'ratio', weekdayWidthReference:0, fixedPanelsCollapsed: { recurring:false, archivedRecurring:true, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, archivedRecurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','dday','diary'], sidebarSectionsCollapsed:{}, laneHeights:{}, laneCollapsed:{}, laneLabelWidth:72, mobileSectionsCollapsed:{}, dayLaneHeights:{}, dayLaneManual:{}, workloadRange:'week', weekViewMode:'detailed', monthShowCommonWithFocus:true, selectedDdayId:'' }
 });
 
@@ -353,7 +354,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '2.78',
+    version: '2.79',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -412,6 +413,12 @@ function normalizeState(raw){
     fixed: Array.isArray(s.fixed) ? s.fixed.filter(f=>f && f.id && f.name).map(f=>({...f,hours:Number(f.hours)||0,noDuration:!!f.noDuration,important:!!f.important,checklist:Array.isArray(f.checklist)?f.checklist.filter(x=>x&&String(x.text||'').trim()).map((x,i)=>({id:String(x.id||`fcl-${i}-${uid()}`),text:String(x.text||'').trim()})):[]})) : [],
     flexible: Array.isArray(s.flexible) ? s.flexible.filter(f=>f && f.id && f.name).map(f=>({...f,hours:Number(f.hours)||0,noDuration:!!f.noDuration,important:!!f.important,checklist:Array.isArray(f.checklist)?f.checklist.filter(x=>x&&String(x.text||'').trim()).map((x,i)=>({id:String(x.id||`xcl-${i}-${uid()}`),text:String(x.text||'').trim()})):[]})) : [],
     purchases: Array.isArray(s.purchases) ? s.purchases.filter(p=>p && p.id && p.name).map((p,i)=>({id:String(p.id),name:String(p.name),qty:Math.max(1,Number(p.qty)||1),memo:String(p.memo||''),dueDate:typeof p.dueDate==='string'?p.dueDate:'',done:!!p.done,createdAt:String(p.createdAt||''),order:Number.isFinite(Number(p.order))?Number(p.order):i})) : [],
+    workMemos: (s.workMemos && typeof s.workMemos==='object') ? Object.fromEntries(Object.entries(s.workMemos).filter(([date,v])=>/^\d{4}-\d{2}-\d{2}$/.test(date)&&v&&typeof v==='object').map(([date,v])=>[date,{
+      imports:Array.isArray(v.imports)?v.imports.filter(x=>x&&typeof x.key==='string').map(x=>({key:String(x.key),title:String(x.title||'')})):[],
+      custom:Array.isArray(v.custom)?v.custom.filter(x=>x&&x.id&&x.title).map(x=>({id:String(x.id),title:String(x.title),done:!!x.done,originDate:String(x.originDate||''),movedTo:String(x.movedTo||'')})):[],
+      movedOut:Array.isArray(v.movedOut)?v.movedOut.filter(x=>x&&x.key&&x.toDate).map(x=>({key:String(x.key),toDate:String(x.toDate),title:String(x.title||''),daily:!!x.daily,eventId:String(x.eventId||'')})):[],
+      freeText:String(v.freeText||'')
+    }])) : {},
     diary: s.diary && typeof s.diary === 'object' ? s.diary : {},
     actualWork: (s.actualWork && typeof s.actualWork==='object') ? Object.fromEntries(Object.entries(s.actualWork).map(([date,rows])=>[
       String(date),
@@ -1089,7 +1096,7 @@ function preparationVirtualEvent(e,entry){
   const note=typeof entry==='string'?preparationNoteForDate(e,date):String(entry.text||'').trim();
   const key=typeof entry==='string'?`auto:${entry}`:String(entry.key||'');
   const sourceDate=typeof entry==='string'?entry:String(entry.sourceDate||entry.date||'');
-  return {...e,_prepDay:true,_prepDate:date,_renderDate:date,_occurrenceStart:e.date,_occurrenceEnd:e.date,_prepNote:note,_prepKey:key,_prepMissed:preparationEntryMissed(e,key),_prepSourceDate:sourceDate,_prepType:typeof entry==='string'?'auto':String(entry.type||''),_prepRuleId:typeof entry==='string'?'':String(entry.ruleId||''),_prepRuleLabel:typeof entry==='string'?'':String(entry.ruleLabel||'')};
+  return {...e,_prepDay:true,_prepDate:date,_renderDate:date,_occurrenceStart:e.date,_occurrenceEnd:e.date,_prepNote:note,_prepKey:key,_prepMissed:preparationEntryMissed(e,key),_prepSourceDate:sourceDate,_prepType:typeof entry==='string'?'auto':String(entry.type||''),_prepRuleId:typeof entry==='string'?'':String(entry.ruleId||''),_prepRuleLabel:typeof entry==='string'?'':String(entry.ruleLabel||''),memoOriginalDate:e.memoPrepOrigins?.[key]||''};
 }
 function isPreparationDeadlineOccurrence(e){
   if(!e?.prepEnabled || e?._prepDay) return false;
@@ -1323,7 +1330,7 @@ function eventItemHtml(e, compact=false){
   const basePrepTitle=prepDeadlineDay?`준비마감 · ${prepTaskTitle}`:prepTaskTitle;
   const shownTitle=prepDay
     ? basePrepTitle
-    : (deadlineItem?`마감 · ${e.title}`:e.title);
+    : (deadlineItem?`마감 · ${e.title}`:e.title)+(e.memoOriginalDate&&e.memoOriginalDate!==renderDate?` (${Number(e.memoOriginalDate.slice(5,7))}/${Number(e.memoOriginalDate.slice(8,10))})`:'');
   const detail=[];
   if(prepDay){ detail.push(preparationSummary(e)); if(prepNote) detail.push(prepNote); }
   else if(!e.allDay && e.start) detail.push(e.start + (e.end?`–${e.end}`:''));
@@ -1374,7 +1381,7 @@ function calendarGroupedItemsHtml(items, compact=false){
 function quickLaneHtml(es, compact=false, force=false){
   const quick=(es||[]).filter(e=>e.kind==='todo'&&!isPreparationManagedItem(e));
   if(!quick.length && !force) return '';
-  return `<div class="quickLane ${compact?'compactQuickLane':''} ${!quick.length?'emptyLane':''}"><div class="quickLaneHead"><span>Quick</span><small>${quick.length}건</small></div><div class="quickLaneItems">${calendarGroupedItemsHtml(quick,compact)}</div></div>`;
+  return `<div class="quickLane ${compact?'compactQuickLane':''} ${!quick.length?'emptyLane':''}"><div class="quickLaneHead"><span>Quick</span><small>${quick.filter(e=>!isMemoDaily(e)).length+(quick.some(isMemoDaily)?1:0)}건</small></div><div class="quickLaneItems">${calendarGroupedItemsHtml(quick,compact)}</div></div>`;
 }
 function anniversaryLaneHtml(es, compact=false){
   const items=(es||[]).filter(e=>e.kind==='anniversary'&&!isPreparationManagedItem(e));
@@ -3294,7 +3301,7 @@ function renderMobileSchedule(days,map){
   let sections='';
   sections+=mobileSectionHtml('common','공통 일정','#d9b5cc',mobileCommonBodyHtml(common),`${common.length}건`);
   if(!calendarFocusIds.size||prep.length) sections+=mobileSectionHtml('prep','준비일정','#b8c8ef',prep.map(e=>eventItemHtml(e,false)).join(''),`${prep.length}건`);
-  if(!calendarFocusIds.size||quick.length) sections+=mobileSectionHtml('quick','Quick','#cfd5dc',calendarGroupedItemsHtml(quick,false),`${quick.length}건`);
+  if(!calendarFocusIds.size||quick.length) sections+=mobileSectionHtml('quick','Quick','#cfd5dc',calendarGroupedItemsHtml(quick,false),`${quick.filter(e=>!isMemoDaily(e)).length+(quick.some(isMemoDaily)?1:0)}건`);
   if(!calendarFocusIds.size||payments.length) sections+=mobileSectionHtml('payment','납부','#e6d399',payments.map(e=>eventItemHtml(e,false)).join(''),`${payments.length}건`);
   for(const root of topLevelCals()) if(laneCalendarMembers(root,visibleIds).length) sections+=mobileRootSectionHtml(selected,root,es,visibleIds);
   const dow=d.getDay();
@@ -3776,6 +3783,289 @@ function renderList(){
   $$('.focusFixedItem').forEach(x=>x.onclick=()=>openFixed(x.dataset.fid));
   bindItems();
 }
+
+// v2.79 · 날짜별 업무 메모. 기존 event / prep / purchase 원본과 완료 상태를 공유합니다.
+let workMemoVisible=false;
+let workMemoDate=ds(new Date());
+let workMemoMissedShown=false;
+let workMemoLastPending=[];
+const workMemoDateValid=x=>/^\d{4}-\d{2}-\d{2}$/.test(String(x||''));
+const workMemoShortDate=x=>workMemoDateValid(x)?`${Number(x.slice(5,7))}/${Number(x.slice(8,10))}`:'';
+function workMemoDay(date){
+  state.workMemos=state.workMemos&&typeof state.workMemos==='object'?state.workMemos:{};
+  if(!state.workMemos[date]) state.workMemos[date]={imports:[],custom:[],movedOut:[],freeText:''};
+  const x=state.workMemos[date];
+  x.imports=Array.isArray(x.imports)?x.imports:[];
+  x.custom=Array.isArray(x.custom)?x.custom:[];
+  x.movedOut=Array.isArray(x.movedOut)?x.movedOut:[];
+  x.freeText=String(x.freeText||'');
+  return x;
+}
+function isMemoDaily(e){
+  if(!e || e._prepDay || e._purchaseDue || e.prepEnabled || ['payment','anniversary','appointment'].includes(e.kind)) return false;
+  if(e.memoFromDaily && e.memoOriginalDate) return true;
+  if(e.repeat!=='daily') return false;
+  return Number(normalizedRule(e).interval||1)===1 && (e._occurrenceStart||e.date)===(e._renderDate||e.date);
+}
+function workMemoRef(e){
+  if(e._purchaseDue) return `buy|${e.purchaseId}`;
+  if(e._prepDay) return `prep|${e.id}|${e._prepKey}`;
+  return `ev|${e.id}|${e._occurrenceStart||e.date}`;
+}
+function workMemoEvents(date){
+  if(!workMemoDateValid(date)) return [];
+  return buildOccurrenceMap(date,date,{includeHidden:true,includePreparations:true})[date]||[];
+}
+function workMemoIsDone(e){
+  if(e._purchaseDue) return false;
+  if(e._prepDay) return preparationEntryDone(e,e._prepKey);
+  if(isPreparationDeadlineOccurrence(e)){
+    const p=preparationProgress(e);
+    if(p.total) return preparationComplete(e,p);
+  }
+  return isDone(e);
+}
+function workMemoTitle(e){
+  if(e._purchaseDue) return `구매 · ${e.title}`;
+  if(e._prepDay) return String(e._prepNote||'').trim()||`준비 · ${e.title}`;
+  return e.kind==='payment'?`납부 · ${e.title}`:e.title;
+}
+function workMemoTasks(date,includeAll=false){
+  const note=workMemoDay(date), events=workMemoEvents(date), byRef=new Map(events.map(e=>[workMemoRef(e),e]));
+  const transferred=new Set(note.movedOut.map(x=>x.key));
+  const rows=[],seen=new Set();
+  function push(e,kind,key=workMemoRef(e)){
+    if(seen.has(key)||transferred.has(key)) return;
+    seen.add(key);
+    rows.push({key,kind,e,title:workMemoTitle(e),done:workMemoIsDone(e),originDate:e.memoOriginalDate||'',sourceDate:date});
+  }
+  events.filter(isMemoDaily).forEach(e=>push(e,'daily'));
+  // 이전 날짜에서 옮긴 비매일 업무도 업무 메모에 자동 등장합니다.
+  events.filter(e=>e.memoOriginalDate && !isMemoDaily(e)).forEach(e=>push(e,'import'));
+  for(const entry of note.imports){const e=byRef.get(entry.key);if(e) push(e,'import',entry.key);}
+  if(includeAll) events.filter(e=>!isMemoDaily(e)).forEach(e=>push(e,'import'));
+  for(const x of note.custom){
+    if(x.movedTo) continue;
+    const key=`custom|${x.id}`;
+    if(!seen.has(key)){seen.add(key);rows.push({key,kind:'custom',custom:x,title:x.title,done:!!x.done,originDate:x.originDate||'',sourceDate:date});}
+  }
+  return rows;
+}
+function workMemoSave(){save();}
+function compactDailyEventsInCalendar(){
+  const root=$('#main');if(!root||view==='diary')return;
+  const groups=new Map();
+  root.querySelectorAll('.item[data-eid]').forEach(node=>{
+    const e=state.events.find(x=>String(x.id)===node.dataset.eid);
+    if(!e)return;
+    const date=node.dataset.renderDate||node.dataset.occurrence;
+    if(!workMemoDateValid(date)||!isMemoDaily({...e,_renderDate:date,_occurrenceStart:node.dataset.occurrence}))return;
+    if(!groups.has(date))groups.set(date,[]);
+    groups.get(date).push({node,e});
+  });
+  for(const [date,rows] of groups){
+    const keys=new Set(),unique=[];
+    for(const r of rows){const key=`${r.e.id}|${r.node.dataset.occurrence}`;if(!keys.has(key)){keys.add(key);unique.push(r);}}
+    const done=unique.filter(x=>workMemoIsDone({...x.e,_occurrenceStart:x.node.dataset.occurrence,_renderDate:date})).length;
+    const moved=(state.workMemos?.[date]?.movedOut||[]).filter(x=>x.daily && (!calendarFocusIds.size || (state.events.find(e=>e.id===x.eventId)&&focusedCalendarIds()?.has(state.events.find(e=>e.id===x.eventId).calId))));
+    const count=unique.length,total=count+moved.length;
+    const label=moved.length?`${done}/${count}/${total}`:`${done}/${total}`;
+    const button=document.createElement('button');button.type='button';button.className=`dailySummaryBtn ${count&&done===count?'completed':''}`;
+    button.dataset.dailySummary=date;
+    button.title=`${date} 매일업무 목록 · 완료 ${done} / 남은 업무 ${count}${moved.length?` / 원래 ${total}`:''}`;
+    button.innerHTML=`<span>☑ 매일업무</span><b>${label}</b>`;
+    const first=rows[0].node;
+    const host=first.closest('.laneOrderedItem, .mobileCalendarEvent')||first;
+    host.parentElement?.insertBefore(button,host);
+    for(const {node} of rows){
+      const wrap=node.closest('.laneOrderedItem, .mobileCalendarEvent');
+      if(wrap)wrap.remove();else node.remove();
+    }
+  }
+  root.querySelectorAll('[data-daily-summary]').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();openWorkMemo(btn.dataset.dailySummary);}));
+}
+function openWorkMemo(date=ds(new Date())){
+  workMemoDate=workMemoDateValid(date)?date:ds(new Date());
+  workMemoVisible=true;workMemoMissedShown=false;
+  $('#workMemoPanel')?.classList.remove('hidden');
+  renderWorkMemoPanel();
+}
+function closeWorkMemo(){workMemoVisible=false;$('#workMemoPanel')?.classList.add('hidden');}
+function workMemoTaskMarkup(row){
+  const done=!!row.done,origin=row.originDate && row.originDate!==workMemoDate;
+  const label=origin?` <span class="wmOrigin">(${esc(workMemoShortDate(row.originDate))})</span>`:'';
+  const kind=row.kind==='daily'?'daily':row.kind==='custom'?'custom':'import';
+  const type=row.e?row.e.kind==='payment'?'납부':row.e._prepDay?'준비':row.e._purchaseDue?'구매':row.e.kind==='appointment'?'약속':'일정':'';
+  const noCheck=!!(row.e?.kind==='anniversary');
+  return `<div class="wmTask ${done?'done':''}" data-wm-task="${esc(row.key)}" data-wm-kind="${kind}"><label><input type="checkbox" data-wm-check="${esc(row.key)}" ${done?'checked':''} ${noCheck?'disabled title="기념일은 완료 체크 대상이 아니에요"':''}><span class="wmTaskLabel">${esc(row.title)}${label}</span></label>${type?`<small>${esc(type)}</small>`:''}</div>`;
+}
+function workMemoMissedTasks(date){
+  const previous=ds(add(parse(date),-1)), note=workMemoDay(previous);
+  const current=workMemoTasks(previous,true);
+  const alreadyMoved=new Set(note.movedOut.map(x=>x.key));
+  return current.filter(x=>!x.done && x.e?.kind!=='anniversary' && !alreadyMoved.has(x.key));
+}
+function renderWorkMemoPanel(){
+  const panel=$('#workMemoPanel');if(!panel||!workMemoVisible)return;
+  const date=workMemoDate, n=workMemoDay(date),rows=workMemoTasks(date),daily=rows.filter(x=>x.kind==='daily'),others=rows.filter(x=>x.kind!=='daily');
+  const doneCount=rows.filter(x=>x.done).length;
+  const weekday=['일','월','화','수','목','금','토'][parse(date).getDay()];
+  $('#wmDate').value=date;
+  $('#wmDateLabel').textContent=`${Number(date.slice(5,7))}월 ${Number(date.slice(8,10))}일 (${weekday})`;
+  $('#wmProgress').textContent=`${doneCount}/${rows.length} 완료`;
+  const html=(items)=>items.length?items.map(workMemoTaskMarkup).join(''):'<div class="wmEmpty">아직 등록된 업무가 없어요.</div>';
+  $('#wmDailyRows').innerHTML=html(daily);
+  $('#wmImportedRows').innerHTML=html(others);
+  const moved=n.movedOut.filter(x=>x.daily);
+  $('#wmDailyMeta').textContent=moved.length?`완료 ${daily.filter(x=>x.done).length}/${daily.length}/${daily.length+moved.length} (마지막 숫자는 이월 전 전체)`:`${daily.filter(x=>x.done).length}/${daily.length}`;
+  $('#wmMovedHistory').innerHTML=n.movedOut.length?`<details><summary>다른 날짜로 옮긴 업무 ${n.movedOut.length}건</summary>${n.movedOut.map(x=>`<div>${esc(x.title)} → ${esc(workMemoShortDate(x.toDate))}</div>`).join('')}</details>`:'';
+  if(document.activeElement?.id!=='wmFreeText') $('#wmFreeText').value=n.freeText;
+  if(workMemoMissedShown){
+    const prev=ds(add(parse(date),-1)),missed=workMemoMissedTasks(date);
+    workMemoLastPending=missed;
+    $('#wmMissedArea').classList.remove('hidden');
+    $('#wmMissedArea').innerHTML=`<div class="wmSectionTitle">${esc(workMemoShortDate(prev))} 미완료 업무 <b>${missed.length}건</b></div>`+(missed.length?missed.map((x,i)=>`<div class="wmMissed" data-wm-missed="${i}"><strong>${esc(x.title)}${x.originDate?` (${esc(workMemoShortDate(x.originDate))})`:''}</strong><div class="wmMissedAction"><button type="button" data-wm-today="${i}">오늘로</button><input type="date" value="${date}" aria-label="업무를 옮길 날짜"><button type="button" data-wm-move="${i}">날짜로 이동</button></div></div>`).join(''):'<div class="wmEmpty">전날 미완료 업무가 없어요.</div>');
+  }else {workMemoLastPending=[];$('#wmMissedArea').classList.add('hidden');$('#wmMissedArea').innerHTML='';}
+}
+function workMemoImportToday(){
+  const note=workMemoDay(workMemoDate),existing=new Set(note.imports.map(x=>x.key)), rows=workMemoEvents(workMemoDate).filter(x=>!isMemoDaily(x));
+  let added=0;
+  rows.forEach(e=>{const key=workMemoRef(e);if(existing.has(key)||note.movedOut.some(x=>x.key===key))return;note.imports.push({key,title:workMemoTitle(e)});existing.add(key);added++;});
+  save();
+  if(!added) $('#wmImportInfo').textContent='오늘 등록된 일정은 이미 모두 불러왔어.';
+  else $('#wmImportInfo').textContent=`오늘의 일정 ${added}건을 가져왔어.`;
+}
+function workMemoToggleTask(key){
+  const row=workMemoTasks(workMemoDate).find(x=>x.key===key);if(!row)return;
+  if(row.kind==='custom'){
+    row.custom.done=!row.custom.done;save();return;
+  }
+  const e=row.e;
+  if(e._prepDay){togglePreparationDone(e.id,e._prepKey);return;}
+  if(e._purchaseDue){
+    const previous=workMemoDay(workMemoDate), pId=e.purchaseId;
+    completePurchase(pId,workMemoDate);
+    const purchased=state.events.find(x=>x.sourceType==='purchase' && x.purchaseSourceId===pId);
+    if(purchased){previous.imports=previous.imports.map(x=>x.key===key?{key:`ev|${purchased.id}|${workMemoDate}`,title:purchased.title}:x);save();}
+    return;
+  }
+  if(e.kind==='anniversary')return;
+  // 준비일정 마감의 완료 여부는 개별 준비항목 전체에서 계산됩니다.
+  // 원본 일정의 done만 토글하면 메모/캘린더 표시가 어긋나므로 준비항목과 함께 변경합니다.
+  if(isPreparationDeadlineOccurrence(e)){
+    const base=state.events.find(x=>x.id===e.id),entries=base?preparationEntries(base):[];
+    if(entries.length){
+      const completed=preparationComplete(base,preparationProgress(base));
+      base.prepDone=base.prepDone||{};base.prepMissed=base.prepMissed||{};
+      entries.forEach(entry=>{
+        if(completed)delete base.prepDone[entry.key];
+        else{base.prepDone[entry.key]=true;delete base.prepMissed[entry.key];}
+      });
+      save();return;
+    }
+  }
+  toggleDone(e.id,e._occurrenceStart||e.date);
+}
+function workMemoMoveMissed(index,dest){
+  const row=workMemoLastPending[index];if(!row||!workMemoDateValid(dest))return;
+  const from=row.sourceDate, key=row.key;
+  if(dest===from){alert('원래 날짜와 같아. 다른 날짜를 선택해 줘.');return;}
+  const origin=row.originDate||from;
+  const fromNote=workMemoDay(from);
+  if(fromNote.movedOut.some(x=>x.key===key)){alert('이미 이동한 업무야.');return;}
+  let newRef='';
+  if(row.kind==='custom'){
+    const x=row.custom;
+    x.movedTo=dest;
+    const clone={...structuredClone(x),id:uid(),done:false,movedTo:'',originDate:origin};
+    workMemoDay(dest).custom.push(clone);
+    newRef=`custom|${clone.id}`;
+  }else if(row.e?._purchaseDue){
+    const p=state.purchases.find(x=>String(x.id)===String(row.e.purchaseId));if(!p){alert('구매업무를 찾을 수 없어.');return;}
+    p.dueDate=dest;newRef=`buy|${p.id}`;
+  }else if(row.e?._prepDay){
+    const e=state.events.find(x=>x.id===row.e.id);
+    if(e?.prepDeadline && dest>e.prepDeadline){alert('마감일 이후로 준비업무를 옮길 수 없어. 먼저 마감일을 수정해 줘.');return;}
+    const existing=preparationEntries(e).find(x=>x.key===row.e._prepKey);
+    if(!existing){alert('원래 준비업무를 찾을 수 없어.');return;}
+    const k=existing.key;
+    const rid=existing.ruleId||'';
+    if(existing.type==='date'&&rid){const t=e.prepTasks?.find(x=>String(x.id)===String(rid));if(t)t.date=dest;}
+    else{e.prepMoves=e.prepMoves||{};e.prepMoves[k]=dest;}
+    e.memoPrepOrigins=e.memoPrepOrigins||{};e.memoPrepOrigins[k]=origin;
+    newRef=`prep|${e.id}|${k}`;
+  }else{
+    const e=state.events.find(x=>x.id===row.e?.id);
+    if(!e){alert('기존 일정을 찾지 못했어.');return;}
+    const daily=isMemoDaily(row.e),occ=row.e._occurrenceStart||e.date;
+    if((e.repeat||'none')!=='none'){
+      const before=new Set(state.events.map(x=>x.id));
+      moveRecurringOccurrenceOnly(e,dest,occ);
+      const detached=state.events.find(x=>!before.has(x.id));
+      if(!detached){alert('업무 이동에 실패했어.');return;}
+      detached.memoOriginalDate=origin;
+      detached.memoFromDaily=daily;
+      newRef=`ev|${detached.id}|${dest}`;
+    }else{
+      const span=Math.max(0,diffDays(e.date,e.endDate||e.date));
+      const old=e.date;
+      e.date=dest;e.endDate=ds(add(parse(dest),span));
+      e.memoOriginalDate=origin;
+      e.memoFromDaily=!!e.memoFromDaily||daily;
+      if(e.checklistDoneByDate?.[old]){e.checklistDoneByDate[dest]=e.checklistDoneByDate[old];delete e.checklistDoneByDate[old];}
+      newRef=`ev|${e.id}|${dest}`;
+    }
+  }
+  fromNote.movedOut.push({key,toDate:dest,title:row.title,daily:row.kind==='daily',eventId:row.e?.id||''});
+  if(newRef && !workMemoDay(dest).imports.some(x=>x.key===newRef) && !newRef.startsWith('custom|'))workMemoDay(dest).imports.push({key:newRef,title:row.title});
+  if(dest===workMemoDate){workMemoMissedShown=false;}
+  save();
+  $('#wmImportInfo').textContent=`${workMemoShortDate(from)} 업무를 ${workMemoShortDate(dest)}로 옮겼어. 원래 날짜의 기록은 유지돼.`;
+}
+function initWorkMemo(){
+  $('#workMemoOpenBtn')?.addEventListener('click',()=>workMemoVisible?closeWorkMemo():openWorkMemo(ds(new Date())));
+  $('#wmClose')?.addEventListener('click',closeWorkMemo);
+  $('#wmDate')?.addEventListener('change',ev=>{if(workMemoDateValid(ev.target.value)){workMemoDate=ev.target.value;workMemoMissedShown=false;renderWorkMemoPanel();}});
+  $('#wmToday')?.addEventListener('click',()=>{workMemoDate=ds(new Date());workMemoMissedShown=false;renderWorkMemoPanel();});
+  $('#wmLoadToday')?.addEventListener('click',workMemoImportToday);
+  $('#wmLoadMissed')?.addEventListener('click',()=>{workMemoMissedShown=!workMemoMissedShown;renderWorkMemoPanel();});
+  $('#wmAdd')?.addEventListener('click',()=>{
+    const el=$('#wmNewTask'),title=el.value.trim();if(!title)return;
+    workMemoDay(workMemoDate).custom.push({id:uid(),title,done:false,originDate:'',movedTo:''});el.value='';save();
+  });
+  $('#wmNewTask')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('#wmAdd').click();}});
+  $('#wmFreeText')?.addEventListener('input',ev=>{
+    workMemoDay(workMemoDate).freeText=ev.target.value;
+    save({rerender:false});
+  });
+  $('#workMemoPanel')?.addEventListener('change',e=>{
+    const c=e.target.closest('[data-wm-check]');if(c)workMemoToggleTask(c.dataset.wmCheck);
+  });
+  $('#workMemoPanel')?.addEventListener('click',e=>{
+    const b=e.target.closest('[data-wm-today],[data-wm-move]');if(!b)return;
+    const index=Number(b.dataset.wmToday??b.dataset.wmMove);
+    const target=b.dataset.wmToday!==undefined?workMemoDate:b.closest('.wmMissed')?.querySelector('input[type=date]')?.value;
+    workMemoMoveMissed(index,target);
+  });
+  // PC에서는 기존 포스트잇처럼 위치를 옮길 수 있습니다.
+  const title=$('#wmDragHandle'),panel=$('#workMemoPanel');let start=null;
+  title?.addEventListener('pointerdown',e=>{
+    if(e.target.closest('button,input'))return;
+    if(window.matchMedia('(max-width:760px)').matches)return;
+    const r=panel.getBoundingClientRect();start={x:e.clientX,y:e.clientY,left:r.left,top:r.top};
+    title.setPointerCapture(e.pointerId);
+  });
+  title?.addEventListener('pointermove',e=>{
+    if(!start)return;
+    panel.style.left=`${clamp(start.left+e.clientX-start.x,0,Math.max(0,innerWidth-panel.offsetWidth))}px`;
+    panel.style.top=`${clamp(start.top+e.clientY-start.y,0,Math.max(0,innerHeight-100))}px`;
+    panel.style.right='auto';
+  });
+  title?.addEventListener('pointerup',()=>{start=null;});
+  title?.addEventListener('pointercancel',()=>{start=null;});
+}
+initWorkMemo();
+
 function render(){
   const sidebar=$('#sidebar'), main=$('#main');
   const keep={sidebarTop:sidebar?.scrollTop||0,sidebarLeft:sidebar?.scrollLeft||0,mainTop:main?.scrollTop||0,mainLeft:main?.scrollLeft||0};
@@ -3800,6 +4090,8 @@ function render(){
     viewSwitch.innerHTML=inDiary?'<span class="calendarSwitchGlyph" aria-hidden="true">📅</span>':diaryIconHtml(true);
   }
   ({week:renderWeek,'2week':()=>renderMultiWeek(2),'3week':()=>renderMultiWeek(3),'4week':()=>renderMultiWeek(4),month:renderMonth,day:renderDay,list:renderList,diary:renderDiaryMain}[view]||renderWeek)();
+  compactDailyEventsInCalendar();
+  if(workMemoVisible) renderWorkMemoPanel();
   const sidebar2=$('#sidebar'), main2=$('#main');
   if(sidebar2){ sidebar2.scrollTop=keep.sidebarTop; sidebar2.scrollLeft=keep.sidebarLeft; }
   if(main2){ main2.scrollTop=keep.mainTop; main2.scrollLeft=keep.mainLeft; }
@@ -5095,7 +5387,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.74',
+    appVersion:'2.79',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state

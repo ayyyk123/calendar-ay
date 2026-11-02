@@ -3299,3 +3299,61 @@ body,button,input,select,textarea{font-family:var(--ui-font);font-weight:500}
   color:#23864a!important;
   font-weight:900;
 }
+
+/* v2.79 · 오늘의 업무 메모 & 날짜별 매일업무 묶기 */
+.workMemoOpenBtn{border:1px solid #c5d4c8!important;background:#ecf6ef!important;color:#206446!important;font-weight:700!important;padding:0 9px!important;min-width:78px;white-space:nowrap;font-size:12px!important;cursor:pointer}
+.dailySummaryBtn{display:flex;align-items:center;justify-content:space-between;gap:5px;width:100%;min-width:0;text-align:left;background:#eef6ed;border:1px solid #a7c6aa;border-left:4px solid #3e9163;padding:5px 7px;margin:2px 0;color:#21583c;font-size:12px;font-weight:650;cursor:pointer;border-radius:4px}
+.dailySummaryBtn b{font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.dailySummaryBtn.completed{background:#f0f2f4;color:#718077;border-color:#d1dbd4}
+.dailySummaryBtn:hover{outline:1px solid #54836b}
+.wmPanel{position:fixed;right:22px;top:100px;width:min(430px,calc(100vw - 30px));max-height:calc(100dvh - 112px);display:flex;flex-direction:column;z-index:1200;background:#fff;border:1px solid #a6b8ac;border-radius:10px;box-shadow:0 13px 38px rgba(0,0,0,.22);overflow:hidden;color:#283530;font-family:'Noto Sans KR',sans-serif}
+.wmPanel.hidden{display:none!important}
+.wmPanel button{cursor:pointer;font:inherit}
+.wmTop{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;gap:6px;background:#e5f0e7;border-bottom:1px solid #c1d4c5;touch-action:none;cursor:move;user-select:none}
+.wmTop>div:first-child{display:flex;flex-direction:column;gap:2px;min-width:0}
+.wmTop b{font-size:15px;color:#28523b}
+.wmTop small{font-size:11px;color:#5d6d62}
+.wmTopRight{display:flex;align-items:center;gap:8px}
+.wmTopRight span{font-size:11px;color:#35664a;white-space:nowrap}
+.wmTopRight button{border:1px solid #b5c7b8;background:#fff;border-radius:4px;padding:3px 8px}
+.wmContent{padding:11px 12px;overflow:auto;overscroll-behavior:contain;flex:1}
+.wmDateBar{display:flex;align-items:center;gap:7px;margin-bottom:9px}
+.wmDateBar input{height:32px;min-width:0;flex:1;border:1px solid #cbd7cc;border-radius:5px;padding:4px 6px}
+.wmDateBar button,.wmNew button{border:1px solid #c1d1c5;border-radius:5px;background:#f2f8f4;padding:6px 10px;white-space:nowrap}
+.wmActions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:5px}
+.wmActions button{font-size:11px;font-weight:650;border:1px solid #c1d7c8;border-radius:5px;background:#f1f8f3;padding:8px 4px;line-height:1.3;white-space:normal}
+.wmInfo{font-size:10px;color:#69806c;line-height:1.5;margin:4px 0 12px}
+.wmSection{margin:10px 0 12px;border:1px solid #e1e8e0;border-radius:6px;overflow:hidden}
+.wmSectionTitle{display:flex;align-items:center;justify-content:space-between;background:#f2f7f3;padding:7px 9px;font-size:12px;font-weight:800;color:#334b3a;border-bottom:1px solid #e1e8e0}
+.wmSectionTitle span,.wmSectionTitle b{font-size:10px;font-weight:600;color:#5c7961}
+.wmTask{display:flex;gap:6px;justify-content:space-between;align-items:center;padding:7px 9px;border-bottom:1px solid #eef1ee;font-size:12px;line-height:1.45}
+.wmTask:last-child{border-bottom:none}
+.wmTask label{display:flex;align-items:flex-start;gap:8px;min-width:0;flex:1;cursor:pointer}
+.wmTask input[type=checkbox]{flex:none;accent-color:#2c975e;width:16px;height:16px;margin:0;cursor:pointer}
+.wmTaskLabel{min-width:0;overflow-wrap:anywhere}
+.wmTask.done .wmTaskLabel{text-decoration:line-through;color:#9baba0}
+.wmTask small{color:#8b9d8d;font-size:10px;white-space:nowrap}
+.wmOrigin{color:#9c5b27;font-weight:750;white-space:nowrap}
+.wmEmpty{padding:13px 9px;color:#9aa99b;font-size:11px}
+.wmNew{display:flex;gap:6px;padding:8px}
+.wmNew input{flex:1;min-width:0;border:1px solid #cfdacb;border-radius:5px;padding:7px;font-size:12px}
+.wmMissedArea{border:1px solid #e5bcaa;border-radius:6px;overflow:hidden;margin:8px 0}
+.wmMissedArea.hidden{display:none}
+.wmMissedArea .wmSectionTitle{background:#fdf1ea;color:#a65135;border-bottom-color:#e8cbbf}
+.wmMissed{padding:9px;border-bottom:1px solid #f0e3dc}
+.wmMissed strong{color:#bb523a;font-size:12px;display:block;margin-bottom:6px;overflow-wrap:anywhere}
+.wmMissedAction{display:flex;gap:5px;flex-wrap:wrap}
+.wmMissedAction button{border:1px solid #e2bbaa;border-radius:4px;background:#fff4ec;color:#96523a;padding:4px 7px;font-size:11px}
+.wmMissedAction input{width:128px;min-width:0;border:1px solid #d9c5b9;border-radius:4px;padding:3px 4px;font-size:11px}
+.wmHistory{font-size:11px;color:#6e7c70;margin:8px 0;line-height:1.65}
+.wmHistory summary{cursor:pointer}
+.wmHistory details{border:1px dashed #b5cabd;padding:6px}
+#wmFreeText{display:block;width:calc(100% - 16px);box-sizing:border-box;margin:8px;border:1px solid #d6dfd5;border-radius:5px;padding:8px;font-family:inherit;font-size:12px;resize:vertical;min-height:78px}
+.wmFoot{font-size:10px;color:#8c9f90;padding:4px 0 2px;text-align:center}
+@media(max-width:760px){
+  .workMemoOpenBtn{font-size:10px!important;min-width:56px;padding:0 5px!important}
+  .wmPanel{left:0!important;right:0!important;top:auto!important;bottom:0!important;width:100vw!important;max-height:88dvh;border-radius:12px 12px 0 0}
+  .wmTop{cursor:default;touch-action:auto}
+  .wmActions button{font-size:11px}
+  .dailySummaryBtn{min-height:32px;font-size:12px}
+}
