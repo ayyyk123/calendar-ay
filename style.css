@@ -3422,3 +3422,13 @@ header .views > #workMemoOpenBtn{width:68px!important;min-width:68px!important;m
 /* v2.81 · task entry is calendar-only; memo board only mirrors registered tasks */
 .wmDayCard .wmDayActions button{max-width:none}
 .wmDailyOptIn{margin:6px 0 10px}
+
+/* v2.82 · 아도라블 업무 메모 표시 위치 선택 */
+.wmDailyOptIn{display:flex!important;flex-direction:column;align-items:stretch;gap:7px;padding:11px 12px}
+.wmDailyOptIn.hidden{display:none!important}
+.wmDailyOptIn label{font-weight:700;font-size:13px}
+.wmDailyOptIn select{height:37px;min-height:37px;width:100%;max-width:100%;box-sizing:border-box;background:#fff;color:#20354a;border:1px solid #c6d1e0;border-radius:4px;padding:5px 9px;font-size:13px}
+.wmDailyOptIn>small{font-size:11px;color:#5d7790;line-height:1.5}
+.wmConfigRow select{width:auto;min-width:125px;max-width:155px;border:1px solid #cbd5e1;border-radius:4px;background:#fff;padding:6px 5px;font-size:12px;color:#24374a}
+.wmConfigRow .wmConfigMeta{display:block;font-size:10px;margin-top:3px;color:#7d8da0}
+@media(max-width:480px){.wmConfigRow select{min-width:108px;max-width:120px;font-size:11px}}
