@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '2.82',
+  version: '2.83',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -354,7 +354,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '2.82',
+    version: '2.83',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -1838,7 +1838,7 @@ function renderFixed(){
 
   $$('.recurringFixed').forEach(x=>{
     x.querySelector('.recurringInspectBtn')?.addEventListener('click',()=>openRecurringPreview(x.dataset.eid));
-    x.querySelector('.recurringEditBtn')?.addEventListener('click',ev=>{ev.stopPropagation();openEvent(null,x.dataset.eid);});
+    x.querySelector('.recurringEditBtn')?.addEventListener('click',ev=>{ev.stopPropagation();openEvent(null,x.dataset.eid,{seriesFromSidebar:true});});
   });
   $$('.manualFixed').forEach(x=>{
     if(x.dataset.used!=='1'){
@@ -4095,7 +4095,24 @@ function initWorkMemo(){
   $('#wmSettingsBtn')?.addEventListener('click',()=>{workMemoSettingsShown=!workMemoSettingsShown;renderWorkMemoPanel();});
   window.addEventListener('resize',()=>{if(workMemoVisible && workMemoBoardDays()!==Number($('#wmBoard')?.style.getPropertyValue('--wm-columns')||0))renderWorkMemoPanel();});
   panel?.addEventListener('change',e=>{
-    const placement=e.target.closest('[data-wm-placement]');if(placement){const obj=state.events.find(x=>x.id===placement.dataset.wmPlacement);if(obj){obj.memoCategory=placement.value;obj.memoEnabled=placement.value!=='off';obj.memoDaily=placement.value==='daily';save();}return;}
+    const placement=e.target.closest('[data-wm-placement]');if(placement){
+      const obj=state.events.find(x=>x.id===placement.dataset.wmPlacement);
+      if(obj){
+        const before=memoTaskPlacement(obj),target=placement.value;
+        if(before!==target){
+          const changed={...structuredClone(obj),memoCategory:target,memoEnabled:target!=='off',memoDaily:target==='daily'};
+          sidebarSeriesEditActive=true;
+          pendingRepeatEdit={id:obj.id,occ:obj.date,obj:changed,chosenDate:obj.date,ruleEdited:false,sidebar:true};
+          $('#repeatEditDlg').querySelector('h3').textContent='업무 메모 분류 적용 시작일';
+          $('#sidebarSeriesApply').classList.remove('hidden');
+          $('#repeatEditDlg .scopeActions').classList.add('hidden');
+          const inp=$('#sidebarApplyStartDate');inp.min=obj.date;inp.value=ds(new Date())<obj.date?obj.date:ds(new Date());
+          $('#repeatEditInfo').textContent='선택한 날짜 이후 업무만 새 분류로 표시합니다. 지난 날짜는 변경하지 않습니다.';
+          $('#repeatEditDateChange').classList.add('hidden');
+          placement.value=before;
+          openDialog($('#repeatEditDlg'));
+        }
+      }return;}
     const checkbox=e.target.closest('[data-wm-check]');if(checkbox){const date=checkbox.closest('[data-wm-date]')?.dataset.wmDate;if(date)workMemoToggleTask(checkbox.dataset.wmCheck,date);}
   });
   panel?.addEventListener('click',e=>{
@@ -4593,6 +4610,7 @@ function cleanedChecklistDoneMap(map,items){
 }
 function openEvent(date,id,options={}){
   closeEventPopover();
+  sidebarSeriesEditActive=!!options?.seriesFromSidebar;
   const e=state.events.find(x=>x.id===id);
   const recurringPreset=!e && options?.preset==='autoRecurring';
   const paymentPreset=!e && options?.preset==='payment';
@@ -4607,6 +4625,11 @@ function openEvent(date,id,options={}){
   $('#eid').value=e?.id||''; $('#title').value=e?.title||''; $('#important').checked=!!e?.important; $('#cal').value=e?.calId||requestedCalId||cals()[0]?.id||'';
   const editingRecurring=!!e && (e.repeat||'none')!=='none';
   $('#date').value=editingRecurring?activeEventOccurrence:(e?.date||date||ds(cursor)); $('#endDate').value=e?.endDate||e?.date||date||ds(cursor);
+  // 사이드바에서는 과거 회차 날짜를 임의로 이동시키지 않습니다.
+  // 수정 적용 시작일은 저장 직후 나오는 별도 날짜 선택창에서 지정합니다.
+  $('#date').readOnly=sidebarSeriesEditActive && editingRecurring;
+  $('#date').classList.toggle('seriesAnchorReadonly',sidebarSeriesEditActive && editingRecurring);
+  $('#date').title=sidebarSeriesEditActive && editingRecurring?'기존 반복 시작일 (수정 적용일은 저장 다음 화면에서 선택)':'';
   $('#allDay').checked=e?.allDay??true; $('#start').value=e?.start||''; $('#end').value=e?.end||''; setDurationInputs(e?.hours??1); $('#noDuration').checked=paymentPreset?true:(e ? !!e.noDuration : true);
   $('#kind').value=e?.kind||(paymentPreset?'payment':(quickPreset?'todo':(commonPreset?'appointment':(recurringPreset?'todo':'event')))); $('#place').value=e?.place||''; $('#repeat').value=e?.repeat||(paymentPreset?'monthly':(recurringPreset?'weekly':'none')); lastRepeatFormType=$('#repeat').value; $('#memo').value=e?.memo||'';
   // 새 일정은 이전에 열었던 일정의 준비/마감 정보를 절대 이어받지 않는다.
@@ -4666,6 +4689,11 @@ function openEvent(date,id,options={}){
   $('#carryEvent').classList.toggle('hidden',!e || e.kind==='anniversary' || e.kind==='payment' || (occurrenceView&&isDone(occurrenceView)));
   updateAllDayUI(); updateKindUI(); setRepeatRule(e||{date:$('#date').value,repeat:$('#repeat').value,repeatRule:null}); updateDurationMode(); updatePrepUI(); updateMemoDailyOptIn();
   showRecurringDateEditHint(e,activeEventOccurrence);
+  if(sidebarSeriesEditActive && editingRecurring){
+    const hint=$('#eventRecurringDateHint');
+    if(hint) hint.textContent=`기존 반복 시작일 ${e.date}은 그대로 유지됩니다. 저장 후 원하는 ‘적용 시작일’을 선택하세요. 그 날짜 이전의 일정·완료 기록은 수정하지 않습니다.`;
+    const startLabel=$('#eventStartDateLabel');if(startLabel)startLabel.textContent='기존 반복 시작일 (유지)';
+  }
   openedRecurringRuleFingerprint=editingRecurring?recurrenceRuleFormFingerprint():'';
   openDialog($('#eventDlg'));
   if(options?.prepFocusDate){
@@ -4682,6 +4710,7 @@ function openDialog(d){ if(!d.open) d.showModal(); }
 function closeDialog(d){ if(d.open) d.close(); }
 
 
+let sidebarSeriesEditActive = false;
 let openedRecurringRuleFingerprint = '';
 function recurrenceRuleFormFingerprint(){
   const checked=$$('#weeklyOptions input[type=checkbox]:checked').map(x=>x.value).sort();
@@ -4766,13 +4795,109 @@ function repeatEditFuture(old,obj,occ){
   old.orderByDate=Object.fromEntries(Object.entries(old.orderByDate||{}).filter(([k])=>k<occ));
   state.events.push(future);
 }
+
+// v2.83: 사이드바에서 수정한 반복업무는 '지정일 이후'에만 적용합니다.
+// 과거 회차의 원본 ID와 각 날짜 완료·제외·체크리스트 기록을 유지하고,
+// 변경 적용일 이후에 실제로 발생하는 첫 회차부터 새 시리즈로 분리합니다.
+function nextSeriesOccurrenceFromDate(old,from){
+  const type=old.repeat||'none';
+  const interval=normalizedRule(old).interval;
+  const lookahead=type==='yearly'?Math.max(130,interval*2)*366
+    :type==='monthly'?Math.max(120,interval*3)*32
+    :type==='weekly'?Math.max(370,interval*25*7)
+    :Math.max(370,interval*8);
+  const horizon=ds(add(parse(from),lookahead));
+  const dates=generateOccurrenceStarts(old,from,horizon);
+  const found=dates.find(d=>ds(d)>=from && !(old.excludedDates||[]).includes(ds(d)));
+  return found?ds(found):'';
+}
+function applySidebarSeriesEditFromDate(old,formObj,from,ruleEdited=false){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(from) || ds(parse(from))!==from){
+    alert('올바른 적용 시작일을 선택해 줘.');return false;
+  }
+  if(from<old.date){alert(`적용 시작일은 기존 반복 시작일(${old.date})보다 빠를 수 없어.`);return false;}
+  // 반복 요일/주기 자체를 수정했다면 기존 요일이 아닌 새 규칙을 적용 시작일에 맞춥니다.
+  // 분류/제목만 수정한 경우에는 기존 반복 주기의 다음 실제 회차에서 분리합니다.
+  const first=ruleEdited?from:nextSeriesOccurrenceFromDate(old,from);
+  if(!first){alert('선택한 날짜 이후에 남은 반복 회차가 없어. 반복 종료일과 적용 시작일을 확인해 줘.');return false;}
+  // 원본 반복이 시작되는 날부터 적용할 때는 이력이 있는 원본을 유지합니다.
+  // 날짜·완료 기록을 한 칸도 이동시키지 않으며 새 업무 ID도 만들지 않습니다.
+  const clone=structuredClone(formObj);
+  if(from<=old.date){
+    const records={
+      date:old.date,endDate:old.endDate,
+      doneDates:old.doneDates||[],excludedDates:old.excludedDates||[],
+      checklistDoneByDate:old.checklistDoneByDate||{},orderByDate:old.orderByDate||{},
+      carryoverHistory:old.carryoverHistory||[]
+    };
+    Object.assign(old,clone,records);
+    return true;
+  }
+  const originalRule=normalizedRule(old);
+  const beforeDate=ds(add(parse(from),-1));
+  const beforeCount=originalRule.endType==='count'
+    ?generateOccurrenceStarts(old,old.date,beforeDate).length:0;
+  // 기존 주/월/연 반복의 위상(시작 요일/반복 간격)을 유지하는 첫 실제 회차입니다.
+  const duration=Math.max(0,diffDays(old.date,old.endDate||old.date));
+  const future={...structuredClone(old),...clone,id:uid(),date:first,endDate:ds(add(parse(first),duration)),detachedFromRepeatId:'',detachedOccurrence:''};
+  if(future.repeat!=='none'){
+    future.repeatRule=structuredClone(clone.repeatRule||originalRule);
+    if(originalRule.endType==='count' && !ruleEdited && future.repeatRule?.endType==='count'){
+      future.repeatRule.count=Math.max(1,Number(originalRule.count)-beforeCount);
+    }
+  }else future.repeatRule=null;
+  if(future.repeat!=='none' && !nextSeriesOccurrenceFromDate(future,from)){
+    alert('변경한 반복 규칙에 적용 시작일 이후의 일정이 없어. 반복 요일과 종료일을 확인해 줘.');
+    return false;
+  }
+  // 같은 회차를 두 시리즈에서 동시에 표시하지 않도록 경계를 나눕니다.
+  const pastRule=normalizedRule(old);
+  pastRule.endType='date';pastRule.until=beforeDate;
+  // 새 객체/ID 준비가 끝난 후에만 원본 수정 (validation failure = no mutation).
+  future.doneDates=(old.doneDates||[]).filter(d=>d>=from);
+  future.excludedDates=(old.excludedDates||[]).filter(d=>d>=from);
+  future.checklistDoneByDate=Object.fromEntries(Object.entries(old.checklistDoneByDate||{}).filter(([date])=>date>=from));
+  future.orderByDate=Object.fromEntries(Object.entries(old.orderByDate||{}).filter(([date])=>date>=from));
+  future.carryoverHistory=(old.carryoverHistory||[]).filter(x=>String(x.fromDate||'')>=from);
+  old.repeatRule=pastRule;
+  old.doneDates=(old.doneDates||[]).filter(d=>d<from);
+  old.excludedDates=(old.excludedDates||[]).filter(d=>d<from);
+  old.checklistDoneByDate=Object.fromEntries(Object.entries(old.checklistDoneByDate||{}).filter(([date])=>date<from));
+  old.orderByDate=Object.fromEntries(Object.entries(old.orderByDate||{}).filter(([date])=>date<from));
+  old.carryoverHistory=(old.carryoverHistory||[]).filter(x=>String(x.fromDate||'')<from);
+  // 이월 기록/참조는 해당 날짜에 유지하면서 미래 원본 ID만 새 시리즈로 연결합니다.
+  for(const [date,note] of Object.entries(state.workMemos||{})){
+    if(date<from || !note || typeof note!=='object')continue;
+    for(const entry of note.imports||[]){
+      if(typeof entry.key==='string' && entry.key.startsWith(`ev|${old.id}|`)) entry.key=`ev|${future.id}|${entry.key.slice(`ev|${old.id}|`.length)}`;
+    }
+    for(const row of note.movedOut||[]){
+      if(row.eventId===old.id)row.eventId=future.id;
+      if(typeof row.key==='string' && row.key.startsWith(`ev|${old.id}|`))row.key=`ev|${future.id}|${row.key.slice(`ev|${old.id}|`.length)}`;
+    }
+  }
+  state.events.push(future);
+  return true;
+}
 function finishRepeatEdit(){
-  pendingRepeatEdit=null; activeEventOccurrence=null;
+  pendingRepeatEdit=null; activeEventOccurrence=null; sidebarSeriesEditActive=false;
   closeDialog($('#repeatEditDlg')); closeDialog($('#eventDlg')); save();
 }
 function requestRepeatEditScope(old,obj,chosenDate,ruleEdited=false){
   const occ=activeEventOccurrence||old.date;
-  pendingRepeatEdit={id:old.id,occ,obj,chosenDate:chosenDate||occ,ruleEdited};
+  pendingRepeatEdit={id:old.id,occ,obj,chosenDate:chosenDate||occ,ruleEdited,sidebar:sidebarSeriesEditActive};
+  $('#repeatEditDlg').querySelector('h3').textContent=sidebarSeriesEditActive?'반복업무 적용 시작일':'반복 일정 수정';
+  $('#sidebarSeriesApply').classList.toggle('hidden',!sidebarSeriesEditActive);
+  $('#repeatEditDlg .scopeActions').classList.toggle('hidden',sidebarSeriesEditActive);
+  if(sidebarSeriesEditActive){
+    const startInput=$('#sidebarApplyStartDate');
+    startInput.min=old.date;
+    startInput.value=ds(new Date())<old.date?old.date:ds(new Date());
+    $('#repeatEditInfo').textContent='선택한 날짜부터 새로운 설정을 적용합니다. 그 이전 일정·완료 기록·체크 내역은 그대로 유지됩니다.';
+    $('#repeatEditDateChange').classList.add('hidden');
+    openDialog($('#repeatEditDlg'));
+    return;
+  }
   $('#repeatEditInfo').textContent=`선택한 회차: ${occ} · 수정 적용 범위를 선택하세요.`;
   const target=$('#repeatEditDateChange');
   if(target){
@@ -4839,11 +4964,20 @@ $('#eventForm').onsubmit=e=>{
     else obj.doneDates=(obj.doneDates||[]).filter(date=>checklistProgress({...preview,_occurrenceStart:date},date).complete);
   }
   if(isRecurringEdit){
+    if(sidebarSeriesEditActive && chosenDate!==old.date){
+      alert('사이드바 수정에서는 기존 반복 시작일을 이동할 수 없어. 저장한 뒤 적용 시작일을 지정해 줘.');return;
+    }
     requestRepeatEditScope(old,obj,chosenDate,changedRepeatRule);
     return;
   }
   if(id) state.events[state.events.findIndex(x=>x.id===id)]={...old,...obj}; else state.events.push(obj);
   activeEventOccurrence=null; closeDialog($('#eventDlg')); save();
+};
+$('#sidebarApplySave').onclick=()=>{
+  const p=pendingRepeatEdit, old=p&&state.events.find(x=>x.id===p.id);
+  if(!p||!old||!p.sidebar)return;
+  const from=$('#sidebarApplyStartDate').value;
+  if(applySidebarSeriesEditFromDate(old,p.obj,from,p.ruleEdited)) finishRepeatEdit();
 };
 $('#editOccurrenceOnly').onclick=()=>{
   const p=pendingRepeatEdit, old=p&&state.events.find(x=>x.id===p.id); if(!p||!old) return;
@@ -4860,8 +4994,8 @@ $('#editWholeSeries').onclick=()=>{
   applyWholeRecurringFormEdit(old,p.obj,p.occ,p.chosenDate,p.ruleEdited);
   finishRepeatEdit();
 };
-$('#cancelRepeatEdit').onclick=()=>{ pendingRepeatEdit=null; closeDialog($('#repeatEditDlg')); };
-$('#cancelEvent').onclick=()=>{ activeEventOccurrence=null; closeDialog($('#eventDlg')); };
+$('#cancelRepeatEdit').onclick=()=>{ pendingRepeatEdit=null; sidebarSeriesEditActive=false; closeDialog($('#repeatEditDlg')); };
+$('#cancelEvent').onclick=()=>{ activeEventOccurrence=null; sidebarSeriesEditActive=false; closeDialog($('#eventDlg')); };
 $('#eventDone').onchange=()=>{
   const id=$('#eid').value, ev=state.events.find(x=>x.id===id); if(!ev) return;
   const occ=activeEventOccurrence||ev.date;
@@ -5458,7 +5592,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.82',
+    appVersion:'2.83',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
