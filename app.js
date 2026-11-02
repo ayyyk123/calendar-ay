@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '2.86',
+  version: '2.87',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -354,7 +354,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '2.86',
+    version: '2.87',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -2683,6 +2683,11 @@ function bindItems(){
       e.preventDefault(); e.stopPropagation(); x.classList.remove('dropReady');
       const payload=activeDrag||readDragPayload(e.dataTransfer); activeDrag=null; stopMultiWeekDragScroll(); document.body.classList.remove('calendarEventDragging');
       if(!payload) return;
+      if(payload.type==='memoTask'){
+        const row=workMemoTasks(payload.sourceDate).find(r=>r.key===payload.key&&r.kind===payload.kind);
+        if(row)workMemoMoveRow(row,x.dataset.dropdate);
+        return;
+      }
       if(payload.type==='fixed'){
         const f=state.fixed.find(z=>z.id===payload.id);
         if(f){
@@ -3816,7 +3821,7 @@ function isAdorableCalendar(calId){
   const root=adorableRoot(), top=topAncestor(calId);
   return !!root && !!top && top.id===root.id;
 }
-// v2.86 · 반복 요일과 업무 분류는 별도로 선택합니다.
+// v2.87 · 반복 요일과 업무 분류는 별도로 선택합니다.
 // 기존 daily/today 값은 구 데이터 호환용으로 해석하며 신규 값은 daily/weekly/monthly/off 입니다.
 const WM_GROUPS=[['daily','일업무'],['weekly','주업무'],['monthly','월업무'],['extra','추가업무']];
 function defaultMemoGroupForRepeat(repeat){
@@ -3911,6 +3916,79 @@ function workMemoTasks(date,includeAll=false){
   return rows;
 }
 function workMemoSave(){save();}
+// 달력 묶음 클릭 시 달력을 가리지 않는 목록을 열어 드래그 이동할 수 있습니다.
+let workGroupPopupState=null;
+function closeWorkGroupPopup(){
+  workGroupPopupState=null;
+  const pop=$('#wmGroupPopup');if(pop){pop.classList.add('hidden');pop.innerHTML='';}
+}
+function positionWorkGroupPopup(anchor){
+  const pop=$('#wmGroupPopup');if(!pop||!anchor)return;
+  const r=anchor.getBoundingClientRect(),width=Math.min(360,window.innerWidth-20);
+  const left=Math.max(8,Math.min(window.innerWidth-width-8,r.left));
+  pop.style.width=width+'px';pop.style.left=left+'px';
+  pop.style.top=Math.max(8,Math.min(window.innerHeight-pop.offsetHeight-8,r.bottom+6))+'px';
+}
+function refreshWorkGroupPopup(){
+  const info=workGroupPopupState,pop=$('#wmGroupPopup');if(!info||!pop)return;
+  const {date,kind}=info;
+  const anchor=[...document.querySelectorAll('#main [data-daily-summary]')].find(x=>x.dataset.dailySummary===date && x.dataset.workGroup===kind);
+  if(!anchor){closeWorkGroupPopup();return;}
+  const label=WM_GROUPS.find(x=>x[0]===kind)?.[1]||'업무';
+  const rows=workMemoTasks(date).filter(x=>x.kind===kind);
+  const currentScroll=pop.querySelector('.wmGroupPopupList')?.scrollTop||0;
+  pop.innerHTML=`<div class="wmGroupPopupHeader"><strong>${esc(workMemoShortDate(date))} ${esc(label)} <small>${rows.filter(x=>x.done).length}/${rows.length}</small></strong><button type="button" data-wm-popup-close aria-label="목록 닫기">✕</button></div><p class="wmGroupPopupHelp">미완료 업무를 잡아 달력의 다른 날짜로 드래그하세요. 휴대폰은 날짜를 선택해 이동할 수 있어요.</p><div class="wmGroupPopupList">${rows.length?rows.map(row=>{
+    const moveable=!row.done && (!!row.e || !!row.custom);
+    const origin=row.originDate&&row.originDate!==date?` <small>(${esc(workMemoShortDate(row.originDate))})</small>`:'';
+    return `<div class="wmPopupTask ${row.done?'completed':''}" data-wm-popup-key="${esc(row.key)}" ${moveable?'draggable="true"':''}><div class="wmPopupTaskMain"><input type="checkbox" data-wm-popup-check="${esc(row.key)}" ${row.done?'checked':''} ${row.e?.kind==='anniversary'?'disabled':''}><span title="${moveable?'드래그해서 날짜 이동':''}">${moveable?'<span class="wmDragGrip">⠿</span> ':''}${esc(row.title)}${origin}</span></div>${moveable?`<div class="wmPopupTaskActions"><input type="date" aria-label="이동할 날짜" value="${date}"><button type="button" data-wm-popup-move>이동</button></div>`:''}</div>`;
+  }).join(''):'<div class="wmGroupPopupEmpty">해당 날짜의 업무가 없습니다.</div>'}</div>`;
+  pop.classList.remove('hidden');
+  const list=pop.querySelector('.wmGroupPopupList');if(list)list.scrollTop=currentScroll;
+  positionWorkGroupPopup(anchor);
+}
+function openWorkGroupPopup(date,kind){
+  if(workGroupPopupState?.date===date&&workGroupPopupState?.kind===kind){closeWorkGroupPopup();return;}
+  workGroupPopupState={date,kind};refreshWorkGroupPopup();
+}
+function initWorkGroupPopup(){
+  const pop=$('#wmGroupPopup');if(!pop)return;
+  pop.addEventListener('click',e=>{
+    if(e.target.closest('[data-wm-popup-close]')){closeWorkGroupPopup();return;}
+    const move=e.target.closest('[data-wm-popup-move]');if(!move)return;
+    const item=move.closest('[data-wm-popup-key]'),info=workGroupPopupState;
+    if(!info||!item)return;
+    const row=workMemoTasks(info.date).find(x=>x.key===item.dataset.wmPopupKey && x.kind===info.kind);
+    const date=item.querySelector('input[type=date]')?.value;
+    if(row)workMemoMoveRow(row,date);
+  });
+  pop.addEventListener('change',e=>{
+    const check=e.target.closest('[data-wm-popup-check]');if(!check||!workGroupPopupState)return;
+    workMemoToggleTask(check.dataset.wmPopupCheck,workGroupPopupState.date);
+  });
+  pop.addEventListener('dragstart',e=>{
+    const item=e.target.closest('[data-wm-popup-key][draggable=true]'),info=workGroupPopupState;
+    if(!item||!info){e.preventDefault();return;}
+    const row=workMemoTasks(info.date).find(x=>x.key===item.dataset.wmPopupKey&&x.kind===info.kind);
+    if(!row||row.done){e.preventDefault();return;}
+    activeDrag={type:'memoTask',key:row.key,sourceDate:info.date,kind:info.kind};
+    e.dataTransfer.effectAllowed='move';
+    try{e.dataTransfer.setData('application/x-calendar-event',JSON.stringify(activeDrag));}catch(_e){}
+    e.dataTransfer.setData('text/plain',`calendar-memo:${row.key}`);
+    item.classList.add('dragging');
+    document.body.classList.add('calendarEventDragging');
+  });
+  pop.addEventListener('dragend',e=>{
+    e.target.closest('[data-wm-popup-key]')?.classList.remove('dragging');
+    activeDrag=null;document.body.classList.remove('calendarEventDragging');
+    $$('.dropReady').forEach(x=>x.classList.remove('dropReady'));
+  });
+  document.addEventListener('pointerdown',e=>{
+    if(workGroupPopupState&&!e.target.closest('#wmGroupPopup')&&!e.target.closest('[data-daily-summary]'))closeWorkGroupPopup();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&workGroupPopupState)closeWorkGroupPopup();});
+  window.addEventListener('resize',()=>{if(workGroupPopupState)refreshWorkGroupPopup();});
+}
+initWorkGroupPopup();
 // 캘린더는 날짜마다 일/주/월/추가업무를 각각 한 줄로 묶어 표시합니다.
 // 선택하지 않은 반복업무와 다른 캘린더의 업무는 원래 모습 그대로 둡니다.
 function compactDailyEventsInCalendar(){
@@ -3964,9 +4042,7 @@ function compactDailyEventsInCalendar(){
     }
   }
   root.querySelectorAll('[data-daily-summary]').forEach(btn=>btn.addEventListener('click',e=>{
-    e.preventDefault();e.stopPropagation();openWorkMemo(btn.dataset.dailySummary);
-    const group=btn.dataset.workGroup;
-    if(group){requestAnimationFrame(()=>$('#wmBoard [data-wm-date="'+btn.dataset.dailySummary+'"] [data-wm-section="'+group+'"]')?.scrollIntoView({block:'nearest'}));}
+    e.preventDefault();e.stopPropagation();openWorkGroupPopup(btn.dataset.dailySummary,btn.dataset.workGroup);
   }));
 }
 function workMemoBoardDays(){
@@ -4025,7 +4101,8 @@ function workMemoDayCard(date){
   }).join('');
   return `<article class="wmDayCard ${today?'wmTodayCard':''}" data-wm-date="${date}">
     <div class="wmDayHead"><div><strong>${Number(date.slice(5,7))}/${Number(date.slice(8,10))} <span>(${wd})</span></strong>${today?'<em>오늘</em>':''}</div><small>${progress}/${rows.length} 완료</small></div>
-    <div class="wmDayScroll"><div class="wmDayActions"><button type="button" data-wm-missed-toggle="${date}" class="${workMemoMissedDates.has(date)?'active':''}">전날 못한 일 ${workMemoMissedDates.has(date)?'접기':'불러오기'}</button></div><div class="wmInfo" data-wm-info="${date}">아도라블 캘린더 일정 자동 반영 · 업무 추가/수정은 캘린더에서</div>
+    <div class="wmDayScroll"><div class="wmDayActions"><button type="button" data-wm-missed-toggle="${date}" class="${workMemoMissedDates.has(date)?'active':''}">전날 못한 일 ${workMemoMissedDates.has(date)?'접기':'불러오기'}</button></div><div class="wmInfo" data-wm-info="${date}">아도라블 일정 자동 연동 · 추가업무는 여기와 캘린더에서 모두 등록 가능</div>
+    <form class="wmNewTaskForm" data-wm-new="${date}" autocomplete="off"><input name="title" type="text" maxlength="180" placeholder="${esc(workMemoShortDate(date))} 추가업무 입력" aria-label="새 추가업무 제목" required><button type="submit">+ 추가업무</button></form>
     ${missed}
     ${sections}
     ${n.movedOut.length?`<details class="wmHistory"><summary>다른 날짜로 옮긴 일 ${n.movedOut.length}건</summary>${n.movedOut.map(x=>`<div>${esc(x.title)} → ${esc(workMemoShortDate(x.toDate))}</div>`).join('')}</details>`:''}
@@ -4090,10 +4167,11 @@ function workMemoToggleTask(key,date=workMemoDate){
   }
   toggleDone(e.id,e._occurrenceStart||e.date);
 }
-function workMemoMoveMissed(index,dest,date=workMemoDate){
-  const row=(workMemoMissedByDate.get(date)||[])[index];if(!row||!workMemoDateValid(dest))return;
+function workMemoMoveRow(row,dest){
+  if(!row||!workMemoDateValid(dest))return false;
+  if(row.done){alert('완료한 업무는 미완료 업무로 이동할 수 없어.');return false;}
   const from=row.sourceDate, key=row.key;
-  if(dest===from){alert('원래 날짜와 같아. 다른 날짜를 선택해 줘.');return;}
+  if(dest===from){alert('원래 날짜와 같아. 다른 날짜를 선택해 줘.');return false;}
   const origin=row.originDate||from;
   const fromNote=workMemoDay(from);
   if(fromNote.movedOut.some(x=>x.key===key)){alert('이미 이동한 업무야.');return;}
@@ -4144,9 +4222,29 @@ function workMemoMoveMissed(index,dest,date=workMemoDate){
   }
   fromNote.movedOut.push({key,toDate:dest,title:row.title,daily:row.kind==='daily',group:row.kind,eventId:row.e?.id||''});
   if(newRef && !workMemoDay(dest).imports.some(x=>x.key===newRef) && !newRef.startsWith('custom|'))workMemoDay(dest).imports.push({key:newRef,title:row.title});
-  if(dest===date){workMemoMissedDates.delete(date);}
+  // 미완료 목록은 사용자가 '접기'를 누를 때까지 유지합니다.
+  closeWorkGroupPopup();
   save();
-  const info=$(`[data-wm-date="${date}"] [data-wm-info]`);if(info)info.textContent=`${workMemoShortDate(from)} → ${workMemoShortDate(dest)} 이동 완료`;
+  const info=$(`[data-wm-date="${from}"] [data-wm-info]`);if(info)info.textContent=`${workMemoShortDate(from)} → ${workMemoShortDate(dest)} 이동 완료`;
+  return true;
+}
+function workMemoMoveMissed(index,dest,date=workMemoDate){
+  const row=(workMemoMissedByDate.get(date)||[])[index];
+  return workMemoMoveRow(row,dest);
+}
+function workMemoAddTask(date,title){
+  const root=adorableRoot(),text=String(title||'').trim();
+  if(!root){alert('아도라블 캘린더가 없어 업무를 추가할 수 없어.');return false;}
+  if(!workMemoDateValid(date)||!text)return false;
+  // 업무 화면에서도 캘린더와 동일한 일정 객체를 한 번만 등록합니다.
+  state.events.push({
+    id:uid(),title:text,calId:root.id,date,endDate:date,allDay:true,start:'',end:'',
+    hours:0,noDuration:true,kind:'todo',place:'',repeat:'none',repeatRule:null,
+    memo:'',memoCategory:'extra',memoEnabled:true,important:false,done:false,
+    doneDates:[],excludedDates:[],checklist:[],checklistDoneByDate:{},orderByDate:{}
+  });
+  save();
+  return true;
 }
 function initWorkMemo(){
   const panel=$('#workMemoPanel');
@@ -4159,6 +4257,12 @@ function initWorkMemo(){
   $('#wmStartDate')?.addEventListener('change',e=>{if(workMemoDateValid(e.target.value)){workMemoDate=e.target.value;renderWorkMemoPanel();}});
   $('#wmSettingsBtn')?.addEventListener('click',()=>{workMemoSettingsShown=!workMemoSettingsShown;renderWorkMemoPanel();});
   window.addEventListener('resize',()=>{if(workMemoVisible && workMemoBoardDays()!==Number($('#wmBoard')?.style.getPropertyValue('--wm-columns')||0))renderWorkMemoPanel();});
+  panel?.addEventListener('submit',e=>{
+    const form=e.target.closest('[data-wm-new]');if(!form)return;
+    e.preventDefault();
+    const title=form.querySelector('input[name=title]')?.value;
+    workMemoAddTask(form.dataset.wmNew,title);
+  });
   panel?.addEventListener('change',e=>{
     const placement=e.target.closest('[data-wm-placement]');if(placement){
       const obj=state.events.find(x=>x.id===placement.dataset.wmPlacement);
@@ -4223,6 +4327,7 @@ function render(){
   }
   ({week:renderWeek,'2week':()=>renderMultiWeek(2),'3week':()=>renderMultiWeek(3),'4week':()=>renderMultiWeek(4),month:renderMonth,day:renderDay,list:renderList,diary:renderDiaryMain}[view]||renderWeek)();
   compactDailyEventsInCalendar();
+  if(workGroupPopupState)refreshWorkGroupPopup();
   if(workMemoVisible) renderWorkMemoPanel();
   const sidebar2=$('#sidebar'), main2=$('#main');
   if(sidebar2){ sidebar2.scrollTop=keep.sidebarTop; sidebar2.scrollLeft=keep.sidebarLeft; }
@@ -4864,7 +4969,7 @@ function repeatEditFuture(old,obj,occ){
   state.events.push(future);
 }
 
-// v2.86: 사이드바에서 수정한 반복업무는 '지정일 이후'에만 적용합니다.
+// v2.87: 사이드바에서 수정한 반복업무는 '지정일 이후'에만 적용합니다.
 // 과거 회차의 원본 ID와 각 날짜 완료·제외·체크리스트 기록을 유지하고,
 // 변경 적용일 이후에 실제로 발생하는 첫 회차부터 새 시리즈로 분리합니다.
 function nextSeriesOccurrenceFromDate(old,from){
@@ -5660,7 +5765,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.86',
+    appVersion:'2.87',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state

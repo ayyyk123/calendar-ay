@@ -3453,3 +3453,25 @@ header .views > #workMemoOpenBtn{width:68px!important;min-width:68px!important;m
 .wmSection-weekly .wmSectionTitle{border-left:3px solid #947fc0}
 .wmSection-monthly .wmSectionTitle{border-left:3px solid #c39b67}
 .wmSection-extra .wmSectionTitle{border-left:3px solid #799b8b}
+
+/* v2.87 업무 화면 직접 추가 + 달력 업무 묶음 드래그 목록 */
+.wmNewTaskForm{display:flex;gap:5px;margin:10px 0;padding:7px;border:1px solid #c7d9ee;border-radius:5px;background:#f5f9ff}
+.wmNewTaskForm input{flex:1;min-width:0;padding:8px;border:1px solid #cad5e3;border-radius:4px;background:white;font-size:12px}
+.wmNewTaskForm button{flex:none;background:#2c68ae;color:white;border:1px solid #2c68ae;border-radius:4px;padding:6px 9px;font-size:12px;font-weight:600}
+.wmGroupPopup{position:fixed;z-index:2800;box-sizing:border-box;background:#fff;border:1px solid #98b5db;border-radius:7px;box-shadow:0 10px 26px #1b36583b;padding:0;max-height:min(72vh,560px);display:flex;flex-direction:column;overflow:hidden;color:#233e5c;text-align:left}
+.wmGroupPopup.hidden{display:none!important}
+.wmGroupPopupHeader{background:#edf4ff;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:7px;border-bottom:1px solid #c9d9ec}
+.wmGroupPopupHeader strong{font-size:13px}.wmGroupPopupHeader small{font-size:11px;color:#526b85;margin-left:6px}
+.wmGroupPopupHeader button{border:1px solid #ced8e5;border-radius:4px;background:white;color:#5a6c80;padding:2px 8px;cursor:pointer}
+.wmGroupPopupHelp{padding:8px 11px;margin:0;font-size:11px;color:#6d7e90;background:#fafcff;line-height:1.45}
+.wmGroupPopupList{overflow-y:auto;overscroll-behavior:contain;padding:5px 9px 9px}
+.wmPopupTask{border:1px solid #e1e8ef;border-radius:5px;margin:5px 0;padding:7px;font-size:12px;background:#fff}
+.wmPopupTask[draggable=true]{cursor:grab}.wmPopupTask.dragging{opacity:.5}.wmPopupTask.completed{background:#f5f7f8;color:#98a3ae}
+.wmPopupTaskMain{display:flex;align-items:flex-start;gap:7px;line-height:1.5;overflow-wrap:anywhere}
+.wmPopupTaskMain input{margin-top:3px;accent-color:#3d8863}.wmPopupTaskMain>span{flex:1;min-width:0}.wmPopupTaskMain small{color:#718a9e}
+.wmDragGrip{color:#7798b8;font-size:14px}
+.wmPopupTaskActions{display:flex;justify-content:flex-end;gap:6px;margin-top:7px}
+.wmPopupTaskActions input{height:28px;min-width:0;border:1px solid #d3dce7;border-radius:3px;font-size:11px;padding:2px 4px}
+.wmPopupTaskActions button{border:1px solid #bdd1e6;border-radius:3px;background:#eef5ff;color:#24588e;font-size:11px;padding:3px 10px;cursor:pointer}
+.wmGroupPopupEmpty{padding:15px 5px;color:#8b97a6;font-size:12px}
+@media(max-width:760px){.wmGroupPopup{max-height:65dvh}.wmNewTaskForm button{font-size:11px;padding:6px}}
