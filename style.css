@@ -3477,7 +3477,7 @@ header .views > #workMemoOpenBtn{width:68px!important;min-width:68px!important;m
 @media(max-width:760px){.wmGroupPopup{max-height:65dvh}.wmNewTaskForm button{font-size:11px;padding:6px}}
 
 
-/* v2.91: 달력 업무 묶음 이름/수치 각각 클릭 & 팝업 행 가로 정렬 */
+/* v2.93: 달력 업무 묶음 이름/수치 각각 클릭 & 팝업 행 가로 정렬 */
 .dailySummaryBtn.wmGroupSummary{
   display:flex!important;align-items:stretch!important;justify-content:space-between!important;
   flex-wrap:nowrap!important;gap:3px!important;min-width:0!important;
@@ -3532,7 +3532,7 @@ header .views > #workMemoOpenBtn{width:68px!important;min-width:68px!important;m
 .wmGroupSummary .wmGroupNameBtn{min-width:0!important}
 .wmGroupSummary .wmGroupCountBtn{min-width:max-content!important}
 
-/* v2.91 · 업무 등록·수정과 달력 추가업무 표시 개선 */
+/* v2.93 · 업무 등록·수정과 달력 추가업무 표시 개선 */
 .wmBoardNewRow{margin:9px 0 11px;display:flex;min-width:0}
 .wmBoardNewRow button{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:9px 7px;background:#edf5ff;border:1px solid #abc7e6;color:#245b9a;border-radius:5px;font-size:12px;font-weight:750;cursor:pointer}
 .wmBoardNewRow button:hover{background:#e3effe}
@@ -3543,3 +3543,72 @@ header .views > #workMemoOpenBtn{width:68px!important;min-width:68px!important;m
 .wmGroupPopup .wmPopupTaskActions{align-items:center}
 .wmPopupTaskActions button[data-wm-popup-edit]{margin-right:auto!important;background:#fff!important;color:#425d7a!important}
 @media(max-width:480px){.wmBoardNewRow button{font-size:11px}.wmBoardNewRow button small{font-size:9px}}
+
+
+/* v2.93 · 업무 묶음은 일반 일정과 동일한 글꼴·크기, 완료 시 연하게 */
+.dailySummaryBtn.wmGroupSummary{
+  font-family:var(--ui-font),'Noto Sans KR',sans-serif!important;
+  font-size:10px!important;font-weight:500!important;letter-spacing:-.01em!important;
+  line-height:1.3!important;min-height:0!important;
+  border:1px solid #d7dce3!important;border-left:2px solid #bdc6d1!important;
+  padding:1px 2px!important;margin:1px 0!important;
+  background:#f5f6f8!important;color:#485565!important;border-radius:3px!important;
+}
+.wmGroupSummary .wmGroupNameBtn,.wmGroupSummary .wmGroupCountBtn{
+  font-family:inherit!important;font-size:inherit!important;font-weight:inherit!important;
+  line-height:inherit!important;min-height:0!important;
+}
+.wmGroupSummary .wmGroupNameBtn{padding:1px 1px!important}
+.wmGroupSummary .wmGroupCountBtn{padding:1px 2px!important}
+.wmGroupSummary .wmGroupMark{font-size:inherit!important;font-weight:500!important;color:#738093!important}
+.dailySummaryBtn.wmGroupSummary.completed{
+  opacity:.55!important;filter:grayscale(0.8)!important;
+  background:#f3f4f5!important;color:#9099a4!important;
+  border-color:#d8dce0!important;border-left-color:#c5cbd2!important;
+}
+.dailySummaryBtn.wmGroupSummary.completed .wmGroupMark{color:#8b969f!important}
+.dailySummaryBtn.wmGroupSummary.completed .wmGroupNameBtn>span{text-decoration:line-through}
+/* 각 달력 보기의 기존 카드 글씨 크기와 일치 */
+.scheduleLaneCell .wmGroupSummary,.scheduleLaneCell .wmGroupSummary button{font-size:7.8px!important;line-height:14px!important}
+.multiCompactView.weeks1 .wmGroupSummary,.multiCompactView.weeks1 .wmGroupSummary button,
+.multiCompactView.weeks2 .wmGroupSummary,.multiCompactView.weeks2 .wmGroupSummary button{font-size:10px!important;line-height:18px!important}
+.multiCompactView.weeks3 .wmGroupSummary,.multiCompactView.weeks3 .wmGroupSummary button{font-size:9.5px!important;line-height:16px!important}
+.multiCompactView.weeks4 .wmGroupSummary,.multiCompactView.weeks4 .wmGroupSummary button{font-size:8.5px!important;line-height:14px!important}
+.month .wmGroupSummary,.month .wmGroupSummary button{font-size:9px!important;line-height:16px!important}
+.mobileScheduleView .wmGroupSummary,.mobileScheduleView .wmGroupSummary button{font-size:13px!important;line-height:1.5!important}
+/* PC에서 오늘 업무 독립 창 */
+.workTodayWindowBtn{border:1px solid #d2d8df!important;background:#fff!important;color:#354457!important;border-radius:4px!important;padding:0 8px!important;font-size:15px!important;cursor:pointer;flex:none!important}
+.workTodayWindowBtn:hover{background:#eef3fa!important}
+@media(max-width:760px){#workTodayWindowBtn,#wmTodayPopupBtn{display:none!important}}
+body.todayWorkPopup{overflow:hidden!important;background:#f3f5f8!important}
+body.todayWorkPopup>header,body.todayWorkPopup>.layout,body.todayWorkPopup>#wmGroupPopup{display:none!important}
+body.todayWorkPopup .wmPanel{display:flex!important;inset:0!important;width:100vw!important;height:100dvh!important;background:#f3f5f8!important}
+body.todayWorkPopup .wmBoard{grid-template-columns:minmax(0,1fr)!important;padding:8px!important;gap:0!important}
+body.todayWorkPopup .wmBoardTop{padding:10px 12px!important;gap:6px!important}
+body.todayWorkPopup .wmBoardTitle{gap:0!important}
+body.todayWorkPopup .wmBoardTitle>button,body.todayWorkPopup #wmPrev,body.todayWorkPopup #wmNext,
+body.todayWorkPopup #wmStartDate,body.todayWorkPopup #wmToday,body.todayWorkPopup #wmSettingsBtn,
+body.todayWorkPopup #wmTodayPopupBtn{display:none!important}
+body.todayWorkPopup .wmBoardToolbar{margin-left:auto!important;gap:7px!important}
+body.todayWorkPopup #wmBoardRange{min-width:0!important;font-size:12px!important}
+body.todayWorkPopup #wmClose{padding:6px 9px!important}
+body.todayWorkPopup .wmDayHead{padding:9px 12px!important}
+body.todayWorkPopup .wmDayScroll{padding:8px 10px!important}
+body.todayWorkPopup .wmDayCard{height:100%;min-height:0}
+@media(max-width:760px){body.todayWorkPopup .wmBoardTop{flex-direction:row!important;align-items:center!important}body.todayWorkPopup .wmBoardTitle small{display:none!important}body.todayWorkPopup .wmBoardToolbar{overflow:visible!important}}
+
+/* v2.93: daily task popups can navigate dates; retain compact popup layout. */
+.wmDayHeadActions{display:flex;align-items:center;gap:7px;min-width:0}
+.wmDayHeadActions button{padding:4px 7px;flex:none;background:#f7fbff;border:1px solid #ccd7e5;border-radius:4px;font-size:11px!important;color:#345570;white-space:nowrap}
+.wmDayHeadActions button:hover{background:#e9f2ff}
+/* On a standalone popup, keep previous/next, date picker and Today visible. */
+body.todayWorkPopup #wmPrev,body.todayWorkPopup #wmNext,
+body.todayWorkPopup #wmStartDate,body.todayWorkPopup #wmToday{display:inline-flex!important}
+body.todayWorkPopup .wmBoardTop{flex-direction:column!important;align-items:stretch!important;gap:6px!important}
+body.todayWorkPopup .wmBoardTitle{justify-content:space-between!important}
+body.todayWorkPopup .wmBoardToolbar{width:100%!important;justify-content:center!important;margin-left:0!important;gap:5px!important;flex-wrap:wrap!important;overflow:visible!important}
+body.todayWorkPopup #wmBoardRange{font-size:12px!important;min-width:74px!important}
+body.todayWorkPopup #wmStartDate{height:32px!important;width:135px!important;flex:0 0 135px!important}
+body.todayWorkPopup #wmToday{padding:6px 9px!important}
+body.todayWorkPopup #wmClose{margin-left:auto!important}
+@media(max-width:510px){body.todayWorkPopup .wmBoardToolbar{justify-content:flex-start!important}body.todayWorkPopup #wmBoardRange{min-width:65px!important}}

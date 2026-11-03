@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '2.91',
+  version: '2.93',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -354,7 +354,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '2.91',
+    version: '2.93',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -3798,8 +3798,43 @@ function renderList(){
 }
 
 // v2.82 · 날짜별 업무 메모. 기존 event / prep / purchase 원본과 완료 상태를 공유합니다.
+const isTodayWorkPopup = new URLSearchParams(window.location.search).get('todayWorkPopup')==='1';
 let workMemoVisible=false;
 let workMemoDate=ds(add(new Date(),-1));
+// Each independent window keeps its own chosen day. Using _blank prevents a second
+// day's popup from overwriting the first popup window.
+let workPopupFollowToday=false;
+function openTodayWorkWindow(date=ds(new Date())){
+  const selected=workMemoDateValid(date)?date:ds(new Date());
+  const url=new URL(window.location.href);
+  url.searchParams.set('todayWorkPopup','1');
+  url.searchParams.set('workPopupDate',selected);
+  url.hash='';
+  const width=490,height=800;
+  const left=Math.max(0,Math.round(window.screenX+Math.max(0,(window.outerWidth-width)/2)));
+  const top=Math.max(0,Math.round(window.screenY+45));
+  const popup=window.open(url.href,'_blank',`popup=yes,width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`);
+  if(!popup){alert('팝업이 차단되었어. 이 사이트의 팝업을 허용한 다음 다시 눌러줘.');return;}
+  popup.focus();
+}
+function setWorkMemoPopupDate(date,{followToday=false}={}){
+  if(!workMemoDateValid(date))return;
+  workMemoDate=date;
+  if(isTodayWorkPopup){
+    workPopupFollowToday=followToday;
+    const url=new URL(window.location.href);
+    url.searchParams.set('workPopupDate',date);
+    window.history.replaceState(window.history.state,'',url.href);
+    document.title=`${workMemoShortDate(date)} 업무 · 아도라블`;
+  }
+  renderWorkMemoPanel();
+}
+function exitTodayWorkPopup(){
+  if(window.opener && !window.opener.closed){window.close();return;}
+  const url=new URL(window.location.href);url.searchParams.delete('todayWorkPopup');url.searchParams.delete('workPopupDate');
+  window.location.assign(url.href);
+}
+
 const workMemoMissedDates=new Set();
 let workMemoLastPending=[];
 const workMemoDateValid=x=>/^\d{4}-\d{2}-\d{2}$/.test(String(x||''));
@@ -3821,7 +3856,7 @@ function isAdorableCalendar(calId){
   const root=adorableRoot(), top=topAncestor(calId);
   return !!root && !!top && top.id===root.id;
 }
-// v2.91 · 반복 요일과 업무 분류는 별도로 선택합니다.
+// v2.93 · 반복 요일과 업무 분류는 별도로 선택합니다.
 // 기존 daily/today 값은 구 데이터 호환용으로 해석하며 신규 값은 daily/weekly/monthly/off 입니다.
 const WM_GROUPS=[['daily','일업무'],['weekly','주업무'],['monthly','월업무'],['extra','추가업무']];
 function defaultMemoGroupForRepeat(repeat){
@@ -4090,7 +4125,7 @@ function compactDailyEventsInCalendar(){
       }
     }
   }
-  // v2.91: 날짜별 캘린더 업무 묶음은 원본 일정 등록 순서가 아닌
+  // v2.93: 날짜별 캘린더 업무 묶음은 원본 일정 등록 순서가 아닌
   // 일업무 → 주업무 → 월업무 → 추가업무 순서로 보여줍니다.
   // 업무 묶음 외의 일정 DOM 순서는 변경하지 않습니다.
   const workGroupRank=new Map(WM_GROUPS.map(([kind],index)=>[kind,index]));
@@ -4125,19 +4160,21 @@ function compactDailyEventsInCalendar(){
   }));
 }
 function workMemoBoardDays(){
+  if(isTodayWorkPopup)return 1;
   const width=Math.max(300,window.innerWidth-42);
   return clamp(Math.floor((width+12)/342),1,8);
 }
 function openWorkMemo(date=ds(new Date())){
   // 선택한 날짜 앞의 하루도 업무 보드에 함께 표시합니다.
   const target=workMemoDateValid(date)?date:ds(new Date());
-  workMemoDate=ds(add(parse(target),-1));
+  workMemoDate=isTodayWorkPopup?target:ds(add(parse(target),-1));
   workMemoVisible=true;workMemoMissedDates.clear();
   $('#workMemoPanel')?.classList.remove('hidden');
   document.body.classList.add('wmBoardActive');
   renderWorkMemoPanel();
 }
 function closeWorkMemo(){
+  if(isTodayWorkPopup){exitTodayWorkPopup();return;}
   workMemoVisible=false;
   $('#workMemoPanel')?.classList.add('hidden');
   document.body.classList.remove('wmBoardActive');
@@ -4181,7 +4218,7 @@ function workMemoDayCard(date){
     return `<section class="wmSection wmSection-${kind}" data-wm-section="${kind}"><div class="wmSectionTitle">${title} <b>${stat}</b></div>${list(items)}</section>`;
   }).join('');
   return `<article class="wmDayCard ${today?'wmTodayCard':''}" data-wm-date="${date}">
-    <div class="wmDayHead"><div><strong>${Number(date.slice(5,7))}/${Number(date.slice(8,10))} <span>(${wd})</span></strong>${today?'<em>오늘</em>':''}</div><small>${progress}/${rows.length} 완료</small></div>
+    <div class="wmDayHead"><div><strong>${Number(date.slice(5,7))}/${Number(date.slice(8,10))} <span>(${wd})</span></strong>${today?'<em>오늘</em>':''}</div><div class="wmDayHeadActions"><small>${progress}/${rows.length} 완료</small>${!isTodayWorkPopup?`<button type="button" data-wm-popout="${date}" title="${esc(workMemoShortDate(date))} 업무를 별도 창에서 보기">↗ 팝업</button>`:''}</div></div>
     <div class="wmDayScroll"><div class="wmDayActions"><button type="button" data-wm-missed-toggle="${date}" class="${workMemoMissedDates.has(date)?'active':''}">전날 못한 일 ${workMemoMissedDates.has(date)?'접기':'불러오기'}</button></div><div class="wmInfo" data-wm-info="${date}">아도라블 일정 자동 연동 · 캘린더와 업무 화면에서 등록·수정 가능</div>
     <div class="wmBoardNewRow"><button type="button" data-wm-create="${date}">＋ 업무 등록 <small>일 · 주 · 월 · 추가업무</small></button></div>
     ${missed}
@@ -4203,7 +4240,7 @@ function renderWorkMemoPanel(){
   });
   const days=workMemoBoardDays();
   const dates=Array.from({length:days},(_,i)=>ds(add(parse(workMemoDate),i)));
-  $('#wmBoardRange').textContent=`${workMemoShortDate(dates[0])} – ${workMemoShortDate(dates[dates.length-1])}`;
+  $('#wmBoardRange').textContent=isTodayWorkPopup?`${workMemoShortDate(dates[0])} (${['일','월','화','수','목','금','토'][parse(dates[0]).getDay()]})`:`${workMemoShortDate(dates[0])} – ${workMemoShortDate(dates[dates.length-1])}`;
   $('#wmStartDate').value=workMemoDate;
   $('#wmBoard').style.setProperty('--wm-columns',String(days));
   workMemoMissedByDate.clear();
@@ -4352,12 +4389,18 @@ function workMemoAddTask(date,title){
 function initWorkMemo(){
   const panel=$('#workMemoPanel');
   $('#workMemoOpenBtn')?.addEventListener('click',()=>workMemoVisible?closeWorkMemo():openWorkMemo(ds(new Date())));
+  $('#workTodayWindowBtn')?.addEventListener('click',()=>openTodayWorkWindow());
+  // The work-board toolbar opens its current start day; each day card can pop out independently.
+  $('#wmTodayPopupBtn')?.addEventListener('click',()=>openTodayWorkWindow(workMemoDate));
   $('#wmClose')?.addEventListener('click',closeWorkMemo);
   $('#wmBack')?.addEventListener('click',closeWorkMemo);
-  $('#wmPrev')?.addEventListener('click',()=>{workMemoDate=ds(add(parse(workMemoDate),-workMemoBoardDays()));renderWorkMemoPanel();});
-  $('#wmNext')?.addEventListener('click',()=>{workMemoDate=ds(add(parse(workMemoDate),workMemoBoardDays()));renderWorkMemoPanel();});
-  $('#wmToday')?.addEventListener('click',()=>{workMemoDate=ds(add(new Date(),workMemoBoardDays()>1?-1:0));workMemoMissedDates.clear();renderWorkMemoPanel();});
-  $('#wmStartDate')?.addEventListener('change',e=>{if(workMemoDateValid(e.target.value)){workMemoDate=e.target.value;renderWorkMemoPanel();}});
+  $('#wmPrev')?.addEventListener('click',()=>setWorkMemoPopupDate(ds(add(parse(workMemoDate),-workMemoBoardDays()))));
+  $('#wmNext')?.addEventListener('click',()=>setWorkMemoPopupDate(ds(add(parse(workMemoDate),workMemoBoardDays()))));
+  $('#wmToday')?.addEventListener('click',()=>{
+    workMemoMissedDates.clear();
+    setWorkMemoPopupDate(ds(add(new Date(),workMemoBoardDays()>1?-1:0)),{followToday:true});
+  });
+  $('#wmStartDate')?.addEventListener('change',e=>setWorkMemoPopupDate(e.target.value));
   $('#wmSettingsBtn')?.addEventListener('click',()=>{workMemoSettingsShown=!workMemoSettingsShown;renderWorkMemoPanel();});
   window.addEventListener('resize',()=>{if(workMemoVisible && workMemoBoardDays()!==Number($('#wmBoard')?.style.getPropertyValue('--wm-columns')||0))renderWorkMemoPanel();});
   panel?.addEventListener('change',e=>{
@@ -4383,6 +4426,7 @@ function initWorkMemo(){
   });
   panel?.addEventListener('click',e=>{
     const btn=e.target.closest('button');if(!btn)return;
+    if(btn.dataset.wmPopout){openTodayWorkWindow(btn.dataset.wmPopout);return;}
     if(btn.dataset.wmCreate){workMemoCreateTask(btn.dataset.wmCreate);return;}
     if(btn.dataset.wmEdit){const date=btn.closest('[data-wm-date]')?.dataset.wmDate;const row=date?workMemoTasks(date).find(x=>x.key===btn.dataset.wmEdit):null;if(row)workMemoEditTask(row,date);return;}
     const date=btn.closest('[data-wm-date]')?.dataset.wmDate;
@@ -4400,6 +4444,33 @@ function initWorkMemo(){
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&workMemoVisible){e.preventDefault();closeWorkMemo();}});
 }
 initWorkMemo();
+if(isTodayWorkPopup){
+  document.body.classList.add('todayWorkPopup');
+  $('#wmBoardTitleText').textContent='날짜별 업무';
+  const requested=new URLSearchParams(window.location.search).get('workPopupDate');
+  const selected=workMemoDateValid(requested)?requested:ds(new Date());
+  workPopupFollowToday=selected===ds(new Date());
+  openWorkMemo(selected);
+  setWorkMemoPopupDate(selected,{followToday:workPopupFollowToday});
+  // Only a window still following 'today' rolls forward at midnight.
+  // Manually selected past/future dates must not suddenly jump to today.
+  window.setInterval(()=>{
+    const today=ds(new Date());
+    if(workMemoVisible && workPopupFollowToday && workMemoDate!==today){
+      workMemoMissedDates.clear();setWorkMemoPopupDate(today,{followToday:true});
+    }
+  },60000);
+}
+// 두 창이 같은 브라우저에 있을 때 저장 직후 업무 상태를 바로 반영합니다.
+// 최신 상태를 받는 쪽에서는 Firebase에 다시 쓰지 않아 저장 충돌을 줄입니다.
+window.addEventListener('storage',e=>{
+  if(!currentUser || e.key!==storageKey() || !e.newValue || localDirty || writeInFlight || applyingRemote)return;
+  try{
+    const incoming=normalizeState(JSON.parse(e.newValue));
+    if(JSON.stringify(incoming)===JSON.stringify(state))return;
+    applyingRemote=true;state=incoming;render();applyingRemote=false;
+  }catch(err){applyingRemote=false;console.warn('다른 창 업무 갱신 실패',err);}
+});
 
 function render(){
   const sidebar=$('#sidebar'), main=$('#main');
@@ -5068,7 +5139,7 @@ function repeatEditFuture(old,obj,occ){
   state.events.push(future);
 }
 
-// v2.91: 사이드바에서 수정한 반복업무는 '지정일 이후'에만 적용합니다.
+// v2.93: 사이드바에서 수정한 반복업무는 '지정일 이후'에만 적용합니다.
 // 과거 회차의 원본 ID와 각 날짜 완료·제외·체크리스트 기록을 유지하고,
 // 변경 적용일 이후에 실제로 발생하는 첫 회차부터 새 시리즈로 분리합니다.
 function nextSeriesOccurrenceFromDate(old,from){
@@ -5864,7 +5935,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.91',
+    appVersion:'2.93',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
