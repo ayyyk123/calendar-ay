@@ -3799,7 +3799,7 @@ function renderList(){
 
 // v2.82 · 날짜별 업무 메모. 기존 event / prep / purchase 원본과 완료 상태를 공유합니다.
 let workMemoVisible=false;
-let workMemoDate=ds(new Date());
+let workMemoDate=ds(add(new Date(),-1));
 const workMemoMissedDates=new Set();
 let workMemoLastPending=[];
 const workMemoDateValid=x=>/^\d{4}-\d{2}-\d{2}$/.test(String(x||''));
@@ -3821,7 +3821,7 @@ function isAdorableCalendar(calId){
   const root=adorableRoot(), top=topAncestor(calId);
   return !!root && !!top && top.id===root.id;
 }
-// v2.88 · 반복 요일과 업무 분류는 별도로 선택합니다.
+// v2.89 · 반복 요일과 업무 분류는 별도로 선택합니다.
 // 기존 daily/today 값은 구 데이터 호환용으로 해석하며 신규 값은 daily/weekly/monthly/off 입니다.
 const WM_GROUPS=[['daily','일업무'],['weekly','주업무'],['monthly','월업무'],['extra','추가업무']];
 function defaultMemoGroupForRepeat(repeat){
@@ -4056,7 +4056,9 @@ function workMemoBoardDays(){
   return clamp(Math.floor((width+12)/342),1,8);
 }
 function openWorkMemo(date=ds(new Date())){
-  workMemoDate=workMemoDateValid(date)?date:ds(new Date());
+  // 선택한 날짜 앞의 하루도 업무 보드에 함께 표시합니다.
+  const target=workMemoDateValid(date)?date:ds(new Date());
+  workMemoDate=ds(add(parse(target),-1));
   workMemoVisible=true;workMemoMissedDates.clear();
   $('#workMemoPanel')?.classList.remove('hidden');
   document.body.classList.add('wmBoardActive');
@@ -4259,7 +4261,7 @@ function initWorkMemo(){
   $('#wmBack')?.addEventListener('click',closeWorkMemo);
   $('#wmPrev')?.addEventListener('click',()=>{workMemoDate=ds(add(parse(workMemoDate),-workMemoBoardDays()));renderWorkMemoPanel();});
   $('#wmNext')?.addEventListener('click',()=>{workMemoDate=ds(add(parse(workMemoDate),workMemoBoardDays()));renderWorkMemoPanel();});
-  $('#wmToday')?.addEventListener('click',()=>{workMemoDate=ds(new Date());workMemoMissedDates.clear();renderWorkMemoPanel();});
+  $('#wmToday')?.addEventListener('click',()=>{workMemoDate=ds(add(new Date(),workMemoBoardDays()>1?-1:0));workMemoMissedDates.clear();renderWorkMemoPanel();});
   $('#wmStartDate')?.addEventListener('change',e=>{if(workMemoDateValid(e.target.value)){workMemoDate=e.target.value;renderWorkMemoPanel();}});
   $('#wmSettingsBtn')?.addEventListener('click',()=>{workMemoSettingsShown=!workMemoSettingsShown;renderWorkMemoPanel();});
   window.addEventListener('resize',()=>{if(workMemoVisible && workMemoBoardDays()!==Number($('#wmBoard')?.style.getPropertyValue('--wm-columns')||0))renderWorkMemoPanel();});
@@ -4975,7 +4977,7 @@ function repeatEditFuture(old,obj,occ){
   state.events.push(future);
 }
 
-// v2.88: 사이드바에서 수정한 반복업무는 '지정일 이후'에만 적용합니다.
+// v2.89: 사이드바에서 수정한 반복업무는 '지정일 이후'에만 적용합니다.
 // 과거 회차의 원본 ID와 각 날짜 완료·제외·체크리스트 기록을 유지하고,
 // 변경 적용일 이후에 실제로 발생하는 첫 회차부터 새 시리즈로 분리합니다.
 function nextSeriesOccurrenceFromDate(old,from){

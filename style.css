@@ -3477,7 +3477,7 @@ header .views > #workMemoOpenBtn{width:68px!important;min-width:68px!important;m
 @media(max-width:760px){.wmGroupPopup{max-height:65dvh}.wmNewTaskForm button{font-size:11px;padding:6px}}
 
 
-/* v2.88: 달력 업무 묶음 이름/수치 각각 클릭 & 팝업 행 가로 정렬 */
+/* v2.89: 달력 업무 묶음 이름/수치 각각 클릭 & 팝업 행 가로 정렬 */
 .dailySummaryBtn.wmGroupSummary{
   display:flex!important;align-items:stretch!important;justify-content:space-between!important;
   flex-wrap:nowrap!important;gap:3px!important;min-width:0!important;
