@@ -3670,3 +3670,10 @@ body.todayWorkPopup .wmDayScroll{padding:6px 8px!important}
   .wmPanel .wmDayScroll{padding:5px 7px}
   body.todayWorkPopup .wmDayScroll{padding:5px 7px!important}
 }
+
+/* v2.97: show actual server save time without an ellipsis. */
+#saveBadge{overflow:visible!important;text-overflow:clip!important;white-space:nowrap!important;}
+#saveBadgeText{overflow:visible!important;text-overflow:clip!important;white-space:nowrap!important;font-variant-numeric:tabular-nums;}
+@media(min-width:761px){header .views>#saveBadge{flex:0 0 150px!important;width:150px!important;min-width:150px!important;max-width:150px!important;font-size:10px!important;padding:3px 4px!important;}}
+@media(max-width:760px){#saveBadge{min-width:0!important;max-width:none!important;overflow:visible!important;}#saveBadgeText{font-size:10px!important;white-space:nowrap!important;letter-spacing:-.4px!important;}}
+#downloadSafetyCopyBtn[hidden]{display:none!important}
