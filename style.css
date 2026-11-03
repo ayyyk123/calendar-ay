@@ -3477,7 +3477,7 @@ header .views > #workMemoOpenBtn{width:68px!important;min-width:68px!important;m
 @media(max-width:760px){.wmGroupPopup{max-height:65dvh}.wmNewTaskForm button{font-size:11px;padding:6px}}
 
 
-/* v2.93: 달력 업무 묶음 이름/수치 각각 클릭 & 팝업 행 가로 정렬 */
+/* v2.94: 달력 업무 묶음 이름/수치 각각 클릭 & 팝업 행 가로 정렬 */
 .dailySummaryBtn.wmGroupSummary{
   display:flex!important;align-items:stretch!important;justify-content:space-between!important;
   flex-wrap:nowrap!important;gap:3px!important;min-width:0!important;
@@ -3532,7 +3532,7 @@ header .views > #workMemoOpenBtn{width:68px!important;min-width:68px!important;m
 .wmGroupSummary .wmGroupNameBtn{min-width:0!important}
 .wmGroupSummary .wmGroupCountBtn{min-width:max-content!important}
 
-/* v2.93 · 업무 등록·수정과 달력 추가업무 표시 개선 */
+/* v2.94 · 업무 등록·수정과 달력 추가업무 표시 개선 */
 .wmBoardNewRow{margin:9px 0 11px;display:flex;min-width:0}
 .wmBoardNewRow button{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:9px 7px;background:#edf5ff;border:1px solid #abc7e6;color:#245b9a;border-radius:5px;font-size:12px;font-weight:750;cursor:pointer}
 .wmBoardNewRow button:hover{background:#e3effe}
@@ -3545,7 +3545,7 @@ header .views > #workMemoOpenBtn{width:68px!important;min-width:68px!important;m
 @media(max-width:480px){.wmBoardNewRow button{font-size:11px}.wmBoardNewRow button small{font-size:9px}}
 
 
-/* v2.93 · 업무 묶음은 일반 일정과 동일한 글꼴·크기, 완료 시 연하게 */
+/* v2.94 · 업무 묶음은 일반 일정과 동일한 글꼴·크기, 완료 시 연하게 */
 .dailySummaryBtn.wmGroupSummary{
   font-family:var(--ui-font),'Noto Sans KR',sans-serif!important;
   font-size:10px!important;font-weight:500!important;letter-spacing:-.01em!important;
@@ -3597,7 +3597,7 @@ body.todayWorkPopup .wmDayScroll{padding:8px 10px!important}
 body.todayWorkPopup .wmDayCard{height:100%;min-height:0}
 @media(max-width:760px){body.todayWorkPopup .wmBoardTop{flex-direction:row!important;align-items:center!important}body.todayWorkPopup .wmBoardTitle small{display:none!important}body.todayWorkPopup .wmBoardToolbar{overflow:visible!important}}
 
-/* v2.93: daily task popups can navigate dates; retain compact popup layout. */
+/* v2.94: daily task popups can navigate dates; retain compact popup layout. */
 .wmDayHeadActions{display:flex;align-items:center;gap:7px;min-width:0}
 .wmDayHeadActions button{padding:4px 7px;flex:none;background:#f7fbff;border:1px solid #ccd7e5;border-radius:4px;font-size:11px!important;color:#345570;white-space:nowrap}
 .wmDayHeadActions button:hover{background:#e9f2ff}
@@ -3612,3 +3612,27 @@ body.todayWorkPopup #wmStartDate{height:32px!important;width:135px!important;fle
 body.todayWorkPopup #wmToday{padding:6px 9px!important}
 body.todayWorkPopup #wmClose{margin-left:auto!important}
 @media(max-width:510px){body.todayWorkPopup .wmBoardToolbar{justify-content:flex-start!important}body.todayWorkPopup #wmBoardRange{min-width:65px!important}}
+
+/* v2.94: 업무 묶음 카드 글자 크기 회복 – 다른 일정과 같은 가독성 */
+.dailySummaryBtn.wmGroupSummary{font-size:12px!important;line-height:1.45!important;min-height:22px!important;padding:2px 4px!important;letter-spacing:0!important}
+.dailySummaryBtn.wmGroupSummary .wmGroupNameBtn,.dailySummaryBtn.wmGroupSummary .wmGroupCountBtn{font-size:inherit!important;line-height:inherit!important;font-weight:600!important;padding:2px 3px!important}
+.scheduleLaneCell .wmGroupSummary,.scheduleLaneCell .wmGroupSummary button{font-size:10.5px!important;line-height:17px!important}
+.multiCompactView.weeks1 .wmGroupSummary,.multiCompactView.weeks1 .wmGroupSummary button,.multiCompactView.weeks2 .wmGroupSummary,.multiCompactView.weeks2 .wmGroupSummary button{font-size:11px!important;line-height:19px!important}
+.multiCompactView.weeks3 .wmGroupSummary,.multiCompactView.weeks3 .wmGroupSummary button{font-size:10px!important;line-height:17px!important}
+.multiCompactView.weeks4 .wmGroupSummary,.multiCompactView.weeks4 .wmGroupSummary button{font-size:10px!important;line-height:17px!important}
+.month .wmGroupSummary,.month .wmGroupSummary button{font-size:10px!important;line-height:17px!important}
+.mobileScheduleView .wmGroupSummary,.mobileScheduleView .wmGroupSummary button{font-size:13px!important;line-height:1.5!important}
+/* 별도 업무 창: 상단 웹앱 툴바/여백 제거, 업무 카드 하나만 노출 */
+body.todayWorkPopup .wmBoardTop,body.todayWorkPopup .wmDailySettings{display:none!important}
+body.todayWorkPopup .wmPanel{padding:0!important;margin:0!important;background:#fff!important}
+body.todayWorkPopup .wmBoard{padding:0!important;margin:0!important;background:#fff!important}
+body.todayWorkPopup .wmDayCard{border:0!important;border-radius:0!important;box-shadow:none!important}
+body.todayWorkPopup .wmDayHead{padding:8px 10px!important;gap:4px!important}
+body.todayWorkPopup .wmDayHead strong{font-size:15px!important}
+body.todayWorkPopup .wmDayHeadActions{display:flex!important;gap:3px!important;min-width:0!important;align-items:center!important}
+body.todayWorkPopup .wmDayHeadActions small{font-size:10px!important;white-space:nowrap!important;padding-left:3px!important}
+body.todayWorkPopup .wmCompactNav{box-sizing:border-box!important;width:24px!important;min-width:24px!important;height:26px!important;padding:0!important;border:1px solid #d6dfe9!important;border-radius:3px!important;background:#fff!important;color:#36485e!important;font-size:17px!important;line-height:1!important;cursor:pointer!important}
+body.todayWorkPopup .wmCompactDate{box-sizing:border-box!important;width:108px!important;min-width:0!important;height:26px!important;padding:0 3px!important;font-size:11px!important;background:#fff!important;border:1px solid #d6dfe9!important;border-radius:3px!important;color:#2b4059!important}
+body.todayWorkPopup .wmDayScroll{padding:5px 8px!important}
+body.todayWorkPopup .wmInfo{display:none!important}
+@media(max-width:440px){body.todayWorkPopup .wmDayHead{padding:7px 6px!important}body.todayWorkPopup .wmCompactDate{width:96px!important}body.todayWorkPopup .wmDayHeadActions{gap:2px!important}body.todayWorkPopup .wmDayHeadActions small{font-size:9px!important}}

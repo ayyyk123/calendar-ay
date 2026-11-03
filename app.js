@@ -3804,13 +3804,30 @@ let workMemoDate=ds(add(new Date(),-1));
 // Each independent window keeps its own chosen day. Using _blank prevents a second
 // day's popup from overwriting the first popup window.
 let workPopupFollowToday=false;
-function openTodayWorkWindow(date=ds(new Date())){
+// v2.94: 업무 카드만 주소창 없이 띄우는 문서 PIP. 브라우저 미지원 시 기존 일반 창 사용.
+// PIP는 페이지당 1개만 열 수 있으므로 여러 날을 동시에 보려면 일반 창 옵션도 유지합니다.
+async function openTodayWorkWindow(date=ds(new Date()),{normalWindow=false}={}){
   const selected=workMemoDateValid(date)?date:ds(new Date());
   const url=new URL(window.location.href);
   url.searchParams.set('todayWorkPopup','1');
   url.searchParams.set('workPopupDate',selected);
   url.hash='';
-  const width=490,height=800;
+  if(!normalWindow && !isTodayWorkPopup && window.documentPictureInPicture?.requestWindow){
+    try{
+      // 클릭 사용자 동작 안에서 바로 요청해야 브라우저가 허용합니다.
+      const pip=await window.documentPictureInPicture.requestWindow({width:455,height:740,disallowReturnToOpener:true});
+      pip.document.title=`${workMemoShortDate(selected)} 업무 · 아도라블`;
+      pip.document.documentElement.style.cssText='width:100%;height:100%;margin:0;overflow:hidden';
+      pip.document.body.style.cssText='margin:0;width:100%;height:100%;background:#f5f7fa;overflow:hidden';
+      const iframe=pip.document.createElement('iframe');
+      iframe.title=`${workMemoShortDate(selected)} 날짜별 업무 목록`;
+      iframe.src=url.href;
+      iframe.style.cssText='display:block;width:100%;height:100%;border:0;margin:0;padding:0;background:#fff';
+      pip.document.body.appendChild(iframe);
+      return;
+    }catch(err){console.warn('주소창 없는 업무 창을 열 수 없어 일반 창으로 전환합니다.',err);}
+  }
+  const width=485,height=780;
   const left=Math.max(0,Math.round(window.screenX+Math.max(0,(window.outerWidth-width)/2)));
   const top=Math.max(0,Math.round(window.screenY+45));
   const popup=window.open(url.href,'_blank',`popup=yes,width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`);
@@ -3856,7 +3873,7 @@ function isAdorableCalendar(calId){
   const root=adorableRoot(), top=topAncestor(calId);
   return !!root && !!top && top.id===root.id;
 }
-// v2.93 · 반복 요일과 업무 분류는 별도로 선택합니다.
+// v2.94 · 반복 요일과 업무 분류는 별도로 선택합니다.
 // 기존 daily/today 값은 구 데이터 호환용으로 해석하며 신규 값은 daily/weekly/monthly/off 입니다.
 const WM_GROUPS=[['daily','일업무'],['weekly','주업무'],['monthly','월업무'],['extra','추가업무']];
 function defaultMemoGroupForRepeat(repeat){
@@ -4125,7 +4142,7 @@ function compactDailyEventsInCalendar(){
       }
     }
   }
-  // v2.93: 날짜별 캘린더 업무 묶음은 원본 일정 등록 순서가 아닌
+  // v2.94: 날짜별 캘린더 업무 묶음은 원본 일정 등록 순서가 아닌
   // 일업무 → 주업무 → 월업무 → 추가업무 순서로 보여줍니다.
   // 업무 묶음 외의 일정 DOM 순서는 변경하지 않습니다.
   const workGroupRank=new Map(WM_GROUPS.map(([kind],index)=>[kind,index]));
@@ -4218,7 +4235,7 @@ function workMemoDayCard(date){
     return `<section class="wmSection wmSection-${kind}" data-wm-section="${kind}"><div class="wmSectionTitle">${title} <b>${stat}</b></div>${list(items)}</section>`;
   }).join('');
   return `<article class="wmDayCard ${today?'wmTodayCard':''}" data-wm-date="${date}">
-    <div class="wmDayHead"><div><strong>${Number(date.slice(5,7))}/${Number(date.slice(8,10))} <span>(${wd})</span></strong>${today?'<em>오늘</em>':''}</div><div class="wmDayHeadActions"><small>${progress}/${rows.length} 완료</small>${!isTodayWorkPopup?`<button type="button" data-wm-popout="${date}" title="${esc(workMemoShortDate(date))} 업무를 별도 창에서 보기">↗ 팝업</button>`:''}</div></div>
+    <div class="wmDayHead"><div><strong>${Number(date.slice(5,7))}/${Number(date.slice(8,10))} <span>(${wd})</span></strong>${today?'<em>오늘</em>':''}</div><div class="wmDayHeadActions">${isTodayWorkPopup?`<button type="button" class="wmCompactNav" data-wm-compact-prev aria-label="이전 날짜">‹</button><input class="wmCompactDate" type="date" data-wm-compact-date value="${date}" aria-label="업무 날짜 선택"><button type="button" class="wmCompactNav" data-wm-compact-next aria-label="다음 날짜">›</button>`:''}<small>${progress}/${rows.length}</small>${!isTodayWorkPopup?`<button type="button" data-wm-popout="${date}" title="${esc(workMemoShortDate(date))} 업무를 별도 창에서 보기">↗ 팝업</button>`:''}</div></div>
     <div class="wmDayScroll"><div class="wmDayActions"><button type="button" data-wm-missed-toggle="${date}" class="${workMemoMissedDates.has(date)?'active':''}">전날 못한 일 ${workMemoMissedDates.has(date)?'접기':'불러오기'}</button></div><div class="wmInfo" data-wm-info="${date}">아도라블 일정 자동 연동 · 캘린더와 업무 화면에서 등록·수정 가능</div>
     <div class="wmBoardNewRow"><button type="button" data-wm-create="${date}">＋ 업무 등록 <small>일 · 주 · 월 · 추가업무</small></button></div>
     ${missed}
@@ -4404,6 +4421,8 @@ function initWorkMemo(){
   $('#wmSettingsBtn')?.addEventListener('click',()=>{workMemoSettingsShown=!workMemoSettingsShown;renderWorkMemoPanel();});
   window.addEventListener('resize',()=>{if(workMemoVisible && workMemoBoardDays()!==Number($('#wmBoard')?.style.getPropertyValue('--wm-columns')||0))renderWorkMemoPanel();});
   panel?.addEventListener('change',e=>{
+    const popupDate=e.target.closest('[data-wm-compact-date]');
+    if(popupDate){setWorkMemoPopupDate(popupDate.value,{followToday:popupDate.value===ds(new Date())});return;}
     const placement=e.target.closest('[data-wm-placement]');if(placement){
       const obj=state.events.find(x=>x.id===placement.dataset.wmPlacement);
       if(obj){
@@ -4426,6 +4445,8 @@ function initWorkMemo(){
   });
   panel?.addEventListener('click',e=>{
     const btn=e.target.closest('button');if(!btn)return;
+    if(btn.hasAttribute('data-wm-compact-prev')){setWorkMemoPopupDate(ds(add(parse(workMemoDate),-1)));return;}
+    if(btn.hasAttribute('data-wm-compact-next')){setWorkMemoPopupDate(ds(add(parse(workMemoDate),1)));return;}
     if(btn.dataset.wmPopout){openTodayWorkWindow(btn.dataset.wmPopout);return;}
     if(btn.dataset.wmCreate){workMemoCreateTask(btn.dataset.wmCreate);return;}
     if(btn.dataset.wmEdit){const date=btn.closest('[data-wm-date]')?.dataset.wmDate;const row=date?workMemoTasks(date).find(x=>x.key===btn.dataset.wmEdit):null;if(row)workMemoEditTask(row,date);return;}
@@ -5139,7 +5160,7 @@ function repeatEditFuture(old,obj,occ){
   state.events.push(future);
 }
 
-// v2.93: 사이드바에서 수정한 반복업무는 '지정일 이후'에만 적용합니다.
+// v2.94: 사이드바에서 수정한 반복업무는 '지정일 이후'에만 적용합니다.
 // 과거 회차의 원본 ID와 각 날짜 완료·제외·체크리스트 기록을 유지하고,
 // 변경 적용일 이후에 실제로 발생하는 첫 회차부터 새 시리즈로 분리합니다.
 function nextSeriesOccurrenceFromDate(old,from){
