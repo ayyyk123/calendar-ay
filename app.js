@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '2.90',
+  version: '2.91',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -354,7 +354,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '2.90',
+    version: '2.91',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -3821,7 +3821,7 @@ function isAdorableCalendar(calId){
   const root=adorableRoot(), top=topAncestor(calId);
   return !!root && !!top && top.id===root.id;
 }
-// v2.90 · 반복 요일과 업무 분류는 별도로 선택합니다.
+// v2.91 · 반복 요일과 업무 분류는 별도로 선택합니다.
 // 기존 daily/today 값은 구 데이터 호환용으로 해석하며 신규 값은 daily/weekly/monthly/off 입니다.
 const WM_GROUPS=[['daily','일업무'],['weekly','주업무'],['monthly','월업무'],['extra','추가업무']];
 function defaultMemoGroupForRepeat(repeat){
@@ -4089,6 +4089,31 @@ function compactDailyEventsInCalendar(){
         if(host)host.appendChild(sum);
       }
     }
+  }
+  // v2.91: 날짜별 캘린더 업무 묶음은 원본 일정 등록 순서가 아닌
+  // 일업무 → 주업무 → 월업무 → 추가업무 순서로 보여줍니다.
+  // 업무 묶음 외의 일정 DOM 순서는 변경하지 않습니다.
+  const workGroupRank=new Map(WM_GROUPS.map(([kind],index)=>[kind,index]));
+  const summariesByDate=new Map();
+  root.querySelectorAll('.wmGroupSummary[data-daily-summary]').forEach(summary=>{
+    const date=summary.dataset.dailySummary;
+    if(!summariesByDate.has(date))summariesByDate.set(date,[]);
+    summariesByDate.get(date).push(summary);
+  });
+  for(const summaries of summariesByDate.values()){
+    if(summaries.length<2)continue;
+    // 가능한 경우 아도라블 캘린더 영역에 네 업무 분류를 모읍니다.
+    // 각 보기에 따라 업무 묶음이 Quick과 캘린더 구역에 흩어질 수 있습니다.
+    const anchor=summaries.find(el=>el.closest('.scheduleLane[data-lane-key^="cal:"], .mobileAgendaSection[data-mobile-section^="cal:"], .calendarTreeGroup'))
+      ||summaries.find(el=>el.parentElement?.matches('.cell, .multiCompactCell, .dayResizableBoard'))
+      ||summaries[0];
+    const host=anchor.parentNode;
+    if(!host)continue;
+    const marker=document.createComment('calendar work summary order');
+    host.insertBefore(marker,anchor);
+    summaries.sort((a,b)=>(workGroupRank.get(a.dataset.workGroup)??99)-(workGroupRank.get(b.dataset.workGroup)??99));
+    for(const summary of summaries)host.insertBefore(summary,marker);
+    marker.remove();
   }
   root.querySelectorAll('[data-daily-summary]').forEach(group=>group.addEventListener('click',e=>{
     const open=e.target.closest('[data-wm-summary-open]');
@@ -5043,7 +5068,7 @@ function repeatEditFuture(old,obj,occ){
   state.events.push(future);
 }
 
-// v2.90: 사이드바에서 수정한 반복업무는 '지정일 이후'에만 적용합니다.
+// v2.91: 사이드바에서 수정한 반복업무는 '지정일 이후'에만 적용합니다.
 // 과거 회차의 원본 ID와 각 날짜 완료·제외·체크리스트 기록을 유지하고,
 // 변경 적용일 이후에 실제로 발생하는 첫 회차부터 새 시리즈로 분리합니다.
 function nextSeriesOccurrenceFromDate(old,from){
@@ -5839,7 +5864,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.90',
+    appVersion:'2.91',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state

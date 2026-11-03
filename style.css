@@ -3477,7 +3477,7 @@ header .views > #workMemoOpenBtn{width:68px!important;min-width:68px!important;m
 @media(max-width:760px){.wmGroupPopup{max-height:65dvh}.wmNewTaskForm button{font-size:11px;padding:6px}}
 
 
-/* v2.90: 달력 업무 묶음 이름/수치 각각 클릭 & 팝업 행 가로 정렬 */
+/* v2.91: 달력 업무 묶음 이름/수치 각각 클릭 & 팝업 행 가로 정렬 */
 .dailySummaryBtn.wmGroupSummary{
   display:flex!important;align-items:stretch!important;justify-content:space-between!important;
   flex-wrap:nowrap!important;gap:3px!important;min-width:0!important;
@@ -3532,7 +3532,7 @@ header .views > #workMemoOpenBtn{width:68px!important;min-width:68px!important;m
 .wmGroupSummary .wmGroupNameBtn{min-width:0!important}
 .wmGroupSummary .wmGroupCountBtn{min-width:max-content!important}
 
-/* v2.90 · 업무 등록·수정과 달력 추가업무 표시 개선 */
+/* v2.91 · 업무 등록·수정과 달력 추가업무 표시 개선 */
 .wmBoardNewRow{margin:9px 0 11px;display:flex;min-width:0}
 .wmBoardNewRow button{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:9px 7px;background:#edf5ff;border:1px solid #abc7e6;color:#245b9a;border-radius:5px;font-size:12px;font-weight:750;cursor:pointer}
 .wmBoardNewRow button:hover{background:#e3effe}
