@@ -108,7 +108,7 @@ let lastFirebaseSavedAt = null;
 let lastLocalSavedAt = null;
 let localDirty = false;
 let writeInFlight = false;
-// v2.98: Firebase server is authoritative. Serialize writes and guard against
+// v2.99: Firebase server is authoritative. Serialize writes and guard against
 // older tabs/devices overwriting a newer confirmed server revision.
 let cloudRevision = 0;
 let cloudLegacyStamp = '';
@@ -4051,9 +4051,17 @@ function workMemoTitle(e){
   if(e._prepDay)return String(e._prepNote||'').trim()||`준비 · ${e.title}`;
   return e.kind==='payment'?`납부 · ${e.title}`:e.title;
 }
+// An earlier transfer is no longer active when the exact task occurrence
+// has been edited back onto its source date. Keep the saved audit entry but
+// never hide a task that the calendar currently contains on that date.
+function workMemoActiveMovedOut(date,note=workMemoDay(date),events=workMemoEvents(date)){
+  const existing=new Set(events.filter(isMemoVisibleEvent).map(workMemoRef));
+  for(const x of note.custom||[])if(!x.movedTo)existing.add(`custom|${x.id}`);
+  return (note.movedOut||[]).filter(x=>x?.key && !existing.has(x.key));
+}
 function workMemoTasks(date,includeAll=false){
   const note=workMemoDay(date),events=workMemoEvents(date),byRef=new Map(events.map(e=>[workMemoRef(e),e]));
-  const transferred=new Set(note.movedOut.map(x=>x.key));
+  const transferred=new Set(workMemoActiveMovedOut(date,note,events).map(x=>x.key));
   const rows=[],seen=new Set();
   function push(e,kind,key=workMemoRef(e)){
     if(seen.has(key)||transferred.has(key)||!isAdorableCalendar(e.calId))return;
@@ -4190,13 +4198,17 @@ function compactDailyEventsInCalendar(){
       const k=workMemoRef(r.e);
       if(!keys.has(k)){keys.add(k);unique.push(r);}
     }
-    const done=unique.filter(x=>workMemoIsDone(x.e)).length;
-    const moved=(state.workMemos?.[date]?.movedOut||[]).filter(x=>{
+    // Use the same live task set as the board/popup, not the raw calendar DOM.
+    // Raw DOM can contain an occurrence whose outdated movedOut record used to
+    // hide it in the popup after its date was manually changed back.
+    const visible=workMemoTasks(date).filter(x=>x.kind===kind && keys.has(x.key));
+    const done=visible.filter(x=>x.done).length;
+    const moved=workMemoActiveMovedOut(date).filter(x=>{
       const ev=state.events.find(e=>e.id===x.eventId);
       const rowGroup=x.group||(x.daily?'daily':'extra');
       return rowGroup===kind && ev && isAdorableCalendar(ev.calId) && (!calendarFocusIds.size || focusedCalendarIds()?.has(ev.calId));
     });
-    const count=unique.length,total=count+moved.length;
+    const count=visible.length,total=count+moved.length;
     const label=moved.length?`${done}/${count}/${total}`:`${done}/${count}`;
     const complete=count>0 && done===count;
     const name=WM_GROUPS.find(x=>x[0]===kind)?.[1]||'업무';
@@ -4235,7 +4247,7 @@ function compactDailyEventsInCalendar(){
         const rows=tasks.filter(row=>row.kind===kind);
         if(!rows.length)continue;
         const done=rows.filter(row=>row.done).length,complete=done===rows.length;
-        const moved=(state.workMemos?.[date]?.movedOut||[]).filter(x=>(x.group||(x.daily?'daily':'extra'))===kind).length;
+        const moved=workMemoActiveMovedOut(date).filter(x=>(x.group||(x.daily?'daily':'extra'))===kind).length;
         const label=moved?`${done}/${rows.length}/${rows.length+moved}`:`${done}/${rows.length}`;
         const sum=document.createElement('div');
         sum.className=`dailySummaryBtn wmGroupSummary wmGroup-${kind} ${complete?'completed':'pending'}`;
@@ -4308,7 +4320,7 @@ function closeWorkMemo(){
   $('#workMemoPanel')?.classList.add('hidden');
   document.body.classList.remove('wmBoardActive');
 }
-// v2.98 · 업무 화면/달력 묶음 팝업에서도 원본 일정의 세부 체크리스트를 표시합니다.
+// v2.99 · 업무 화면/달력 묶음 팝업에서도 원본 일정의 세부 체크리스트를 표시합니다.
 // 세부 항목은 별도의 일정으로 복제하지 않으며, 반복 회차별 완료 기록에 직접 연결합니다.
 function workMemoSubtasksMarkup(row){
   const e=row?.e;
@@ -4341,7 +4353,7 @@ function workMemoTaskMarkup(row,date){
 function workMemoMissedTasks(date){
   const previous=ds(add(parse(date),-1)),note=workMemoDay(previous);
   const rows=workMemoTasks(previous,false);
-  const alreadyMoved=new Set(note.movedOut.map(x=>x.key));
+  const alreadyMoved=new Set(workMemoActiveMovedOut(previous,note).map(x=>x.key));
   return rows.filter(x=>!x.done && x.e?.kind!=='anniversary' && !alreadyMoved.has(x.key));
 }
 const workMemoMissedByDate=new Map();
@@ -4353,6 +4365,7 @@ function workMemoDailySettingsHtml(){
 }
 function workMemoDayCard(date){
   const n=workMemoDay(date),rows=workMemoTasks(date);
+  const activeMoved=workMemoActiveMovedOut(date,n);
   const wd=['일','월','화','수','목','금','토'][parse(date).getDay()],today=date===ds(new Date());
   const progress=rows.filter(x=>x.done).length;
   const list=items=>items.length?items.map(x=>workMemoTaskMarkup(x,date)).join(''):'<div class="wmEmpty">등록된 업무 없음</div>';
@@ -4364,7 +4377,7 @@ function workMemoDayCard(date){
   }
   const sections=WM_GROUPS.map(([kind,title])=>{
     const items=rows.filter(x=>x.kind===kind),done=items.filter(x=>x.done).length;
-    const moved=n.movedOut.filter(x=>(x.group||(x.daily?'daily':'extra'))===kind);
+    const moved=activeMoved.filter(x=>(x.group||(x.daily?'daily':'extra'))===kind);
     const stat=moved.length?`${done}/${items.length}/${items.length+moved.length}`:`${done}/${items.length}`;
     return `<section class="wmSection wmSection-${kind}" data-wm-section="${kind}"><div class="wmSectionTitle">${title} <b>${stat}</b></div>${list(items)}</section>`;
   }).join('');
@@ -4374,7 +4387,7 @@ function workMemoDayCard(date){
     <div class="wmBoardNewRow"><button type="button" data-wm-create="${date}">＋ 업무 등록 <small>일 · 주 · 월 · 추가업무</small></button></div>
     ${missed}
     ${sections}
-    ${n.movedOut.length?`<details class="wmHistory"><summary>다른 날짜로 옮긴 일 ${n.movedOut.length}건</summary>${n.movedOut.map(x=>`<div>${esc(x.title)} → ${esc(workMemoShortDate(x.toDate))}</div>`).join('')}</details>`:''}
+    ${activeMoved.length?`<details class="wmHistory"><summary>다른 날짜로 옮긴 일 ${activeMoved.length}건</summary>${activeMoved.map(x=>`<div>${esc(x.title)} → ${esc(workMemoShortDate(x.toDate))}</div>`).join('')}</details>`:''}
     <section class="wmSection wmNoteSection"><div class="wmSectionTitle">메모</div><textarea data-wm-note="${date}" placeholder="그날의 메모를 자유롭게 작성">${esc(n.freeText)}</textarea></section>
     </div></article>`;
 }
@@ -4465,7 +4478,7 @@ function workMemoMoveRow(row,dest){
   if(dest===from){alert('원래 날짜와 같아. 다른 날짜를 선택해 줘.');return false;}
   const origin=row.originDate||from;
   const fromNote=workMemoDay(from);
-  if(fromNote.movedOut.some(x=>x.key===key)){alert('이미 이동한 업무야.');return;}
+  if(workMemoActiveMovedOut(from,fromNote).some(x=>x.key===key)){alert('이미 이동한 업무야.');return;}
   let newRef='';
   if(row.custom){
     const x=row.custom;
@@ -4511,6 +4524,9 @@ function workMemoMoveRow(row,dest){
       newRef=`ev|${e.id}|${dest}`;
     }
   }
+  // A task moved back by manual date edit may have an obsolete transfer
+  // under this same source key; replace it rather than stacking ghost moves.
+  fromNote.movedOut=fromNote.movedOut.filter(x=>x.key!==key);
   fromNote.movedOut.push({key,toDate:dest,title:row.title,daily:row.kind==='daily',group:row.kind,eventId:row.e?.id||''});
   if(newRef && !workMemoDay(dest).imports.some(x=>x.key===newRef) && !newRef.startsWith('custom|'))workMemoDay(dest).imports.push({key:newRef,title:row.title});
   // 미완료 목록은 사용자가 '접기'를 누를 때까지 유지합니다.
