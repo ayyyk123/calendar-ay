@@ -3636,3 +3636,37 @@ body.todayWorkPopup .wmCompactDate{box-sizing:border-box!important;width:108px!i
 body.todayWorkPopup .wmDayScroll{padding:5px 8px!important}
 body.todayWorkPopup .wmInfo{display:none!important}
 @media(max-width:440px){body.todayWorkPopup .wmDayHead{padding:7px 6px!important}body.todayWorkPopup .wmCompactDate{width:96px!important}body.todayWorkPopup .wmDayHeadActions{gap:2px!important}body.todayWorkPopup .wmDayHeadActions small{font-size:9px!important}}
+
+/* v2.95 · 날짜별 업무 보드/독립 팝업 공통 컴팩트 간격.
+   글자 크기는 유지하고 패딩, 버튼 높이, 섹션 사이 간격만 줄입니다. */
+.wmPanel .wmBoard{gap:9px;padding:10px}
+.wmPanel .wmDayHead{padding:8px 10px;gap:5px}
+.wmPanel .wmDayHead>div{gap:5px}
+.wmPanel .wmDayScroll{padding:6px 8px}
+.wmPanel .wmDayActions button{padding:5px 4px;line-height:1.25}
+.wmPanel .wmDayCard .wmInfo{margin:3px 0 4px;line-height:1.35}
+.wmPanel .wmDayCard .wmBoardNewRow{margin:5px 0 7px}
+.wmPanel .wmDayCard .wmBoardNewRow button{padding:6px 7px;line-height:1.3}
+.wmPanel .wmDayCard .wmSection{margin:6px 0;border-radius:5px}
+.wmPanel .wmDayCard .wmSectionTitle{padding:5px 8px;line-height:1.25}
+.wmPanel .wmDayCard .wmTask{padding:3px 7px;gap:5px;line-height:1.3;font-size:12px}
+.wmPanel .wmDayCard .wmTask label{align-items:center;gap:6px}
+.wmPanel .wmDayCard .wmTask input[type=checkbox]{width:15px;height:15px;flex:0 0 15px}
+.wmPanel .wmDayCard .wmTaskEditBtn{width:22px!important;min-width:22px!important;height:22px!important;padding:0!important;font-size:12px!important}
+.wmPanel .wmDayCard .wmTask small{font-size:10px}
+.wmPanel .wmDayCard .wmEmpty{padding:7px 8px;line-height:1.35}
+.wmPanel .wmDayCard .wmMissedArea{margin:6px 0}
+.wmPanel .wmDayCard .wmMissed{padding:6px 8px}
+.wmPanel .wmDayCard .wmMissed strong{margin-bottom:4px;line-height:1.3}
+.wmPanel .wmDayCard .wmMissedAction{gap:4px}
+.wmPanel .wmDayCard .wmHistory{margin:5px 0;line-height:1.45}
+.wmPanel .wmDayCard .wmNoteSection textarea{margin:5px 7px;padding:7px;min-height:85px;width:calc(100% - 14px);line-height:1.4}
+/* 문서 PIP와 일반 별도 창은 동일한 카드 구조이므로 동일한 간격을 사용합니다. */
+body.todayWorkPopup .wmDayHead{padding:7px 9px!important}
+body.todayWorkPopup .wmDayScroll{padding:6px 8px!important}
+@media(max-width:760px){
+  .wmPanel .wmBoard{padding:7px;gap:7px}
+  .wmPanel .wmDayHead{padding:7px 8px}
+  .wmPanel .wmDayScroll{padding:5px 7px}
+  body.todayWorkPopup .wmDayScroll{padding:5px 7px!important}
+}
