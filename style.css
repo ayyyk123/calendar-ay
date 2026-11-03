@@ -3677,3 +3677,37 @@ body.todayWorkPopup .wmDayScroll{padding:6px 8px!important}
 @media(min-width:761px){header .views>#saveBadge{flex:0 0 150px!important;width:150px!important;min-width:150px!important;max-width:150px!important;font-size:10px!important;padding:3px 4px!important;}}
 @media(max-width:760px){#saveBadge{min-width:0!important;max-width:none!important;overflow:visible!important;}#saveBadgeText{font-size:10px!important;white-space:nowrap!important;letter-spacing:-.4px!important;}}
 #downloadSafetyCopyBtn[hidden]{display:none!important}
+
+
+/* v2.98 · 일정에 등록된 세부 체크리스트를 업무 보드와 날짜별 팝업에 함께 표시 */
+.wmPanel .wmTaskWithSubtasks{flex-wrap:wrap;align-items:center}
+.wmPanel .wmSubtaskList,
+#wmGroupPopup .wmSubtaskList{
+  box-sizing:border-box;flex:0 0 100%;min-width:0;width:100%;
+  padding:4px 4px 3px 22px;margin:2px 0 1px;
+  border-top:1px dashed #e1e7ed;background:transparent;
+}
+.wmPanel .wmSubtaskHead,#wmGroupPopup .wmSubtaskHead{
+  display:flex;gap:5px;align-items:center;color:#758698;
+  font-size:10px;line-height:1.35;margin-bottom:2px;font-weight:500;
+}
+.wmPanel .wmSubtaskHead span,#wmGroupPopup .wmSubtaskHead span{font-variant-numeric:tabular-nums}
+.wmPanel .wmSubtaskList label.wmSubtask,#wmGroupPopup .wmSubtaskList label.wmSubtask{
+  display:grid!important;grid-template-columns:14px minmax(0,1fr)!important;
+  gap:6px!important;align-items:start!important;min-width:0!important;
+  padding:2px 0!important;margin:0!important;font-size:11px!important;
+  line-height:1.4!important;color:#455466!important;cursor:pointer;
+}
+.wmPanel .wmSubtaskList input[type=checkbox],#wmGroupPopup .wmSubtaskList input[type=checkbox]{
+  box-sizing:border-box!important;width:13px!important;min-width:13px!important;max-width:13px!important;
+  height:13px!important;margin:1px 0 0!important;padding:0!important;
+  flex:none!important;accent-color:#438b67!important;cursor:pointer;
+}
+.wmPanel .wmSubtaskList .wmSubtask span,#wmGroupPopup .wmSubtaskList .wmSubtask span{
+  min-width:0!important;white-space:normal!important;word-break:keep-all;overflow-wrap:anywhere!important;
+}
+.wmPanel .wmSubtaskList .wmSubtask.done span,#wmGroupPopup .wmSubtaskList .wmSubtask.done span{
+  color:#9aa7b0!important;text-decoration:line-through;
+}
+#wmGroupPopup .wmSubtaskList{padding-left:24px;padding-right:0;margin-top:5px}
+@media(max-width:480px){.wmPanel .wmSubtaskList{padding-left:19px}}

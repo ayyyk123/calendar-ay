@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '2.97',
+  version: '2.98',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -108,7 +108,7 @@ let lastFirebaseSavedAt = null;
 let lastLocalSavedAt = null;
 let localDirty = false;
 let writeInFlight = false;
-// v2.97: Firebase server is authoritative. Serialize writes and guard against
+// v2.98: Firebase server is authoritative. Serialize writes and guard against
 // older tabs/devices overwriting a newer confirmed server revision.
 let cloudRevision = 0;
 let cloudLegacyStamp = '';
@@ -364,7 +364,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '2.97',
+    version: '2.98',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -4101,7 +4101,7 @@ function refreshWorkGroupPopup(){
   pop.innerHTML=`<div class="wmGroupPopupHeader"><strong>${esc(workMemoShortDate(date))} ${esc(label)} <small>${rows.filter(x=>x.done).length}/${rows.length}</small></strong><button type="button" data-wm-popup-close aria-label="목록 닫기">✕</button></div><p class="wmGroupPopupHelp">미완료 업무를 잡아 달력의 다른 날짜로 드래그하세요. 휴대폰은 날짜를 선택해 이동할 수 있어요.</p><div class="wmGroupPopupList">${rows.length?rows.map(row=>{
     const moveable=!row.done && (!!row.e || !!row.custom);
     const origin=row.originDate&&row.originDate!==date?` <small>(${esc(workMemoShortDate(row.originDate))})</small>`:'';
-    return `<div class="wmPopupTask ${row.done?'completed':''}" data-wm-popup-key="${esc(row.key)}" ${moveable?'draggable="true"':''}><div class="wmPopupTaskMain"><input type="checkbox" data-wm-popup-check="${esc(row.key)}" ${row.done?'checked':''} ${row.e?.kind==='anniversary'?'disabled':''}><span title="${moveable?'드래그해서 날짜 이동':''}">${moveable?'<span class="wmDragGrip">⠿</span> ':''}${esc(row.title)}${origin}</span></div><div class="wmPopupTaskActions"><button type="button" data-wm-popup-edit>✎ 수정·삭제</button>${moveable?`<input type="date" aria-label="이동할 날짜" value="${date}"><button type="button" data-wm-popup-move>이동</button>`:''}</div></div>`;
+    return `<div class="wmPopupTask ${row.done?'completed':''}" data-wm-popup-key="${esc(row.key)}" ${moveable?'draggable="true"':''}><div class="wmPopupTaskMain"><input type="checkbox" data-wm-popup-check="${esc(row.key)}" ${row.done?'checked':''} ${row.e?.kind==='anniversary'?'disabled':''}><span title="${moveable?'드래그해서 날짜 이동':''}">${moveable?'<span class="wmDragGrip">⠿</span> ':''}${esc(row.title)}${origin}</span></div>${workMemoSubtasksMarkup(row)}<div class="wmPopupTaskActions"><button type="button" data-wm-popup-edit>✎ 수정·삭제</button>${moveable?`<input type="date" aria-label="이동할 날짜" value="${date}"><button type="button" data-wm-popup-move>이동</button>`:''}</div></div>`;
   }).join(''):'<div class="wmGroupPopupEmpty">해당 날짜의 업무가 없습니다.</div>'}</div>`;
   pop.classList.remove('hidden');
   const list=pop.querySelector('.wmGroupPopupList');if(list)list.scrollTop=currentScroll;
@@ -4130,10 +4130,14 @@ function initWorkGroupPopup(){
     if(row)workMemoMoveRow(row,date);
   });
   pop.addEventListener('change',e=>{
-    const check=e.target.closest('[data-wm-popup-check]');if(!check||!workGroupPopupState)return;
+    if(!workGroupPopupState)return;
+    const sub=e.target.closest('[data-wm-subcheck]');
+    if(sub){workMemoToggleSubtask(sub.dataset.wmSubcheck,sub.dataset.wmSubid,workGroupPopupState.date);return;}
+    const check=e.target.closest('[data-wm-popup-check]');if(!check)return;
     workMemoToggleTask(check.dataset.wmPopupCheck,workGroupPopupState.date);
   });
   pop.addEventListener('dragstart',e=>{
+    if(e.target.closest('.wmSubtaskList')){e.preventDefault();return;}
     const item=e.target.closest('[data-wm-popup-key][draggable=true]'),info=workGroupPopupState;
     if(!item||!info){e.preventDefault();return;}
     const row=workMemoTasks(info.date).find(x=>x.key===item.dataset.wmPopupKey&&x.kind===info.kind);
@@ -4304,13 +4308,35 @@ function closeWorkMemo(){
   $('#workMemoPanel')?.classList.add('hidden');
   document.body.classList.remove('wmBoardActive');
 }
+// v2.98 · 업무 화면/달력 묶음 팝업에서도 원본 일정의 세부 체크리스트를 표시합니다.
+// 세부 항목은 별도의 일정으로 복제하지 않으며, 반복 회차별 완료 기록에 직접 연결합니다.
+function workMemoSubtasksMarkup(row){
+  const e=row?.e;
+  if(!e || e._prepDay || e._purchaseDue)return '';
+  const items=checklistItems(e);
+  if(!items.length)return '';
+  const occ=checklistOccurrenceKey(e),doneSet=checklistDoneSet(e,occ);
+  const completed=items.reduce((n,x)=>n+Number(doneSet.has(String(x.id))),0);
+  return `<div class="wmSubtaskList" aria-label="${esc(row.title)} 세부 체크리스트">
+    <div class="wmSubtaskHead">세부 체크리스트 <span>${completed}/${items.length}</span></div>
+    ${items.map(x=>{const checked=doneSet.has(String(x.id));return `<label class="wmSubtask ${checked?'done':''}"><input type="checkbox" data-wm-subcheck="${esc(row.key)}" data-wm-subid="${esc(x.id)}" ${checked?'checked':''}><span>${esc(x.text)}</span></label>`;}).join('')}
+  </div>`;
+}
+function workMemoToggleSubtask(key,subId,date){
+  const row=workMemoTasks(date).find(x=>x.key===key);
+  if(!row?.e || row.e._prepDay || row.e._purchaseDue)return;
+  const e=row.e;
+  // 캘린더의 기존 toggleSubtask와 동일한 원본 ID/반복 회차를 사용합니다.
+  toggleSubtask(e.id,checklistOccurrenceKey(e),subId);
+}
 function workMemoTaskMarkup(row,date){
   const done=!!row.done,origin=row.originDate && row.originDate!==date;
   const label=origin?` <span class="wmOrigin">(${esc(workMemoShortDate(row.originDate))})</span>`:'';
   const kind=['daily','weekly','monthly','extra'].includes(row.kind)?row.kind:'extra';
   const type=row.e?row.e.kind==='payment'?'납부':row.e._prepDay?'준비':row.e._purchaseDue?'구매':row.e.kind==='appointment'?'약속':'일정':'';
   const noCheck=!!row.e?.kind && row.e.kind==='anniversary';
-  return `<div class="wmTask ${done?'done':''}" data-wm-task="${esc(row.key)}" data-wm-kind="${kind}"><label><input type="checkbox" data-wm-check="${esc(row.key)}" ${done?'checked':''} ${noCheck?'disabled':''}><span class="wmTaskLabel">${esc(row.title)}${label}</span></label>${type&&row.kind!=='daily'?`<small>${esc(type)}</small>`:''}<button type="button" class="wmTaskEditBtn" data-wm-edit="${esc(row.key)}" title="수정 · 삭제" aria-label="${esc(row.title)} 수정 또는 삭제">✎</button></div>`;
+  const subtasks=workMemoSubtasksMarkup(row);
+  return `<div class="wmTask ${done?'done':''} ${subtasks?'wmTaskWithSubtasks':''}" data-wm-task="${esc(row.key)}" data-wm-kind="${kind}"><label><input type="checkbox" data-wm-check="${esc(row.key)}" ${done?'checked':''} ${noCheck?'disabled':''}><span class="wmTaskLabel">${esc(row.title)}${label}</span></label>${type&&row.kind!=='daily'?`<small>${esc(type)}</small>`:''}<button type="button" class="wmTaskEditBtn" data-wm-edit="${esc(row.key)}" title="수정 · 삭제" aria-label="${esc(row.title)} 수정 또는 삭제">✎</button>${subtasks}</div>`;
 }
 function workMemoMissedTasks(date){
   const previous=ds(add(parse(date),-1)),note=workMemoDay(previous);
@@ -4549,6 +4575,8 @@ function initWorkMemo(){
           openDialog($('#repeatEditDlg'));
         }
       }return;}
+    const sub=e.target.closest('[data-wm-subcheck]');
+    if(sub){const date=sub.closest('[data-wm-date]')?.dataset.wmDate;if(date)workMemoToggleSubtask(sub.dataset.wmSubcheck,sub.dataset.wmSubid,date);return;}
     const checkbox=e.target.closest('[data-wm-check]');if(checkbox){const date=checkbox.closest('[data-wm-date]')?.dataset.wmDate;if(date)workMemoToggleTask(checkbox.dataset.wmCheck,date);}
   });
   panel?.addEventListener('click',e=>{
@@ -6091,7 +6119,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.97',
+    appVersion:'2.98',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
