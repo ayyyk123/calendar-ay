@@ -3711,3 +3711,38 @@ body.todayWorkPopup .wmDayScroll{padding:6px 8px!important}
 }
 #wmGroupPopup .wmSubtaskList{padding-left:24px;padding-right:0;margin-top:5px}
 @media(max-width:480px){.wmPanel .wmSubtaskList{padding-left:19px}}
+
+/* v2.100: preparation tasks that are checked off must use the same muted
+   appearance as completed ordinary events. Older preparation-specific
+   !important rules unintentionally overrode the generic .item.done style. */
+.item.prepDayItem.done,
+.item.prepDeadlineDayItem.done {
+  background:#f1f3f5!important;
+  border-color:#d8dfe5!important;
+  border-left-color:#b8c4ce!important;
+  box-shadow:inset 0 0 0 1px #e0e5ea!important;
+  opacity:.72!important;
+}
+.item.prepDayItem.done:hover,
+.item.prepDeadlineDayItem.done:hover { background:#eef1f4!important; }
+.item.prepDayItem.done .itemTitle,
+.item.prepDeadlineDayItem.done .itemTitle {
+  color:#808992!important;
+  font-weight:500!important;
+  text-decoration:none!important;
+}
+.item.prepDayItem.done .prepCheck {
+  background:#edf5ef!important;
+  border-color:#bdd5c5!important;
+  color:#4a7859!important;
+}
+/* Selected entry remains locatable without turning completed tasks blue. */
+.prepPlanRow.focused.done {
+  background:#f4f6f7!important;
+  border:2px solid #aebbc8!important;
+  box-shadow:inset 3px 0 0 #aebbc8!important;
+}
+.prepPlanRow.focused.done .prepPlanDate {
+  color:#8a9199!important;
+  font-weight:700!important;
+}

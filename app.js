@@ -108,7 +108,7 @@ let lastFirebaseSavedAt = null;
 let lastLocalSavedAt = null;
 let localDirty = false;
 let writeInFlight = false;
-// v2.99: Firebase server is authoritative. Serialize writes and guard against
+// v2.100: Firebase server is authoritative. Serialize writes and guard against
 // older tabs/devices overwriting a newer confirmed server revision.
 let cloudRevision = 0;
 let cloudLegacyStamp = '';
@@ -4320,7 +4320,7 @@ function closeWorkMemo(){
   $('#workMemoPanel')?.classList.add('hidden');
   document.body.classList.remove('wmBoardActive');
 }
-// v2.99 · 업무 화면/달력 묶음 팝업에서도 원본 일정의 세부 체크리스트를 표시합니다.
+// v2.100 · 업무 화면/달력 묶음 팝업에서도 원본 일정의 세부 체크리스트를 표시합니다.
 // 세부 항목은 별도의 일정으로 복제하지 않으며, 반복 회차별 완료 기록에 직접 연결합니다.
 function workMemoSubtasksMarkup(row){
   const e=row?.e;
