@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '2.98',
+  version: '2.102',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -364,7 +364,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '2.98',
+    version: '2.102',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -1185,7 +1185,13 @@ function preparationProgress(e){
 // 마감 표시와 준비계획 팝업은 같은 완료 기준을 사용한다.
 // 완료 기록은 준비항목별 prepDone에 그대로 두고, 원본의 done 플래그를 임의로 변경하지 않는다.
 function preparationComplete(e,progress=preparationProgress(e)){
+  // 실제로 완료한 준비업무만 완료로 계산한다. '못함'은 완료로 바꾸지 않는다.
   return progress.total>0 && progress.done===progress.total && progress.missed===0;
+}
+function preparationClosed(e,progress=preparationProgress(e)){
+  // 모든 준비업무가 '완료' 또는 '못함'으로 처리됐으면 마감 자체는 종료된 상태다.
+  // 기존 prepDone / prepMissed 기록은 어떤 경우에도 변경하지 않는다.
+  return progress.total>0 && preparationEntries(e).every(entry=>preparationEntryDone(e,entry.key)||preparationEntryMissed(e,entry.key));
 }
 function preparationDates(e){
   return [...new Set(preparationEntries(e).map(x=>x.date))].sort();
@@ -1426,10 +1432,11 @@ function eventItemHtml(e, compact=false){
   const c=cal(e.calId), purchaseDue=!!e._purchaseDue, purchaseLinked=purchaseDue||e.sourceType==='purchase', prepDay=!!e._prepDay, prepDeadlineDay=prepDay && (e._renderDate||e._prepDate||e.date)===(e.prepDeadline||e.date), deadlineItem=isPreparationDeadlineOccurrence(e);
   const deadlineProgress=deadlineItem?preparationProgress(e):null;
   const deadlineComplete=!!deadlineProgress && preparationComplete(e,deadlineProgress);
-  // 준비일정이 있는 마감 카드는 팝업에서 모든 준비항목을 완료했을 때만 완료 표시한다.
-  // 준비항목이 전혀 없는 일정은 기존의 수동 완료 상태를 유지한다.
-  const done=prepDay?(typeof e._prepChecked==='boolean'?e._prepChecked:preparationEntryDone(e,e._prepKey))
-    :deadlineItem && deadlineProgress.total>0?deadlineComplete:isDone(e);
+  const deadlineClosed=!!deadlineProgress && preparationClosed(e,deadlineProgress);
+  // 준비업무별 완료 키는 이동한 날짜가 아니라 원래 회차 키를 사용한다.
+  // 팝업과 달력 모두 동일한 키로 판정한다. 마감 자체는 모두 처리되면 종료 표시만 한다.
+  const done=prepDay?preparationEntryDone(e,e._prepKey)
+    :deadlineItem && deadlineProgress.total>0?deadlineClosed:isDone(e);
   const missed=prepDay?preparationEntryMissed(e,e._prepKey):false, checkable=e.kind!=='anniversary' && !prepDay;
   const recurring=(e.repeat||'none')!=='none';
   const payment=e.kind==='payment';
@@ -1470,7 +1477,7 @@ function eventItemHtml(e, compact=false){
   const repeatBadge=!prepDay&&recurring?`<span class="repeatMark" title="${esc(repeatRuleLabel(e))}">↻</span>`:'';
   const carryBadge=inLabel?`<span class="carryBadge carryIn" title="${esc(inLabel)}">↪</span>`:'';
   const amountInline=!prepDay&&payment&&Number(e.paymentAmount)>0?`<span class="inlineMeta">₩${Number(e.paymentAmount).toLocaleString('ko-KR')}</span>`:'';
-  return `<div class="item ${done?'done':''} ${missed?'prepMissedItem':''} kind-${esc(e.kind||'event')} ${recurring&&!prepDay?'recurringItem':''} ${payment&&!prepDay?'paymentItem':''} ${e.fixedId?'manualPlacedItem':''} ${e.flexibleId?'flexiblePlacedItem':''} ${inLabel?'carriedIn':''} ${outRecord?'carriedOut':''} ${prepDay?'prepDayItem':''} ${prepDeadlineDay?'prepDeadlineDayItem':''} ${deadlineItem?'prepDeadlineItem':''} ${deadlineItem&&deadlineComplete?'prepDeadlineComplete':''}" draggable="${drag}" data-eid="${esc(e.id)}" data-occurrence="${esc(e._occurrenceStart||e.date)}" data-render-date="${esc(renderDate)}" data-cal-id="${esc(e.calId)}" data-lane="${payment?'payment':'work'}" data-prep-day="${prepDay?'1':''}" data-prep-completed="${prepDay?(done?'yes':'no'):''}" data-prep-key="${prepDay?esc(e._prepKey||''):''}" data-prep-source-date="${prepDay?esc(e._prepSourceDate||''):''}" data-prep-type="${prepDay?esc(e._prepType||''):''}" data-prep-rule-id="${prepDay?esc(e._prepRuleId||''):''}" data-prep-event="${e.prepEnabled?'1':''}" data-purchase-due="${purchaseDue?'1':''}" data-purchase-id="${purchaseDue?esc(e.purchaseId||''):''}" style="--item-color:${esc(c.color)};border-left-color:${esc(c.color)}">
+  return `<div class="item ${done?'done':''} ${missed?'prepMissedItem':''} kind-${esc(e.kind||'event')} ${recurring&&!prepDay?'recurringItem':''} ${payment&&!prepDay?'paymentItem':''} ${e.fixedId?'manualPlacedItem':''} ${e.flexibleId?'flexiblePlacedItem':''} ${inLabel?'carriedIn':''} ${outRecord?'carriedOut':''} ${prepDay?'prepDayItem':''} ${prepDeadlineDay?'prepDeadlineDayItem':''} ${deadlineItem?'prepDeadlineItem':''} ${deadlineItem&&deadlineComplete?'prepDeadlineComplete':''} ${deadlineItem&&deadlineClosed&&!deadlineComplete?'prepDeadlineClosed':''}" draggable="${drag}" data-eid="${esc(e.id)}" data-occurrence="${esc(e._occurrenceStart||e.date)}" data-render-date="${esc(renderDate)}" data-cal-id="${esc(e.calId)}" data-lane="${payment?'payment':'work'}" data-prep-day="${prepDay?'1':''}" data-prep-completed="${prepDay?(done?'yes':'no'):''}" data-prep-key="${prepDay?esc(e._prepKey||''):''}" data-prep-source-date="${prepDay?esc(e._prepSourceDate||''):''}" data-prep-type="${prepDay?esc(e._prepType||''):''}" data-prep-rule-id="${prepDay?esc(e._prepRuleId||''):''}" data-prep-event="${e.prepEnabled?'1':''}" data-purchase-due="${purchaseDue?'1':''}" data-purchase-id="${purchaseDue?esc(e.purchaseId||''):''}" style="--item-color:${esc(c.color)};border-left-color:${esc(c.color)};${prepDay&&done?'background:#f1f3f5!important;box-shadow:none!important;opacity:.66!important;border-color:#d8dfe5!important;':''}">
     <div class="itemRow">${dragHandle}${!prepDay&&e.important?`<button type="button" class="importanceBtn on" data-action="importance" aria-label="중요 표시 해제" title="중요 표시 해제">★</button>`:''}${mainCheck}${missed?`<span class="prepMissedMark" title="못함">✕</span>`:''}<div class="itemTitle" title="${esc(tooltip)}">${timePrefix}<span class="durationPrefix">${esc(durationPrefix)}</span>${!prepDay&&payment?'₩ ':(!checkable&&!prepDay?kindPrefix(e):'')}${esc(shownTitle)}</div>${amountInline}${repeatBadge}${carryBadge}${checklistButton}</div>
     ${expanded?checklistHtml(e,false):''}
   </div>`;
@@ -2544,10 +2551,11 @@ function openPreparationPlan(id,focusDate=''){
   $('#prepPlanTitle').textContent=e.title;
   const prepProgress=preparationProgress(e);
   const prepComplete=preparationComplete(e,prepProgress);
+  const prepClosed=preparationClosed(e,prepProgress);
   const prepDlg=$('#prepPlanDlg'), completeBadge=$('#prepPlanCompleteBadge');
-  prepDlg?.classList.toggle('complete',prepComplete);
-  if(completeBadge) completeBadge.classList.toggle('hidden',!prepComplete);
-  $('#prepPlanSummary').textContent=`${preparationSummary(e)}${prepProgress.total?` · 완료 ${prepProgress.done}/${prepProgress.total}`:''}${prepProgress.missed?` · 못함 ${prepProgress.missed}`:''}`;
+  prepDlg?.classList.toggle('complete',prepClosed);
+  if(completeBadge){completeBadge.classList.toggle('hidden',!prepClosed);completeBadge.textContent=prepComplete?'✓ 완료':'마감 처리';}
+  $('#prepPlanSummary').textContent=`${preparationSummary(e)}${prepProgress.total?` · 완료 ${prepProgress.done}/${prepProgress.total}`:''}`;
   const memo=$('#prepPlanGeneralMemo');
   memo.textContent=''; memo.classList.add('hidden');
   const rows=entries.map(entry=>{
@@ -2559,7 +2567,7 @@ function openPreparationPlan(id,focusDate=''){
   if(!rows.length) rows.push(`<div class="prepPlanRow"><span class="prepPlanCheckSpacer"></span><div class="prepPlanDate">준비일정</div><div class="prepPlanText muted">등록된 준비 일정이 없습니다.</div></div>`);
   const deadline=e.prepDeadline||e.date, deadlineFocused=activePrepPlanDate&&deadline===activePrepPlanDate;
   const deadlineMemo=String(e.memo||'').trim();
-  rows.push(`<div class="prepPlanRow deadline ${prepComplete?'done completeDeadline':''} ${deadlineFocused?'focused':''}"><span class="prepPlanCheckSpacer">${prepComplete?'✓':''}</span><div class="prepPlanDate">마감일<small>${esc(deadline)}</small></div><div class="prepPlanText"><b>${esc(e.title)}</b>${e.place?`<br>${esc(e.place)}`:''}${deadlineMemo?`<div class="prepDeadlineMemo"><span>메모</span>${esc(deadlineMemo)}</div>`:''}</div></div>`);
+  rows.push(`<div class="prepPlanRow deadline ${prepClosed?'done completeDeadline':''} ${deadlineFocused?'focused':''}"><span class="prepPlanCheckSpacer">${prepComplete?'✓':''}</span><div class="prepPlanDate">마감일<small>${esc(deadline)}</small></div><div class="prepPlanText"><b>${esc(e.title)}</b>${e.place?`<br>${esc(e.place)}`:''}${deadlineMemo?`<div class="prepDeadlineMemo"><span>메모</span>${esc(deadlineMemo)}</div>`:''}</div></div>`);
   $('#prepPlanList').innerHTML=rows.join('');
   $('#prepPlanList').onclick=ev=>{
     const doneBtn=ev.target.closest('[data-prep-plan-check]');
@@ -4043,7 +4051,7 @@ function workMemoIsDone(e){
   if(e._prepDay)return preparationEntryDone(e,e._prepKey);
   if(isPreparationDeadlineOccurrence(e)){
     const p=preparationProgress(e);
-    if(p.total)return preparationComplete(e,p);
+    if(p.total)return preparationClosed(e,p);
   }
   return isDone(e);
 }
@@ -6136,7 +6144,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.98',
+    appVersion:'2.102',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state

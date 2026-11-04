@@ -3766,3 +3766,15 @@ body.todayWorkPopup .wmDayScroll{padding:6px 8px!important}
 #main .item.prepDayItem[data-prep-completed="no"] .itemTitle {
   text-decoration:none!important;
 }
+
+/* v2.102: moved preparation items use the original occurrence's checked state. */
+#main .item.prepDayItem[data-prep-completed="yes"],
+#dayListBody .item.prepDayItem[data-prep-completed="yes"]{
+  background:#f1f3f5!important;box-shadow:none!important;opacity:.66!important;
+  border-color:#d8dfe5!important;border-left-color:#b8c4ce!important;
+}
+#main .item.prepDayItem[data-prep-completed="yes"] .itemTitle,
+#dayListBody .item.prepDayItem[data-prep-completed="yes"] .itemTitle{color:#8a929b!important;font-weight:500!important;}
+.item.prepDeadlineItem.prepDeadlineClosed{background:#f1f3f5!important;box-shadow:none!important;opacity:.72!important;border-color:#d8dfe5!important;}
+.item.prepDeadlineItem.prepDeadlineClosed .itemTitle{color:#8a929b!important;font-weight:500!important;}
+.prepPlanRow.focused.done{background:#f2f4f5!important;border-color:#aebbc8!important;box-shadow:inset 3px 0 0 #aebbc8!important;}
