@@ -108,7 +108,7 @@ let lastFirebaseSavedAt = null;
 let lastLocalSavedAt = null;
 let localDirty = false;
 let writeInFlight = false;
-// v2.100: Firebase server is authoritative. Serialize writes and guard against
+// v2.101: Firebase server is authoritative. Serialize writes and guard against
 // older tabs/devices overwriting a newer confirmed server revision.
 let cloudRevision = 0;
 let cloudLegacyStamp = '';
@@ -1211,7 +1211,7 @@ function preparationVirtualEvent(e,entry){
   const note=typeof entry==='string'?preparationNoteForDate(e,date):String(entry.text||'').trim();
   const key=typeof entry==='string'?`auto:${entry}`:String(entry.key||'');
   const sourceDate=typeof entry==='string'?entry:String(entry.sourceDate||entry.date||'');
-  return {...e,_prepDay:true,_prepDate:date,_renderDate:date,_occurrenceStart:e.date,_occurrenceEnd:e.date,_prepNote:note,_prepKey:key,_prepMissed:preparationEntryMissed(e,key),_prepSourceDate:sourceDate,_prepType:typeof entry==='string'?'auto':String(entry.type||''),_prepRuleId:typeof entry==='string'?'':String(entry.ruleId||''),_prepRuleLabel:typeof entry==='string'?'':String(entry.ruleLabel||''),memoOriginalDate:e.memoPrepOrigins?.[key]||''};
+  return {...e,_prepDay:true,_prepDate:date,_renderDate:date,_occurrenceStart:e.date,_occurrenceEnd:e.date,_prepNote:note,_prepKey:key,_prepChecked:preparationEntryDone(e,key),_prepMissed:preparationEntryMissed(e,key),_prepSourceDate:sourceDate,_prepType:typeof entry==='string'?'auto':String(entry.type||''),_prepRuleId:typeof entry==='string'?'':String(entry.ruleId||''),_prepRuleLabel:typeof entry==='string'?'':String(entry.ruleLabel||''),memoOriginalDate:e.memoPrepOrigins?.[key]||''};
 }
 function isPreparationDeadlineOccurrence(e){
   if(!e?.prepEnabled || e?._prepDay) return false;
@@ -1428,7 +1428,7 @@ function eventItemHtml(e, compact=false){
   const deadlineComplete=!!deadlineProgress && preparationComplete(e,deadlineProgress);
   // 준비일정이 있는 마감 카드는 팝업에서 모든 준비항목을 완료했을 때만 완료 표시한다.
   // 준비항목이 전혀 없는 일정은 기존의 수동 완료 상태를 유지한다.
-  const done=prepDay?preparationEntryDone(e,e._prepKey)
+  const done=prepDay?(typeof e._prepChecked==='boolean'?e._prepChecked:preparationEntryDone(e,e._prepKey))
     :deadlineItem && deadlineProgress.total>0?deadlineComplete:isDone(e);
   const missed=prepDay?preparationEntryMissed(e,e._prepKey):false, checkable=e.kind!=='anniversary' && !prepDay;
   const recurring=(e.repeat||'none')!=='none';
@@ -1444,8 +1444,9 @@ function eventItemHtml(e, compact=false){
   // 일반 준비일은 그날 해야 할 업무만, 마감 관련 카드만 `준비마감`/`마감`을 표시한다.
   const prepTaskTitle=prepNote||'할 일 미입력';
   const basePrepTitle=prepDeadlineDay?`준비마감 · ${prepTaskTitle}`:prepTaskTitle;
+  const prepDisplayTitle=done?`✓ ${basePrepTitle}`:basePrepTitle;
   const shownTitle=prepDay
-    ? basePrepTitle
+    ? prepDisplayTitle
     : (deadlineItem?`마감 · ${e.title}`:e.title)+(e.memoOriginalDate&&e.memoOriginalDate!==renderDate?` (${Number(e.memoOriginalDate.slice(5,7))}/${Number(e.memoOriginalDate.slice(8,10))})`:'');
   const detail=[];
   if(prepDay){ detail.push(preparationSummary(e)); if(prepNote) detail.push(prepNote); }
@@ -1469,7 +1470,7 @@ function eventItemHtml(e, compact=false){
   const repeatBadge=!prepDay&&recurring?`<span class="repeatMark" title="${esc(repeatRuleLabel(e))}">↻</span>`:'';
   const carryBadge=inLabel?`<span class="carryBadge carryIn" title="${esc(inLabel)}">↪</span>`:'';
   const amountInline=!prepDay&&payment&&Number(e.paymentAmount)>0?`<span class="inlineMeta">₩${Number(e.paymentAmount).toLocaleString('ko-KR')}</span>`:'';
-  return `<div class="item ${done?'done':''} ${missed?'prepMissedItem':''} kind-${esc(e.kind||'event')} ${recurring&&!prepDay?'recurringItem':''} ${payment&&!prepDay?'paymentItem':''} ${e.fixedId?'manualPlacedItem':''} ${e.flexibleId?'flexiblePlacedItem':''} ${inLabel?'carriedIn':''} ${outRecord?'carriedOut':''} ${prepDay?'prepDayItem':''} ${prepDeadlineDay?'prepDeadlineDayItem':''} ${deadlineItem?'prepDeadlineItem':''} ${deadlineItem&&deadlineComplete?'prepDeadlineComplete':''}" draggable="${drag}" data-eid="${esc(e.id)}" data-occurrence="${esc(e._occurrenceStart||e.date)}" data-render-date="${esc(renderDate)}" data-cal-id="${esc(e.calId)}" data-lane="${payment?'payment':'work'}" data-prep-day="${prepDay?'1':''}" data-prep-key="${prepDay?esc(e._prepKey||''):''}" data-prep-source-date="${prepDay?esc(e._prepSourceDate||''):''}" data-prep-type="${prepDay?esc(e._prepType||''):''}" data-prep-rule-id="${prepDay?esc(e._prepRuleId||''):''}" data-prep-event="${e.prepEnabled?'1':''}" data-purchase-due="${purchaseDue?'1':''}" data-purchase-id="${purchaseDue?esc(e.purchaseId||''):''}" style="--item-color:${esc(c.color)};border-left-color:${esc(c.color)}">
+  return `<div class="item ${done?'done':''} ${missed?'prepMissedItem':''} kind-${esc(e.kind||'event')} ${recurring&&!prepDay?'recurringItem':''} ${payment&&!prepDay?'paymentItem':''} ${e.fixedId?'manualPlacedItem':''} ${e.flexibleId?'flexiblePlacedItem':''} ${inLabel?'carriedIn':''} ${outRecord?'carriedOut':''} ${prepDay?'prepDayItem':''} ${prepDeadlineDay?'prepDeadlineDayItem':''} ${deadlineItem?'prepDeadlineItem':''} ${deadlineItem&&deadlineComplete?'prepDeadlineComplete':''}" draggable="${drag}" data-eid="${esc(e.id)}" data-occurrence="${esc(e._occurrenceStart||e.date)}" data-render-date="${esc(renderDate)}" data-cal-id="${esc(e.calId)}" data-lane="${payment?'payment':'work'}" data-prep-day="${prepDay?'1':''}" data-prep-completed="${prepDay?(done?'yes':'no'):''}" data-prep-key="${prepDay?esc(e._prepKey||''):''}" data-prep-source-date="${prepDay?esc(e._prepSourceDate||''):''}" data-prep-type="${prepDay?esc(e._prepType||''):''}" data-prep-rule-id="${prepDay?esc(e._prepRuleId||''):''}" data-prep-event="${e.prepEnabled?'1':''}" data-purchase-due="${purchaseDue?'1':''}" data-purchase-id="${purchaseDue?esc(e.purchaseId||''):''}" style="--item-color:${esc(c.color)};border-left-color:${esc(c.color)}">
     <div class="itemRow">${dragHandle}${!prepDay&&e.important?`<button type="button" class="importanceBtn on" data-action="importance" aria-label="중요 표시 해제" title="중요 표시 해제">★</button>`:''}${mainCheck}${missed?`<span class="prepMissedMark" title="못함">✕</span>`:''}<div class="itemTitle" title="${esc(tooltip)}">${timePrefix}<span class="durationPrefix">${esc(durationPrefix)}</span>${!prepDay&&payment?'₩ ':(!checkable&&!prepDay?kindPrefix(e):'')}${esc(shownTitle)}</div>${amountInline}${repeatBadge}${carryBadge}${checklistButton}</div>
     ${expanded?checklistHtml(e,false):''}
   </div>`;
@@ -4320,7 +4321,7 @@ function closeWorkMemo(){
   $('#workMemoPanel')?.classList.add('hidden');
   document.body.classList.remove('wmBoardActive');
 }
-// v2.100 · 업무 화면/달력 묶음 팝업에서도 원본 일정의 세부 체크리스트를 표시합니다.
+// v2.101 · 업무 화면/달력 묶음 팝업에서도 원본 일정의 세부 체크리스트를 표시합니다.
 // 세부 항목은 별도의 일정으로 복제하지 않으며, 반복 회차별 완료 기록에 직접 연결합니다.
 function workMemoSubtasksMarkup(row){
   const e=row?.e;
