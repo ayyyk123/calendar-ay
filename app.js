@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '2.102',
+  version: '2.103',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -364,7 +364,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '2.102',
+    version: '2.103',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -2885,7 +2885,12 @@ function moveRecurringOccurrenceOnly(e,newDate,occ){
   if(!e.excludedDates.includes(occ)) e.excludedDates.push(occ);
   const wasDone=(e.doneDates||[]).includes(occ);
   const movedChecklistDone=Array.isArray(e.checklistDoneByDate?.[occ])?[...e.checklistDoneByDate[occ]]:[];
-  const detached={...structuredClone(e),id:uid(),date:newDate,endDate:ds(add(parse(newDate),span)),repeat:'none',repeatRule:null,excludedDates:[],done:wasDone,doneDates:[],checklistDoneByDate:movedChecklistDone.length?{[newDate]:movedChecklistDone}:{},orderByDate:{},repeatOrder:0,fixedId:null,detachedFromRepeatId:e.id,detachedOccurrence:occ};
+  // Preserve the original work-board group when splitting a recurring occurrence.
+  // Without this, a monthly payment moved one day earlier becomes repeat='none'
+  // and is incorrectly rendered as an extra task.
+  const sourceGroup=workMemoGroup(e);
+  const detached={...structuredClone(e),id:uid(),date:newDate,endDate:ds(add(parse(newDate),span)),repeat:'none',repeatRule:null,excludedDates:[],done:wasDone,doneDates:[],checklistDoneByDate:movedChecklistDone.length?{[newDate]:movedChecklistDone}:{},orderByDate:{},repeatOrder:0,fixedId:null,detachedFromRepeatId:e.id,detachedOccurrence:occ,
+    memoCategory:sourceGroup,memoEnabled:sourceGroup!=='off'};
   if(e.checklistDoneByDate?.[occ]) delete e.checklistDoneByDate[occ];
   detached.carryoverHistory=[];
   state.events.push(detached);
@@ -4018,6 +4023,15 @@ function workMemoGroup(e){
     if(e.memoFromDaily)return 'daily';
   }
   if(['off','daily','weekly','monthly','extra'].includes(e.memoCategory))return e.memoCategory;
+  // Repair previously moved recurring instances that predate the above fix:
+  // infer their group from the actual source series, rather than the split
+  // instance's repeat='none'. Do not alter persisted events while rendering.
+  if(e.detachedFromRepeatId){
+    const source=state.events.find(x=>String(x.id)===String(e.detachedFromRepeatId));
+    if(source && source!==e && (source.repeat||'none')!=='none' && isAdorableCalendar(source.calId)){
+      return workMemoGroup(source);
+    }
+  }
   if(e.fixedId && state.fixed.some(f=>String(f.id)===String(e.fixedId)))return 'monthly';
   if((e.repeat||'none')==='none')return 'extra';
   // 일업무를 월~목에만 반복 설정해도 일업무로 표시합니다.
@@ -6144,7 +6158,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.102',
+    appVersion:'2.103',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
