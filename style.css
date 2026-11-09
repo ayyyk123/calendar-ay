@@ -3778,3 +3778,58 @@ body.todayWorkPopup .wmDayScroll{padding:6px 8px!important}
 .item.prepDeadlineItem.prepDeadlineClosed{background:#f1f3f5!important;box-shadow:none!important;opacity:.72!important;border-color:#d8dfe5!important;}
 .item.prepDeadlineItem.prepDeadlineClosed .itemTitle{color:#8a929b!important;font-weight:500!important;}
 .prepPlanRow.focused.done{background:#f2f4f5!important;border-color:#aebbc8!important;box-shadow:inset 3px 0 0 #aebbc8!important;}
+
+/* v2.104 — D-Day: separate upcoming and elapsed anniversaries (presentation only). */
+#sidebar .ddayTabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:1px 0 7px}
+#sidebar .ddayTab{display:flex;align-items:center;justify-content:center;gap:4px;min-width:0;min-height:26px;padding:4px 3px!important;border:1px solid #d5dde7!important;border-radius:2px!important;background:#f7f9fb!important;color:#59677a!important;font-size:10px!important;font-weight:600!important;cursor:pointer}
+#sidebar .ddayTab span{font-weight:700;font-variant-numeric:tabular-nums;color:#6b7788}
+#sidebar .ddayTab.on{border-color:#7e9dc8!important;background:#e8f0ff!important;color:#254c83!important}
+#sidebar .ddayTab.on span{color:#254c83}
+#sidebar .ddayTab:focus-visible{outline:2px solid #476ea8;outline-offset:1px}
+#sidebar .ddayEntries{min-width:0}
+
+/* v2.104 · 날짜별 업무보드와 PIP 공통 접기/펼치기 (저장 데이터 변경 없음) */
+.wmPanel details.wmSection,
+.wmPanel details.wmMissedArea,
+#wmGroupPopup details.wmGroupPopupDetails,
+.wmPanel details.wmSubtaskList,
+#wmGroupPopup details.wmSubtaskList{min-width:0}
+.wmPanel details.wmSection>summary,
+.wmPanel details.wmMissedArea>summary,
+#wmGroupPopup details.wmGroupPopupDetails>summary,
+.wmPanel details.wmSubtaskList>summary,
+#wmGroupPopup details.wmSubtaskList>summary{list-style:none;cursor:pointer;user-select:none}
+.wmPanel details>summary::-webkit-details-marker,
+#wmGroupPopup details>summary::-webkit-details-marker{display:none}
+.wmPanel details.wmSection>summary.wmSectionTitle,
+.wmPanel details.wmMissedArea>summary.wmSectionTitle{display:flex!important;align-items:center;gap:7px!important}
+.wmPanel details.wmSection>summary.wmSectionTitle b,
+.wmPanel details.wmMissedArea>summary.wmSectionTitle b{margin-left:auto}
+.wmPanel details.wmSection>summary.wmSectionTitle::after,
+.wmPanel details.wmMissedArea>summary.wmSectionTitle::after,
+#wmGroupPopup details.wmGroupPopupDetails>summary::after{content:'⌄';font-size:16px;font-weight:500;color:#70849b;line-height:1;flex:none;margin-left:3px;transition:transform .13s ease}
+.wmPanel details.wmSection:not([open])>summary.wmSectionTitle::after,
+.wmPanel details.wmMissedArea:not([open])>summary.wmSectionTitle::after,
+#wmGroupPopup details.wmGroupPopupDetails:not([open])>summary::after{transform:rotate(-90deg)}
+.wmPanel details.wmSection:not([open])>summary.wmSectionTitle,
+.wmPanel details.wmMissedArea:not([open])>summary.wmSectionTitle{border-bottom:none}
+.wmPanel details.wmSection>summary.wmSectionTitle:hover,
+.wmPanel details.wmMissedArea>summary.wmSectionTitle:hover,
+#wmGroupPopup details.wmGroupPopupDetails>summary:hover{filter:brightness(.98)}
+.wmPanel details.wmSection>summary:focus-visible,
+.wmPanel details.wmMissedArea>summary:focus-visible,
+.wmPanel details.wmSubtaskList>summary:focus-visible,
+#wmGroupPopup details>summary:focus-visible{outline:2px solid #4082c2;outline-offset:-2px}
+.wmPanel details.wmSubtaskList>summary.wmSubtaskHead,
+#wmGroupPopup details.wmSubtaskList>summary.wmSubtaskHead{display:flex!important;align-items:center;gap:5px;min-height:17px;margin:0;padding:1px 0 2px}
+.wmPanel details.wmSubtaskList>summary.wmSubtaskHead::before,
+#wmGroupPopup details.wmSubtaskList>summary.wmSubtaskHead::before{content:'▾';font-size:12px;color:#72859a;margin-right:1px}
+.wmPanel details.wmSubtaskList:not([open])>summary.wmSubtaskHead::before,
+#wmGroupPopup details.wmSubtaskList:not([open])>summary.wmSubtaskHead::before{content:'▸'}
+.wmPanel details.wmSubtaskList .wmSubtaskBody,
+#wmGroupPopup details.wmSubtaskList .wmSubtaskBody{padding-top:3px}
+#wmGroupPopup .wmGroupPopupDetails{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+#wmGroupPopup .wmGroupPopupDetails:not([open]){display:block}
+#wmGroupPopup .wmGroupPopupFold{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 11px;background:#f5f8fc;color:#415c77;font-size:11px;font-weight:650;border-bottom:1px solid #e2e9f2}
+#wmGroupPopup .wmGroupPopupFold b{font-size:10px;margin-left:auto;font-weight:600}
+#wmGroupPopup .wmGroupPopupList{flex:1;min-height:0;overflow-y:auto}

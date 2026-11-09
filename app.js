@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '2.103',
+  version: '2.104',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -86,6 +86,8 @@ const defaultState = () => ({
 });
 
 let state = defaultState();
+// v2.104: D-Day tab is purely a per-window view preference; no Firebase write.
+let ddayActiveTab = 'upcoming';
 let cursor = new Date();
 let view = 'week';
 let mobileSelectedDate = '';
@@ -364,7 +366,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '2.103',
+    version: '2.104',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -2286,22 +2288,45 @@ function selectedDdayMarkerHtml(date, extraClass=''){
   const label=selectedDdayOffset(date);
   return `<span class="selectedDdayMarker ${esc(extraClass)}" title="${esc(info.e.title)} · ${esc(info.target)} 기준">${esc(label)}</span>`;
 }
+// Separate elapsed anniversaries from upcoming ones without modifying their records.
+// A repeating anniversary is upcoming when it has a next occurrence; an expired
+// repeating anniversary is kept in the elapsed tab at its last occurrence.
+function ddayDisplayEntries(today=ds(new Date())){
+  return state.events.filter(e=>e.kind==='anniversary').map(e=>{
+    let target=String(e.date||'');
+    if((e.repeat||'none')!=='none'){
+      const next=nextOccurrenceFor(e,today,3653);
+      if(next) target=next;
+      else if(target<today){
+        const past=generateOccurrenceStarts(e,e.date,today).map(ds).filter(d=>d<today);
+        target=past.length ? past[past.length-1] : target;
+      }
+    }
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(target)) return null;
+    return {e,target,diff:diffDays(today,target)};
+  }).filter(Boolean);
+}
 function renderDdays(){
   const today=ds(new Date());
   const selectedId=String(state.settings?.selectedDdayId||'');
-  const rows=state.events.filter(e=>e.kind==='anniversary').map(e=>{
-    let target;
-    if((e.repeat||'none')==='none') target=e.date;
-    else target=nextOccurrenceFor(e,today,740);
-    if(!target) return null;
-    return {e,target,diff:diffDays(today,target)};
-  }).filter(Boolean).sort((a,b)=>Math.abs(a.diff)-Math.abs(b.diff)).slice(0,8);
-  $('#ddayList').innerHTML=rows.map(({e,target,diff})=>{
+  const entries=ddayDisplayEntries(today);
+  const upcoming=entries.filter(x=>x.diff>=0).sort((a,b)=>(a.diff-b.diff)||a.e.title.localeCompare(b.e.title,'ko'));
+  const elapsed=entries.filter(x=>x.diff<0).sort((a,b)=>(b.diff-a.diff)||a.e.title.localeCompare(b.e.title,'ko'));
+  const active=ddayActiveTab==='elapsed'?'elapsed':'upcoming';
+  const rows=active==='elapsed'?elapsed:upcoming;
+  const tabs=`<div class="ddayTabs" role="group" aria-label="D-Day 목록 구분"><button type="button" class="ddayTab ${active==='upcoming'?'on':''}" data-dday-tab="upcoming" aria-pressed="${active==='upcoming'}" aria-label="다가올 D-Day ${upcoming.length}건">다가올 <span>${upcoming.length}</span></button><button type="button" class="ddayTab ${active==='elapsed'?'on':''}" data-dday-tab="elapsed" aria-pressed="${active==='elapsed'}" aria-label="지난 D-Day ${elapsed.length}건">지난 <span>${elapsed.length}</span></button></div>`;
+  const list=rows.map(({e,target,diff})=>{
     const selected=e.id===selectedId;
     const ddayText=diff===0?'D-Day':diff>0?`D-${diff}`:`D+${Math.abs(diff)}`;
     return `<div class="ddayRow ${selected?'selectedDday':''}" data-eid="${esc(e.id)}" role="button" tabindex="0" title="클릭: 달력 D-Day 기준 ${selected?'해제':'선택'}"><div class="ddayInfo">${esc(e.title)}<small>${target}</small>${selected?'<em class="ddaySelectedTag">기준</em>':''}</div><div class="ddayActions"><b>${ddayText}</b><button type="button" class="ddayEditBtn" data-dday-edit="${esc(e.id)}" title="D-Day 수정" aria-label="D-Day 수정">✎</button></div></div>`;
-  }).join('')||'<div class="empty">등록된 기념일이 없습니다.</div>';
-  $$('.ddayRow').forEach(x=>{
+  }).join('')||`<div class="empty">${active==='elapsed'?'지난 D-Day가 없습니다.':'다가올 D-Day가 없습니다.'}</div>`;
+  $('#ddayList').innerHTML=tabs+`<div class="ddayEntries">${list}</div>`;
+  $$('#ddayList [data-dday-tab]').forEach(btn=>btn.onclick=()=>{
+    if(ddayActiveTab===btn.dataset.ddayTab) return;
+    ddayActiveTab=btn.dataset.ddayTab;
+    renderDdays(); // Viewing a tab does not alter or save the calendar.
+  });
+  $$('#ddayList .ddayRow').forEach(x=>{
     const toggle=()=>{
       const id=x.dataset.eid||'';
       state.settings.selectedDdayId=state.settings.selectedDdayId===id?'':id;
@@ -2310,7 +2335,7 @@ function renderDdays(){
     x.onclick=e=>{ if(e.target.closest('.ddayEditBtn')) return; toggle(); };
     x.onkeydown=e=>{ if((e.key==='Enter'||e.key===' ') && !e.target.closest('.ddayEditBtn')){ e.preventDefault(); toggle(); } };
   });
-  $$('.ddayEditBtn').forEach(btn=>btn.onclick=e=>{ e.preventDefault(); e.stopPropagation(); openEvent(null,btn.dataset.ddayEdit); });
+  $$('#ddayList .ddayEditBtn').forEach(btn=>btn.onclick=e=>{ e.preventDefault(); e.stopPropagation(); openEvent(null,btn.dataset.ddayEdit); });
 }
 
 function diaryEntries(){
@@ -4129,11 +4154,12 @@ function refreshWorkGroupPopup(){
   const label=WM_GROUPS.find(x=>x[0]===kind)?.[1]||'업무';
   const rows=workMemoTasks(date).filter(x=>x.kind===kind);
   const currentScroll=pop.querySelector('.wmGroupPopupList')?.scrollTop||0;
-  pop.innerHTML=`<div class="wmGroupPopupHeader"><strong>${esc(workMemoShortDate(date))} ${esc(label)} <small>${rows.filter(x=>x.done).length}/${rows.length}</small></strong><button type="button" data-wm-popup-close aria-label="목록 닫기">✕</button></div><p class="wmGroupPopupHelp">미완료 업무를 잡아 달력의 다른 날짜로 드래그하세요. 휴대폰은 날짜를 선택해 이동할 수 있어요.</p><div class="wmGroupPopupList">${rows.length?rows.map(row=>{
+  const popupFoldKey=`popup|${date}|${kind}`;
+  pop.innerHTML=`<div class="wmGroupPopupHeader"><strong>${esc(workMemoShortDate(date))} ${esc(label)} <small>${rows.filter(x=>x.done).length}/${rows.length}</small></strong><button type="button" data-wm-popup-close aria-label="목록 닫기">✕</button></div><details class="wmGroupPopupDetails" data-wm-fold-key="${esc(popupFoldKey)}"${wmFoldOpen(popupFoldKey)}><summary class="wmGroupPopupFold">${esc(label)} 목록 <b>${rows.length}건</b></summary><p class="wmGroupPopupHelp">미완료 업무를 잡아 달력의 다른 날짜로 드래그하세요. 휴대폰은 날짜를 선택해 이동할 수 있어요.</p><div class="wmGroupPopupList">${rows.length?rows.map(row=>{
     const moveable=!row.done && (!!row.e || !!row.custom);
     const origin=row.originDate&&row.originDate!==date?` <small>(${esc(workMemoShortDate(row.originDate))})</small>`:'';
     return `<div class="wmPopupTask ${row.done?'completed':''}" data-wm-popup-key="${esc(row.key)}" ${moveable?'draggable="true"':''}><div class="wmPopupTaskMain"><input type="checkbox" data-wm-popup-check="${esc(row.key)}" ${row.done?'checked':''} ${row.e?.kind==='anniversary'?'disabled':''}><span title="${moveable?'드래그해서 날짜 이동':''}">${moveable?'<span class="wmDragGrip">⠿</span> ':''}${esc(row.title)}${origin}</span></div>${workMemoSubtasksMarkup(row)}<div class="wmPopupTaskActions"><button type="button" data-wm-popup-edit>✎ 수정·삭제</button>${moveable?`<input type="date" aria-label="이동할 날짜" value="${date}"><button type="button" data-wm-popup-move>이동</button>`:''}</div></div>`;
-  }).join(''):'<div class="wmGroupPopupEmpty">해당 날짜의 업무가 없습니다.</div>'}</div>`;
+  }).join(''):'<div class="wmGroupPopupEmpty">해당 날짜의 업무가 없습니다.</div>'}</div></details>`;
   pop.classList.remove('hidden');
   const list=pop.querySelector('.wmGroupPopupList');if(list)list.scrollTop=currentScroll;
   positionWorkGroupPopup(anchor);
@@ -4343,6 +4369,18 @@ function closeWorkMemo(){
   $('#workMemoPanel')?.classList.add('hidden');
   document.body.classList.remove('wmBoardActive');
 }
+// v2.104 · 접기/펼치기는 화면 상태만 기록합니다. 일정 데이터/Firebase에 저장하지 않습니다.
+// 체크한 뒤 다시 렌더링되어도 각 날짜, 업무 종류, 세부 체크리스트의 접힘 상태를 유지합니다.
+const wmDisclosureStates = new Map();
+function wmFoldOpen(key){ return wmDisclosureStates.get(key)!==false ? ' open' : ''; }
+function wmRememberDisclosureToggle(event){
+  const details=event.target;
+  if(details?.matches?.('details[data-wm-fold-key]')){
+    wmDisclosureStates.set(details.dataset.wmFoldKey,details.open);
+  }
+}
+// toggle 이벤트는 버블링하지 않으므로 캡처 단계에서 처리합니다.
+document.addEventListener('toggle',wmRememberDisclosureToggle,true);
 // v2.101 · 업무 화면/달력 묶음 팝업에서도 원본 일정의 세부 체크리스트를 표시합니다.
 // 세부 항목은 별도의 일정으로 복제하지 않으며, 반복 회차별 완료 기록에 직접 연결합니다.
 function workMemoSubtasksMarkup(row){
@@ -4352,10 +4390,11 @@ function workMemoSubtasksMarkup(row){
   if(!items.length)return '';
   const occ=checklistOccurrenceKey(e),doneSet=checklistDoneSet(e,occ);
   const completed=items.reduce((n,x)=>n+Number(doneSet.has(String(x.id))),0);
-  return `<div class="wmSubtaskList" aria-label="${esc(row.title)} 세부 체크리스트">
-    <div class="wmSubtaskHead">세부 체크리스트 <span>${completed}/${items.length}</span></div>
-    ${items.map(x=>{const checked=doneSet.has(String(x.id));return `<label class="wmSubtask ${checked?'done':''}"><input type="checkbox" data-wm-subcheck="${esc(row.key)}" data-wm-subid="${esc(x.id)}" ${checked?'checked':''}><span>${esc(x.text)}</span></label>`;}).join('')}
-  </div>`;
+  const foldKey=`sub|${row.sourceDate||''}|${row.key}`;
+  return `<details class="wmSubtaskList" data-wm-fold-key="${esc(foldKey)}" aria-label="${esc(row.title)} 세부 체크리스트"${wmFoldOpen(foldKey)}>
+    <summary class="wmSubtaskHead">세부 체크리스트 <span>${completed}/${items.length}</span></summary>
+    <div class="wmSubtaskBody">${items.map(x=>{const checked=doneSet.has(String(x.id));return `<label class="wmSubtask ${checked?'done':''}"><input type="checkbox" data-wm-subcheck="${esc(row.key)}" data-wm-subid="${esc(x.id)}" ${checked?'checked':''}><span>${esc(x.text)}</span></label>`;}).join('')}</div>
+  </details>`;
 }
 function workMemoToggleSubtask(key,subId,date){
   const row=workMemoTasks(date).find(x=>x.key===key);
@@ -4396,13 +4435,15 @@ function workMemoDayCard(date){
   if(workMemoMissedDates.has(date)){
     const prev=ds(add(parse(date),-1)),pending=workMemoMissedTasks(date);
     workMemoMissedByDate.set(date,pending);
-    missed=`<section class="wmMissedArea"><div class="wmSectionTitle">${esc(workMemoShortDate(prev))} 미완료 <b>${pending.length}건</b></div>${pending.length?pending.map((x,i)=>`<div class="wmMissed" data-wm-missed="${i}"><strong>${esc(x.title)}${x.originDate?` (${esc(workMemoShortDate(x.originDate))})`:''}</strong><div class="wmMissedAction"><button type="button" data-wm-today="${i}">오늘로</button><input type="date" value="${date}" aria-label="이동 날짜"><button type="button" data-wm-move="${i}">날짜 지정</button></div></div>`).join(''):'<div class="wmEmpty">전날 미완료 업무 없음</div>'}</section>`;
+    const missedKey=`missed|${date}`;
+    missed=`<details class="wmMissedArea" data-wm-fold-key="${esc(missedKey)}"${wmFoldOpen(missedKey)}><summary class="wmSectionTitle">${esc(workMemoShortDate(prev))} 미완료 <b>${pending.length}건</b></summary>${pending.length?pending.map((x,i)=>`<div class="wmMissed" data-wm-missed="${i}"><strong>${esc(x.title)}${x.originDate?` (${esc(workMemoShortDate(x.originDate))})`:''}</strong><div class="wmMissedAction"><button type="button" data-wm-today="${i}">오늘로</button><input type="date" value="${date}" aria-label="이동 날짜"><button type="button" data-wm-move="${i}">날짜 지정</button></div></div>`).join(''):'<div class="wmEmpty">전날 미완료 업무 없음</div>'}</details>`;
   }
   const sections=WM_GROUPS.map(([kind,title])=>{
     const items=rows.filter(x=>x.kind===kind),done=items.filter(x=>x.done).length;
     const moved=activeMoved.filter(x=>(x.group||(x.daily?'daily':'extra'))===kind);
     const stat=moved.length?`${done}/${items.length}/${items.length+moved.length}`:`${done}/${items.length}`;
-    return `<section class="wmSection wmSection-${kind}" data-wm-section="${kind}"><div class="wmSectionTitle">${title} <b>${stat}</b></div>${list(items)}</section>`;
+    const foldKey=`group|${date}|${kind}`;
+    return `<details class="wmSection wmSection-${kind}" data-wm-section="${kind}" data-wm-fold-key="${esc(foldKey)}"${wmFoldOpen(foldKey)}><summary class="wmSectionTitle">${title} <b>${stat}</b></summary>${list(items)}</details>`;
   }).join('');
   return `<article class="wmDayCard ${today?'wmTodayCard':''}" data-wm-date="${date}">
     <div class="wmDayHead"><div><strong>${Number(date.slice(5,7))}/${Number(date.slice(8,10))} <span>(${wd})</span></strong>${today?'<em>오늘</em>':''}</div><div class="wmDayHeadActions">${isTodayWorkPopup?`<button type="button" class="wmCompactNav" data-wm-compact-prev aria-label="이전 날짜">‹</button><input class="wmCompactDate" type="date" data-wm-compact-date value="${date}" aria-label="업무 날짜 선택"><button type="button" class="wmCompactNav" data-wm-compact-next aria-label="다음 날짜">›</button>`:''}<small>${progress}/${rows.length}</small>${!isTodayWorkPopup?`<button type="button" data-wm-popout="${date}" title="${esc(workMemoShortDate(date))} 업무를 별도 창에서 보기">↗ 팝업</button>`:''}</div></div>
@@ -4411,7 +4452,7 @@ function workMemoDayCard(date){
     ${missed}
     ${sections}
     ${activeMoved.length?`<details class="wmHistory"><summary>다른 날짜로 옮긴 일 ${activeMoved.length}건</summary>${activeMoved.map(x=>`<div>${esc(x.title)} → ${esc(workMemoShortDate(x.toDate))}</div>`).join('')}</details>`:''}
-    <section class="wmSection wmNoteSection"><div class="wmSectionTitle">메모</div><textarea data-wm-note="${date}" placeholder="그날의 메모를 자유롭게 작성">${esc(n.freeText)}</textarea></section>
+    <details class="wmSection wmNoteSection" data-wm-fold-key="${esc(`note|${date}`)}"${wmFoldOpen(`note|${date}`)}><summary class="wmSectionTitle">메모</summary><textarea data-wm-note="${date}" placeholder="그날의 메모를 자유롭게 작성">${esc(n.freeText)}</textarea></details>
     </div></article>`;
 }
 function renderWorkMemoPanel(){
@@ -6158,7 +6199,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.103',
+    appVersion:'2.104',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
