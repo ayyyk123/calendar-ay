@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '2.105',
+  version: '2.106',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -366,7 +366,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '2.105',
+    version: '2.106',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -1617,6 +1617,100 @@ function syncSelects(){
   selectedFlexibleFilter='all';
   selectedPaymentFilter='all';
 }
+// v2.106: 캘린더 목록에서 직접 순서 변경. 상위/하위 관계는 변경하지 않습니다.
+// 같은 상위 아래의 캘린더만 재배열하며, 상위 항목을 옮길 때 하위 목록은 함께 이동합니다.
+function calendarSiblings(parentId=''){
+  return sortedRawCals(state.calendars.filter(c=>(c.parentId||'')===(parentId||'')));
+}
+function reorderCalendarSibling(sourceId, targetId, placeBefore){
+  const source=state.calendars.find(c=>c.id===sourceId);
+  const target=state.calendars.find(c=>c.id===targetId);
+  if(!source||!target||source.id===target.id||(source.parentId||'')!==(target.parentId||'')) return false;
+  const siblings=calendarSiblings(source.parentId||'');
+  const oldIds=siblings.map(c=>c.id);
+  const nextIds=oldIds.filter(id=>id!==sourceId);
+  const at=nextIds.indexOf(targetId);
+  if(at<0) return false;
+  nextIds.splice(at+(placeBefore?0:1),0,sourceId);
+  if(oldIds.every((id,i)=>id===nextIds[i])) return false;
+  // 기존 저장 포맷 order를 그대로 사용해 다른 화면/기기에서도 같은 순서로 정렬되게 합니다.
+  nextIds.forEach((id,i)=>{ const c=state.calendars.find(x=>x.id===id); if(c) c.order=i+1; });
+  return true;
+}
+function bindCalendarListReorder(){
+  const list=$('#calList'); if(!list) return;
+  let drag=null;
+  const clearMarks=()=>list.querySelectorAll('.calDragSource,.calDropBefore,.calDropAfter').forEach(row=>row.classList.remove('calDragSource','calDropBefore','calDropAfter'));
+  const targetAt=(x,y)=>{
+    if(!drag) return null;
+    const row=document.elementFromPoint(x,y)?.closest('#calList .calRow');
+    if(!row) return null;
+    let target=state.calendars.find(c=>c.id===row.dataset.cid);
+    if(!target) return null;
+    // 상위 캘린더를 하위 캘린더 위에 놓아도 그 상위 그룹을 기준으로 이동합니다.
+    if(!drag.parentId && target.parentId) target=topAncestor(target);
+    if(!target || target.id===drag.id || (target.parentId||'')!==drag.parentId) return null;
+    const targetRow=[...list.querySelectorAll('.calRow')].find(r=>r.dataset.cid===target.id);
+    if(!targetRow) return null;
+    const rect=targetRow.getBoundingClientRect();
+    return {id:target.id, row:targetRow, before:y<rect.top+rect.height/2};
+  };
+  const redrawMarks=()=>{
+    clearMarks();
+    if(!drag?.started) return;
+    drag.row.classList.add('calDragSource');
+    if(drag.target)drag.target.row.classList.add(drag.target.before?'calDropBefore':'calDropAfter');
+  };
+  list.querySelectorAll('.calDragGrip').forEach(grip=>{
+    grip.onpointerdown=e=>{
+      if(e.isPrimary===false || (e.pointerType==='mouse'&&e.button!==0))return;
+      const row=grip.closest('.calRow'), source=state.calendars.find(c=>c.id===row?.dataset.cid);
+      if(!row||!source)return;
+      e.preventDefault();
+      drag={id:source.id,parentId:source.parentId||'',row,pointerId:e.pointerId,x:e.clientX,y:e.clientY,started:false,target:null,grip};
+      try{grip.setPointerCapture(e.pointerId);}catch{}
+    };
+    grip.onpointermove=e=>{
+      if(!drag||drag.grip!==grip||e.pointerId!==drag.pointerId)return;
+      if(!drag.started && Math.hypot(e.clientX-drag.x,e.clientY-drag.y)<5)return;
+      drag.started=true;
+      // 사이드바가 길어도 가장자리에서 스크롤을 내려 대상 행을 찾을 수 있습니다.
+      const side=$('#sidebar'), bounds=side?.getBoundingClientRect();
+      if(side&&bounds){
+        if(e.clientY>bounds.bottom-25)side.scrollTop+=14;
+        else if(e.clientY<bounds.top+25)side.scrollTop-=14;
+      }
+      drag.target=targetAt(e.clientX,e.clientY);
+      redrawMarks();
+    };
+    const finish=e=>{
+      if(!drag||drag.grip!==grip||e.pointerId!==drag.pointerId)return;
+      const current=drag;
+      try{if(grip.hasPointerCapture(e.pointerId))grip.releasePointerCapture(e.pointerId);}catch{}
+      clearMarks();drag=null;
+      if(e.type!=='pointerup'||!current.started||!current.target)return;
+      if(reorderCalendarSibling(current.id,current.target.id,current.target.before)) save();
+    };
+    grip.onpointerup=finish;
+    grip.onpointercancel=finish;
+    // 키보드도 위/아래 화살표로 같은 수준의 순서를 변경할 수 있습니다.
+    grip.onkeydown=e=>{
+      if(e.key!=='ArrowUp'&&e.key!=='ArrowDown')return;
+      e.preventDefault();
+      const id=grip.closest('.calRow')?.dataset.cid, source=state.calendars.find(c=>c.id===id);
+      if(!source)return;
+      const siblings=calendarSiblings(source.parentId||'');
+      const index=siblings.findIndex(c=>c.id===id), step=e.key==='ArrowUp'?-1:1;
+      if(index<0||index+step<0||index+step>=siblings.length)return;
+      const target=siblings[index+step];
+      if(reorderCalendarSibling(id,target.id,step<0)){
+        save();
+        const newGrip=[...list.querySelectorAll('.calRow')].find(r=>r.dataset.cid===id)?.querySelector('.calDragGrip');
+        newGrip?.focus();
+      }
+    };
+  });
+}
 function renderSide(){
   applySidebarSectionOrder();
   bindSidebarSectionReorder();
@@ -1627,7 +1721,7 @@ function renderSide(){
   $('#calList').classList.toggle('hasCalendarSelection',calendarFocusIds.size>0);
   $('#calList').innerHTML=cals().map(c=>{
     const depth=calendarDepth(c.id), focused=calendarFocusIds.has(c.id);
-    return `<div class="calRow ${depth?'subCalendarRow':''} ${focused?'calendarFocused':''}" data-cid="${esc(c.id)}" style="--cal-depth:${depth}"><input class="calVisible" type="checkbox" ${isCalendarHidden(c.id)?'':'checked'} title="표시/숨김"><i class="dot" style="background:${esc(c.color)}"></i><button type="button" class="calNameBtn" aria-pressed="${focused?'true':'false'}" title="${esc(c.name)} 필터 선택/해제 · 여러 캘린더 동시 선택 가능">${esc(c.name)}</button><small>${esc(c.period)}</small><button type="button" class="calEdit" title="캘린더 수정" aria-label="${esc(c.name)} 수정">✎</button></div>`;
+    return `<div class="calRow ${depth?'subCalendarRow':''} ${focused?'calendarFocused':''}" data-cid="${esc(c.id)}" style="--cal-depth:${depth}"><button type="button" class="calDragGrip" title="${esc(c.name)} 순서 바꾸기 · 끌어서 이동 (키보드 ↑↓ 가능)" aria-label="${esc(c.name)} 순서 변경" aria-roledescription="순서 변경 손잡이">⠿</button><input class="calVisible" type="checkbox" ${isCalendarHidden(c.id)?'':'checked'} title="표시/숨김"><i class="dot" style="background:${esc(c.color)}"></i><button type="button" class="calNameBtn" aria-pressed="${focused?'true':'false'}" title="${esc(c.name)} 필터 선택/해제 · 여러 캘린더 동시 선택 가능">${esc(c.name)}</button><small>${esc(c.period)}</small><button type="button" class="calEdit" title="캘린더 수정" aria-label="${esc(c.name)} 수정">✎</button></div>`;
   }).join('');
   $$('.calRow').forEach(row=>{
     row.querySelector('.calVisible').onclick=e=>{
@@ -1657,6 +1751,7 @@ function renderSide(){
     };
     row.querySelector('.calEdit').onclick=e=>{ e.stopPropagation(); openCal(row.dataset.cid); };
   });
+  bindCalendarListReorder();
   state.settings.fixedPanelsCollapsed=state.settings.fixedPanelsCollapsed||{};
   state.settings.fixedPanelsCollapsed.flexible=false;
   state.settings.fixedPanelsCollapsed.purchase=false;
@@ -5782,7 +5877,7 @@ function openCal(id){
   $('#cid').value=c?.id||''; $('#cname').value=c?.name||''; $('#ccolor').value=c?.color||'#d9d9d9';
   $('#cparent').innerHTML=`<option value="">없음 (기본 캘린더)</option>${parentOptionsFor(c?.id||'')}`;
   $('#cparent').value=c?.parentId||'';
-  $('#corder').value=c?.order||state.calendars.length+1; $('#cperiod').value=c?.period||'오전';
+  $('#cperiod').value=c?.period||'오전';
   for(const dow of [1,2,3,4,5,6,0]){
     const src=c?.capacityByDay?.[dow]??c?.capacityByDay?.[String(dow)]??{hours:c?.capacity??8,unknown:!!c?.capacityUnknown};
     const inp=document.querySelector(`[data-cap-dow="${dow}"]`), chk=document.querySelector(`[data-cap-unknown="${dow}"]`);
@@ -5807,7 +5902,10 @@ $('#calForm').onsubmit=e=>{
   if(id && (parentId===id || descendants(id).some(c=>c.id===parentId))){ alert('자기 자신 또는 자신의 부속캘린더를 상위 캘린더로 지정할 수 없습니다.'); return; }
   const capacityByDay=Object.fromEntries([0,1,2,3,4,5,6].map(d=>{ const inp=document.querySelector(`[data-cap-dow="${d}"]`), chk=document.querySelector(`[data-cap-unknown="${d}"]`); return [d,{hours:Number(inp?.value)||0,unknown:!!chk?.checked}]; }));
   const known=[0,1,2,3,4,5,6].map(d=>capacityByDay[d]).filter(x=>!x.unknown), avg=known.length?known.reduce((a,x)=>a+x.hours,0)/known.length:0;
-  const obj={id:id||uid(),name:$('#cname').value.trim(),color:$('#ccolor').value,order:Number($('#corder').value)||1,period:$('#cperiod').value,capacity:avg,capacityUnknown:known.length===0,capacityByDay,parentId};
+  const previous=state.calendars.find(c=>c.id===id);
+  const sameParent=previous && (previous.parentId||'')===parentId;
+  const nextOrder=sameParent ? previous.order : (Math.max(0,...state.calendars.filter(c=>c.id!==id&&(c.parentId||'')===parentId).map(c=>Number(c.order)||0))+1);
+  const obj={id:id||uid(),name:$('#cname').value.trim(),color:$('#ccolor').value,order:nextOrder,period:$('#cperiod').value,capacity:avg,capacityUnknown:known.length===0,capacityByDay,parentId};
   if(id) state.calendars[state.calendars.findIndex(x=>x.id===id)]=obj; else state.calendars.push(obj);
   closeDialog($('#calDlg')); save();
 };
@@ -6204,7 +6302,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.105',
+    appVersion:'2.106',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state

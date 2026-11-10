@@ -3841,3 +3841,17 @@ body.todayWorkPopup .wmDayScroll{padding:6px 8px!important}
 #wmGroupPopup .wmImportantStar{font-size:12px;margin-right:5px}
 .wmMissed .wmImportantStar{margin-right:5px}
 .wmTask.done .wmImportantStar,.wmPopupTask.completed .wmImportantStar{opacity:.7}
+
+
+/* v2.106 · 캘린더 목록 드래그 순서 변경 (마우스·터치·키보드) */
+#calList .calRow{grid-template-columns:19px auto 11px minmax(0,1fr) auto auto;column-gap:5px;position:relative;min-height:31px}
+#calList .calDragGrip{display:grid;place-items:center;width:19px;height:24px;min-width:19px;padding:0!important;margin:0;border:0!important;background:transparent!important;color:#8a96a6;font-size:17px;line-height:1;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
+#calList .calDragGrip:hover,#calList .calDragGrip:focus-visible{color:#3566ad;background:#edf4ff!important;outline:1px solid #aac6e8;border-radius:4px}
+#calList .calDragGrip:active{cursor:grabbing}
+#calList .calRow.calDragSource{background:#edf4ff;opacity:.72}
+#calList .calRow.calDropBefore::before,#calList .calRow.calDropAfter::after{content:"";position:absolute;z-index:6;left:2px;right:2px;height:3px;background:#3277e5;border-radius:3px;pointer-events:none}
+#calList .calRow.calDropBefore::before{top:-2px}
+#calList .calRow.calDropAfter::after{bottom:-2px}
+#calList .calRow.calDropBefore,#calList .calRow.calDropAfter{background:#eef5ff}
+.calReorderHint{display:block;margin:3px 1px 8px 9px;font-size:10px;line-height:1.35;color:#8090a4}
+@media(max-width:760px){#calList .calRow{grid-template-columns:19px auto 11px minmax(0,1fr) auto auto;column-gap:4px}#calList .calDragGrip{width:19px;min-width:19px;height:30px}}
