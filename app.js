@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '2.104',
+  version: '2.105',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -366,7 +366,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '2.104',
+    version: '2.105',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -4094,6 +4094,11 @@ function workMemoIsDone(e){
   }
   return isDone(e);
 }
+// v2.105 · 업무 목록/PIP/달력 상세 팝업에 달력의 중요(★) 표시를 동일하게 반영합니다.
+// 읽기 전용 표시이므로 중요 상태나 완료 기록을 다시 저장하지 않습니다.
+function workMemoStarMarkup(row){
+  return row?.e?.important ? '<span class="wmImportantStar" title="중요 업무" aria-label="중요 업무">★</span>' : '';
+}
 function workMemoTitle(e){
   if(e._purchaseDue)return `구매 · ${e.title}`;
   if(e._prepDay)return String(e._prepNote||'').trim()||`준비 · ${e.title}`;
@@ -4158,7 +4163,7 @@ function refreshWorkGroupPopup(){
   pop.innerHTML=`<div class="wmGroupPopupHeader"><strong>${esc(workMemoShortDate(date))} ${esc(label)} <small>${rows.filter(x=>x.done).length}/${rows.length}</small></strong><button type="button" data-wm-popup-close aria-label="목록 닫기">✕</button></div><details class="wmGroupPopupDetails" data-wm-fold-key="${esc(popupFoldKey)}"${wmFoldOpen(popupFoldKey)}><summary class="wmGroupPopupFold">${esc(label)} 목록 <b>${rows.length}건</b></summary><p class="wmGroupPopupHelp">미완료 업무를 잡아 달력의 다른 날짜로 드래그하세요. 휴대폰은 날짜를 선택해 이동할 수 있어요.</p><div class="wmGroupPopupList">${rows.length?rows.map(row=>{
     const moveable=!row.done && (!!row.e || !!row.custom);
     const origin=row.originDate&&row.originDate!==date?` <small>(${esc(workMemoShortDate(row.originDate))})</small>`:'';
-    return `<div class="wmPopupTask ${row.done?'completed':''}" data-wm-popup-key="${esc(row.key)}" ${moveable?'draggable="true"':''}><div class="wmPopupTaskMain"><input type="checkbox" data-wm-popup-check="${esc(row.key)}" ${row.done?'checked':''} ${row.e?.kind==='anniversary'?'disabled':''}><span title="${moveable?'드래그해서 날짜 이동':''}">${moveable?'<span class="wmDragGrip">⠿</span> ':''}${esc(row.title)}${origin}</span></div>${workMemoSubtasksMarkup(row)}<div class="wmPopupTaskActions"><button type="button" data-wm-popup-edit>✎ 수정·삭제</button>${moveable?`<input type="date" aria-label="이동할 날짜" value="${date}"><button type="button" data-wm-popup-move>이동</button>`:''}</div></div>`;
+    return `<div class="wmPopupTask ${row.done?'completed':''}" data-wm-popup-key="${esc(row.key)}" ${moveable?'draggable="true"':''}><div class="wmPopupTaskMain"><input type="checkbox" data-wm-popup-check="${esc(row.key)}" ${row.done?'checked':''} ${row.e?.kind==='anniversary'?'disabled':''}><span title="${moveable?'드래그해서 날짜 이동':''}">${moveable?'<span class="wmDragGrip">⠿</span> ':''}${workMemoStarMarkup(row)}${esc(row.title)}${origin}</span></div>${workMemoSubtasksMarkup(row)}<div class="wmPopupTaskActions"><button type="button" data-wm-popup-edit>✎ 수정·삭제</button>${moveable?`<input type="date" aria-label="이동할 날짜" value="${date}"><button type="button" data-wm-popup-move>이동</button>`:''}</div></div>`;
   }).join(''):'<div class="wmGroupPopupEmpty">해당 날짜의 업무가 없습니다.</div>'}</div></details>`;
   pop.classList.remove('hidden');
   const list=pop.querySelector('.wmGroupPopupList');if(list)list.scrollTop=currentScroll;
@@ -4410,7 +4415,7 @@ function workMemoTaskMarkup(row,date){
   const type=row.e?row.e.kind==='payment'?'납부':row.e._prepDay?'준비':row.e._purchaseDue?'구매':row.e.kind==='appointment'?'약속':'일정':'';
   const noCheck=!!row.e?.kind && row.e.kind==='anniversary';
   const subtasks=workMemoSubtasksMarkup(row);
-  return `<div class="wmTask ${done?'done':''} ${subtasks?'wmTaskWithSubtasks':''}" data-wm-task="${esc(row.key)}" data-wm-kind="${kind}"><label><input type="checkbox" data-wm-check="${esc(row.key)}" ${done?'checked':''} ${noCheck?'disabled':''}><span class="wmTaskLabel">${esc(row.title)}${label}</span></label>${type&&row.kind!=='daily'?`<small>${esc(type)}</small>`:''}<button type="button" class="wmTaskEditBtn" data-wm-edit="${esc(row.key)}" title="수정 · 삭제" aria-label="${esc(row.title)} 수정 또는 삭제">✎</button>${subtasks}</div>`;
+  return `<div class="wmTask ${done?'done':''} ${subtasks?'wmTaskWithSubtasks':''}" data-wm-task="${esc(row.key)}" data-wm-kind="${kind}"><label><input type="checkbox" data-wm-check="${esc(row.key)}" ${done?'checked':''} ${noCheck?'disabled':''}>${workMemoStarMarkup(row)}<span class="wmTaskLabel">${esc(row.title)}${label}</span></label>${type&&row.kind!=='daily'?`<small>${esc(type)}</small>`:''}<button type="button" class="wmTaskEditBtn" data-wm-edit="${esc(row.key)}" title="수정 · 삭제" aria-label="${esc(row.title)} 수정 또는 삭제">✎</button>${subtasks}</div>`;
 }
 function workMemoMissedTasks(date){
   const previous=ds(add(parse(date),-1)),note=workMemoDay(previous);
@@ -4436,7 +4441,7 @@ function workMemoDayCard(date){
     const prev=ds(add(parse(date),-1)),pending=workMemoMissedTasks(date);
     workMemoMissedByDate.set(date,pending);
     const missedKey=`missed|${date}`;
-    missed=`<details class="wmMissedArea" data-wm-fold-key="${esc(missedKey)}"${wmFoldOpen(missedKey)}><summary class="wmSectionTitle">${esc(workMemoShortDate(prev))} 미완료 <b>${pending.length}건</b></summary>${pending.length?pending.map((x,i)=>`<div class="wmMissed" data-wm-missed="${i}"><strong>${esc(x.title)}${x.originDate?` (${esc(workMemoShortDate(x.originDate))})`:''}</strong><div class="wmMissedAction"><button type="button" data-wm-today="${i}">오늘로</button><input type="date" value="${date}" aria-label="이동 날짜"><button type="button" data-wm-move="${i}">날짜 지정</button></div></div>`).join(''):'<div class="wmEmpty">전날 미완료 업무 없음</div>'}</details>`;
+    missed=`<details class="wmMissedArea" data-wm-fold-key="${esc(missedKey)}"${wmFoldOpen(missedKey)}><summary class="wmSectionTitle">${esc(workMemoShortDate(prev))} 미완료 <b>${pending.length}건</b></summary>${pending.length?pending.map((x,i)=>`<div class="wmMissed" data-wm-missed="${i}"><strong>${workMemoStarMarkup(x)}${esc(x.title)}${x.originDate?` (${esc(workMemoShortDate(x.originDate))})`:''}</strong><div class="wmMissedAction"><button type="button" data-wm-today="${i}">오늘로</button><input type="date" value="${date}" aria-label="이동 날짜"><button type="button" data-wm-move="${i}">날짜 지정</button></div></div>`).join(''):'<div class="wmEmpty">전날 미완료 업무 없음</div>'}</details>`;
   }
   const sections=WM_GROUPS.map(([kind,title])=>{
     const items=rows.filter(x=>x.kind===kind),done=items.filter(x=>x.done).length;
@@ -6199,7 +6204,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.104',
+    appVersion:'2.105',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state

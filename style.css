@@ -3833,3 +3833,11 @@ body.todayWorkPopup .wmDayScroll{padding:6px 8px!important}
 #wmGroupPopup .wmGroupPopupFold{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 11px;background:#f5f8fc;color:#415c77;font-size:11px;font-weight:650;border-bottom:1px solid #e2e9f2}
 #wmGroupPopup .wmGroupPopupFold b{font-size:10px;margin-left:auto;font-weight:600}
 #wmGroupPopup .wmGroupPopupList{flex:1;min-height:0;overflow-y:auto}
+
+/* v2.105 · Important event star shared by work board, daily PIP and grouped popup. */
+.wmImportantStar{display:inline-block;flex:0 0 auto;color:#e2a322;font-weight:800;font-size:13px;line-height:1;vertical-align:baseline;margin-right:4px;text-decoration:none!important;white-space:nowrap}
+.wmTask label>.wmImportantStar{align-self:center;margin-right:0}
+.wmPanel .wmTask label>.wmImportantStar{font-size:12px}
+#wmGroupPopup .wmImportantStar{font-size:12px;margin-right:5px}
+.wmMissed .wmImportantStar{margin-right:5px}
+.wmTask.done .wmImportantStar,.wmPopupTask.completed .wmImportantStar{opacity:.7}
