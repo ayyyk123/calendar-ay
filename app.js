@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '2.108',
+  version: '2.109',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -366,7 +366,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '2.108',
+    version: '2.109',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -6017,7 +6017,7 @@ $('#diaryForm').onsubmit=e=>{ e.preventDefault(); const date=$('#diaryDate').val
 $('#cancelDiary').onclick=()=>closeDialog($('#diaryDlg'));
 $('#deleteDiary').onclick=()=>{ const date=$('#diaryDate').value; if(state.diary[date]&&confirm('이 날짜의 다이어리를 삭제할까요?')){delete state.diary[date];closeDialog($('#diaryDlg'));save();} };
 
-// v2.108: 검색은 반복 일정의 원본이 아닌 실제 날짜별 발생 회차를 조회한다.
+// v2.109: 검색은 반복 일정의 원본이 아닌 실제 날짜별 발생 회차를 조회한다.
 // 달력 생성과 동일한 generateOccurrenceStarts/isDone/excludedDates 기준 사용.
 const SEARCH_MAX_CANDIDATES=4000;
 const SEARCH_DISPLAY_LIMIT=250;
@@ -6028,10 +6028,23 @@ function initSearchDates(){
   if(start && !start.value) start.value=ds(add(new Date(),-365));
   if(end && !end.value) end.value=ds(add(new Date(),730));
 }
+function updateSearchPeriodUI(){
+  const custom=$('#searchPeriodMode')?.value==='custom';
+  const fields=$('#searchDateFields');
+  if(fields)fields.hidden=!custom;
+  if(custom)initSearchDates();
+}
+// 전체 기간: 저장된 단일/완료 일정은 기간 제한 없이 검색.
+// 종료일이 없는 반복 일정은 무한히 생성될 수 있으므로 미래 10년까지의 회차 조회.
+function searchRepeatHorizon(){
+  const now=new Date();
+  return ds(new Date(now.getFullYear()+10,now.getMonth(),now.getDate()));
+}
 function collectSearchResults(query, status, from, to){
   const q=normalizeSearchText(query);
   const matches=[], active=['all','done','pending'].includes(status)?status:'all';
-  if(!q || !from || !to || from>to) return {results:[],limited:false};
+  const custom=!!(from||to);
+  if(!q || (custom && (!from || !to || from>to))) return {results:[],limited:false};
   let limited=false;
   const today=ds(new Date());
   for(const e of state.events){
@@ -6039,15 +6052,19 @@ function collectSearchResults(query, status, from, to){
     const normalizedHay=normalizeSearchText(hay);
     if(!normalizedHay.includes(q)) continue;
     const span=Math.max(0,diffDays(e.date,e.endDate||e.date));
-    const earliest=ds(add(parse(from),-span));
-    // 반복 일정의 각 발생일과 과거에 날짜를 옮겨 분리한 단일 일정은 각각 조회된다.
-    const starts=generateOccurrenceStarts(e,earliest,to);
+    const earliest=custom?ds(add(parse(from),-span)):e.date;
+    const repeat=(e.repeat||'none')!=='none';
+    // 전체 검색에서는 모든 단일 일정을 조회하고, 반복은 유한한 조회 범위에서 생성한다.
+    // 명시적인 반복 종료일이 있으면 그 날짜까지, 종료일이 없으면 미래 10년까지.
+    const rule=repeat?normalizedRule(e):null;
+    const naturalEnd=repeat && rule.endType==='date' && rule.until?rule.until:'';
+    const eventTo=custom?to:(repeat?(naturalEnd||searchRepeatHorizon()):e.date);
+    const starts=generateOccurrenceStarts(e,earliest,eventTo);
     for(const d of starts){
       const occ=ds(d);
-      if(occ<from || occ>to || (e.excludedDates||[]).includes(occ)) continue;
+      if((custom && (occ<from || occ>to)) || (e.excludedDates||[]).includes(occ)) continue;
       const done=isDone({...e,_occurrenceStart:occ});
       if(active==='done' && !done || active==='pending' && done) continue;
-      const repeat=(e.repeat||'none')!=='none';
       const dateEnd=span?ds(add(d,span)):'';
       matches.push({type:'event',id:e.id,occ,date:occ,done,title:e.title,calendar:calendarPath(e.calId),
         meta:`${repeat?'반복 일정 · ':''}${dateEnd?`~ ${dateEnd} · `:''}${calendarPath(e.calId)}`});
@@ -6066,7 +6083,7 @@ function collectSearchResults(query, status, from, to){
       if(normalizeSearchText(hay).includes(q)) matches.push({type:'flexible',id:f.id,title:f.name,meta:`시간날때 업무 · ${calendarPath(f.calId)}`});
     }
     for(const [date,d] of Object.entries(state.diary||{})){
-      if(date<from || date>to) continue;
+      if(custom && (date<from || date>to)) continue;
       if(normalizeSearchText(d.text||'').includes(q))matches.push({type:'diary',id:date,date,title:`다이어리 ${date}`,meta:String(d.text||'').slice(0,60)});
     }
   }
@@ -6114,9 +6131,9 @@ function renderSearch(){
   const container=$('#searchResults'), count=$('#searchCount');
   const q=$('#searchInput').value.trim();
   if(!q){container.innerHTML='<div class="empty">검색어를 입력하세요.</div>';if(count)count.textContent='';return;}
-  initSearchDates();
-  const from=$('#searchFrom').value,to=$('#searchTo').value;
-  if(!from || !to || from>to){container.innerHTML='<div class="empty">검색 기간을 확인해 주세요. 시작일은 종료일보다 늦을 수 없어요.</div>';if(count)count.textContent='';return;}
+  const custom=$('#searchPeriodMode').value==='custom';
+  const from=custom?$('#searchFrom').value:'',to=custom?$('#searchTo').value:'';
+  if(custom && (!from || !to || from>to)){container.innerHTML='<div class="empty">검색 기간을 확인해 주세요. 시작일은 종료일보다 늦을 수 없어요.</div>';if(count)count.textContent='';return;}
   const status=$('#searchStatus').value;
   const {results,limited}=collectSearchResults(q.toLocaleLowerCase(),status,from,to);
   if(count)count.textContent=`검색 결과 ${results.length}건${limited?' 이상':''} · ${Math.min(SEARCH_DISPLAY_LIMIT,results.length)}건 표시${limited?' · 기간을 좁혀 주세요':''}`;
@@ -6141,9 +6158,10 @@ function renderSearch(){
     else openDiary(r.id);
   });
 }
-$('#searchBtn').onclick=()=>{ $('#searchInput').value='';$('#searchStatus').value='all';initSearchDates();$('#searchResults').innerHTML='<div class="empty">검색어를 입력하세요.</div>';$('#searchCount').textContent='';openDialog($('#searchDlg'));setTimeout(()=>$('#searchInput').focus(),50);};
+$('#searchBtn').onclick=()=>{ $('#searchInput').value='';$('#searchStatus').value='all';$('#searchPeriodMode').value='all';updateSearchPeriodUI();$('#searchResults').innerHTML='<div class="empty">검색어를 입력하세요.</div>';$('#searchCount').textContent='';openDialog($('#searchDlg'));setTimeout(()=>$('#searchInput').focus(),50);};
 $('#searchInput').oninput=renderSearch;
 ['searchStatus','searchFrom','searchTo'].forEach(id=>{const el=$(`#${id}`);if(el)el.onchange=renderSearch;});
+$('#searchPeriodMode').onchange=()=>{updateSearchPeriodUI();renderSearch();};
 $('#closeSearch').onclick=()=>closeDialog($('#searchDlg'));$('#searchForm').onsubmit=e=>e.preventDefault();
 
 function setFixedAddMenu(open){
@@ -6465,7 +6483,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.108',
+    appVersion:'2.109',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state

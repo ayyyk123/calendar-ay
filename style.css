@@ -3884,3 +3884,11 @@ body.todayWorkPopup .wmDayScroll{padding:6px 8px!important}
  .searchResultStatus{margin-left:auto}
  .searchDateJump{margin-left:auto}
 }
+
+/* v2.109 검색: 전체 기간 기본값, 날짜 지정은 선택 시에만 표시 */
+.searchFilters{grid-template-columns:1fr 1fr}
+.searchDateFields{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:-3px}
+.searchDateFields[hidden]{display:none!important}
+.searchDateFields label{font-size:12px;color:#586172;font-weight:500;min-width:0}
+.searchDateFields input{min-width:0;font-size:12px;padding:7px 6px;width:100%;box-sizing:border-box}
+@media(max-width:560px){.searchFilters{grid-template-columns:1fr 1fr}.searchFilters label:first-child{grid-column:auto}}
