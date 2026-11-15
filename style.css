@@ -3892,3 +3892,62 @@ body.todayWorkPopup .wmDayScroll{padding:6px 8px!important}
 .searchDateFields label{font-size:12px;color:#586172;font-weight:500;min-width:0}
 .searchDateFields input{min-width:0;font-size:12px;padding:7px 6px;width:100%;box-sizing:border-box}
 @media(max-width:560px){.searchFilters{grid-template-columns:1fr 1fr}.searchFilters label:first-child{grid-column:auto}}
+
+
+/* v2.110 — prevent desktop toolbar overlap in resized windows.
+   The wide-screen centered view switcher must stop using absolute positioning
+   as soon as there is no room for three horizontal clusters.
+   Keep all click targets and the full Firebase save timestamp visible. */
+@media (min-width:761px) and (max-width:1200px) {
+  :root { --header-h:86px; }
+  body:not(.todayWorkPopup) > header {
+    display:flex!important; flex-wrap:wrap!important; align-content:center!important;
+    align-items:center!important; box-sizing:border-box!important;
+    height:var(--header-h)!important; min-height:var(--header-h)!important;
+    gap:5px 9px!important; padding:5px 10px!important;
+  }
+  body:not(.todayWorkPopup) > header .brand {
+    order:0!important; flex:0 0 auto!important; min-width:0!important;
+    margin:0!important; align-self:center!important;
+  }
+  body:not(.todayWorkPopup) > header nav {
+    order:1!important; flex:1 1 0!important; min-width:0!important;
+    width:auto!important; display:flex!important; justify-content:flex-end!important;
+    align-items:center!important; flex-wrap:nowrap!important; gap:5px!important;
+    margin:0!important; overflow:visible!important;
+  }
+  body:not(.todayWorkPopup) > header nav #range {
+    flex:1 1 145px!important; min-width:0!important; width:auto!important;
+    max-width:220px!important; margin:0!important; font-size:12px!important;
+    white-space:nowrap!important; overflow:hidden!important; text-overflow:ellipsis!important;
+  }
+  body:not(.todayWorkPopup) > header nav .dateNavButtons {
+    flex:0 0 auto!important; margin:0!important;
+  }
+  body:not(.todayWorkPopup) > header nav #currentViewWrap {
+    position:relative!important; top:auto!important; left:auto!important; right:auto!important;
+    transform:none!important; z-index:21!important; flex:0 0 auto!important;
+    margin:0!important; max-width:none!important;
+  }
+  body:not(.todayWorkPopup) > header .views {
+    order:2!important; flex:0 0 100%!important; width:100%!important;
+    min-width:0!important; box-sizing:border-box!important;
+    display:flex!important; justify-content:flex-start!important; align-items:center!important;
+    flex-wrap:nowrap!important; gap:4px!important; margin:0!important;
+  }
+  body:not(.todayWorkPopup) > header .views > #saveBadge {
+    flex:0 0 168px!important; width:168px!important; min-width:168px!important;
+    max-width:168px!important; box-sizing:border-box!important; margin:0 3px 0 0!important;
+    white-space:nowrap!important; overflow:visible!important;
+  }
+  body:not(.todayWorkPopup) > header .views > #saveBadge #saveBadgeText {
+    overflow:visible!important; text-overflow:clip!important; white-space:nowrap!important;
+  }
+  body:not(.todayWorkPopup) > header .views > #manualSaveBtn {
+    flex:0 0 34px!important; width:34px!important; min-width:34px!important;
+    max-width:34px!important; margin:0!important;
+  }
+  body:not(.todayWorkPopup) > header .views > #naverMailShortcut { margin-left:auto!important; }
+  body:not(.todayWorkPopup) > .layout { height:calc(100dvh - var(--header-h))!important; }
+  body:not(.todayWorkPopup) > .layout aside { top:var(--header-h)!important; }
+}
