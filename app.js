@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '2.107',
+  version: '2.108',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -366,7 +366,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '2.107',
+    version: '2.108',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -6017,18 +6017,134 @@ $('#diaryForm').onsubmit=e=>{ e.preventDefault(); const date=$('#diaryDate').val
 $('#cancelDiary').onclick=()=>closeDialog($('#diaryDlg'));
 $('#deleteDiary').onclick=()=>{ const date=$('#diaryDate').value; if(state.diary[date]&&confirm('이 날짜의 다이어리를 삭제할까요?')){delete state.diary[date];closeDialog($('#diaryDlg'));save();} };
 
-function renderSearch(){
-  const q=$('#searchInput').value.trim().toLowerCase(); if(!q){$('#searchResults').innerHTML='<div class="empty">검색어를 입력하세요.</div>';return;}
-  const results=[];
-  for(const e of state.events){ const hay=[e.title,e.memo,e.place,cal(e.calId).name,...checklistItems(e).map(x=>x.text),...Object.values(e.prepDailyNotes||{}),...(e.prepTasks||[]).map(x=>x.text)].join(' ').toLowerCase(); if(hay.includes(q)) results.push({type:'event',id:e.id,title:e.title,meta:`${e.date} · ${cal(e.calId).name}${e.prepEnabled?' · '+preparationSummary(e):''}`}); }
-  for(const f of state.fixed){ const hay=[f.name,f.memo,cal(f.calId).name,...(f.checklist||[]).map(x=>x.text)].join(' ').toLowerCase(); if(hay.includes(q)) results.push({type:'fixed',id:f.id,title:f.name,meta:`고정업무 · ${cal(f.calId).name}`}); }
-  for(const f of (state.flexible||[])){ const hay=[f.name,f.memo,cal(f.calId).name,...(f.checklist||[]).map(x=>x.text)].join(' ').toLowerCase(); if(hay.includes(q)) results.push({type:'flexible',id:f.id,title:f.name,meta:`시간날때 업무 · ${cal(f.calId).name}`}); }
-  for(const [date,d] of Object.entries(state.diary)){ if((d.text||'').toLowerCase().includes(q)) results.push({type:'diary',id:date,title:`다이어리 ${date}`,meta:d.text.slice(0,60)}); }
-  $('#searchResults').innerHTML=results.slice(0,100).map((r,i)=>`<div class="searchResult" data-idx="${i}"><b>${esc(r.title)}</b><small>${esc(r.meta)}</small></div>`).join('')||'<div class="empty">검색 결과가 없습니다.</div>';
-  $$('.searchResult').forEach(x=>x.onclick=()=>{const r=results[Number(x.dataset.idx)];closeDialog($('#searchDlg'));if(r.type==='event')openEvent(null,r.id);else if(r.type==='fixed')openFixed(r.id);else if(r.type==='flexible')openFlexible(r.id);else openDiary(r.id);});
+// v2.108: 검색은 반복 일정의 원본이 아닌 실제 날짜별 발생 회차를 조회한다.
+// 달력 생성과 동일한 generateOccurrenceStarts/isDone/excludedDates 기준 사용.
+const SEARCH_MAX_CANDIDATES=4000;
+const SEARCH_DISPLAY_LIMIT=250;
+// '웨딩 꿀팁 공유'와 '웨딩꿀팁공유'처럼 띄어쓰기 차이가 있어도 찾는다.
+function normalizeSearchText(value){return String(value??'').toLocaleLowerCase().replace(/[\s·._\-()\[\]{}]+/g,'');}
+function initSearchDates(){
+  const start=$('#searchFrom'), end=$('#searchTo');
+  if(start && !start.value) start.value=ds(add(new Date(),-365));
+  if(end && !end.value) end.value=ds(add(new Date(),730));
 }
-$('#searchBtn').onclick=()=>{ $('#searchInput').value=''; $('#searchResults').innerHTML='<div class="empty">검색어를 입력하세요.</div>'; openDialog($('#searchDlg')); setTimeout(()=>$('#searchInput').focus(),50); };
-$('#searchInput').oninput=renderSearch; $('#closeSearch').onclick=()=>closeDialog($('#searchDlg')); $('#searchForm').onsubmit=e=>e.preventDefault();
+function collectSearchResults(query, status, from, to){
+  const q=normalizeSearchText(query);
+  const matches=[], active=['all','done','pending'].includes(status)?status:'all';
+  if(!q || !from || !to || from>to) return {results:[],limited:false};
+  let limited=false;
+  const today=ds(new Date());
+  for(const e of state.events){
+    const hay=[e.title,e.memo,e.place,calendarPath(e.calId),...checklistItems(e).map(x=>x.text),...Object.values(e.prepDailyNotes||{}),...(e.prepTasks||[]).map(x=>x.text)].join(' ');
+    const normalizedHay=normalizeSearchText(hay);
+    if(!normalizedHay.includes(q)) continue;
+    const span=Math.max(0,diffDays(e.date,e.endDate||e.date));
+    const earliest=ds(add(parse(from),-span));
+    // 반복 일정의 각 발생일과 과거에 날짜를 옮겨 분리한 단일 일정은 각각 조회된다.
+    const starts=generateOccurrenceStarts(e,earliest,to);
+    for(const d of starts){
+      const occ=ds(d);
+      if(occ<from || occ>to || (e.excludedDates||[]).includes(occ)) continue;
+      const done=isDone({...e,_occurrenceStart:occ});
+      if(active==='done' && !done || active==='pending' && done) continue;
+      const repeat=(e.repeat||'none')!=='none';
+      const dateEnd=span?ds(add(d,span)):'';
+      matches.push({type:'event',id:e.id,occ,date:occ,done,title:e.title,calendar:calendarPath(e.calId),
+        meta:`${repeat?'반복 일정 · ':''}${dateEnd?`~ ${dateEnd} · `:''}${calendarPath(e.calId)}`});
+      if(matches.length>=SEARCH_MAX_CANDIDATES){limited=true;break;}
+    }
+    if(limited) break;
+  }
+  // 날짜가 없는 템플릿 및 다이어리는 완료 상태 필터를 적용하지 않는다.
+  if(active==='all' && !limited){
+    for(const f of state.fixed){
+      const hay=[f.name,f.memo,calendarPath(f.calId),...(f.checklist||[]).map(x=>x.text)].join(' ');
+      if(normalizeSearchText(hay).includes(q)) matches.push({type:'fixed',id:f.id,title:f.name,meta:`날짜 지정 배치 · ${calendarPath(f.calId)}`});
+    }
+    for(const f of (state.flexible||[])){
+      const hay=[f.name,f.memo,calendarPath(f.calId),...(f.checklist||[]).map(x=>x.text)].join(' ');
+      if(normalizeSearchText(hay).includes(q)) matches.push({type:'flexible',id:f.id,title:f.name,meta:`시간날때 업무 · ${calendarPath(f.calId)}`});
+    }
+    for(const [date,d] of Object.entries(state.diary||{})){
+      if(date<from || date>to) continue;
+      if(normalizeSearchText(d.text||'').includes(q))matches.push({type:'diary',id:date,date,title:`다이어리 ${date}`,meta:String(d.text||'').slice(0,60)});
+    }
+  }
+  // 다가오는 일정부터, 그 다음 최근 과거, 날짜 미지정 자료 순으로 보여준다.
+  const score=r=>r.date?(r.date>=today?0:1):2;
+  matches.sort((a,b)=>{
+    const aScore=score(a),bScore=score(b);
+    if(aScore!==bScore) return aScore-bScore;
+    if(aScore===0)return a.date.localeCompare(b.date)||a.title.localeCompare(b.title,'ko');
+    if(aScore===1)return b.date.localeCompare(a.date)||a.title.localeCompare(b.title,'ko');
+    return a.title.localeCompare(b.title,'ko');
+  });
+  return {results:matches,limited};
+}
+function jumpToSearchResult(result){
+  if(!result?.date)return;
+  closeDialog($('#searchDlg'));
+  cursor=parse(result.date);
+  mobileSelectedDate=result.date;
+  view='day';lastScheduleView='day';
+  calendarFocusIds.clear();
+  render();
+  const item=[...document.querySelectorAll('#main .item')]
+    .find(x=>x.dataset.eid===result.id && x.dataset.occurrence===(result.occ||result.date));
+  if(item){
+    item.classList.add('searchJumpHighlight');
+    item.scrollIntoView({block:'center',behavior:'auto'});
+  }else if(result.type==='event'){
+    // 검색한 캘린더가 숨겨졌더라도 해당 일정은 날짜 화면에서 확인할 수 있게 한다.
+    const ev=state.events.find(x=>x.id===result.id);
+    if(ev){
+      const board=$('#main .dayResizableBoard');
+      if(board){
+        const panel=document.createElement('div');
+        panel.className='searchJumpHiddenEvent';
+        panel.innerHTML=`<b>검색한 일정 · 숨김 캘린더</b>${eventItemHtml({...ev,_occurrenceStart:result.occ||result.date,_renderDate:result.date})}`;
+        board.prepend(panel);bindItems();
+        panel.querySelector('.item')?.classList.add('searchJumpHighlight');
+        panel.scrollIntoView({block:'center',behavior:'auto'});
+      }
+    }
+  }
+}
+function renderSearch(){
+  const container=$('#searchResults'), count=$('#searchCount');
+  const q=$('#searchInput').value.trim();
+  if(!q){container.innerHTML='<div class="empty">검색어를 입력하세요.</div>';if(count)count.textContent='';return;}
+  initSearchDates();
+  const from=$('#searchFrom').value,to=$('#searchTo').value;
+  if(!from || !to || from>to){container.innerHTML='<div class="empty">검색 기간을 확인해 주세요. 시작일은 종료일보다 늦을 수 없어요.</div>';if(count)count.textContent='';return;}
+  const status=$('#searchStatus').value;
+  const {results,limited}=collectSearchResults(q.toLocaleLowerCase(),status,from,to);
+  if(count)count.textContent=`검색 결과 ${results.length}건${limited?' 이상':''} · ${Math.min(SEARCH_DISPLAY_LIMIT,results.length)}건 표시${limited?' · 기간을 좁혀 주세요':''}`;
+  container.innerHTML=results.slice(0,SEARCH_DISPLAY_LIMIT).map((r,i)=>{
+    if(r.type==='event'){
+      return `<div class="searchResult searchResultOccurrence">
+        <div class="searchResultInfo"><b>${esc(r.title)}</b><small>${esc(r.meta)}</small></div>
+        <span class="searchResultStatus ${r.done?'isDone':'isPending'}">${r.done?'완료':'미완료'}</span>
+        <button type="button" class="searchDateJump" data-search-idx="${i}" title="${esc(r.date)} 날짜로 이동">${esc(r.date)} <span>이동</span></button>
+        <button type="button" class="searchEdit" data-search-idx="${i}" title="${esc(r.date)} 회차 수정">수정</button>
+      </div>`;
+    }
+    return `<div class="searchResult searchResultOther"><div class="searchResultInfo"><b>${esc(r.title)}</b><small>${esc(r.meta)}</small></div><button type="button" class="searchEdit" data-search-idx="${i}">열기</button></div>`;
+  }).join('')||'<div class="empty">검색 결과가 없습니다.</div>';
+  container.querySelectorAll('.searchDateJump').forEach(btn=>btn.onclick=()=>jumpToSearchResult(results[Number(btn.dataset.searchIdx)]));
+  container.querySelectorAll('.searchEdit').forEach(btn=>btn.onclick=()=>{
+    const r=results[Number(btn.dataset.searchIdx)];if(!r)return;
+    closeDialog($('#searchDlg'));
+    if(r.type==='event')openEvent(r.occ||r.date,r.id);
+    else if(r.type==='fixed')openFixed(r.id);
+    else if(r.type==='flexible')openFlexible(r.id);
+    else openDiary(r.id);
+  });
+}
+$('#searchBtn').onclick=()=>{ $('#searchInput').value='';$('#searchStatus').value='all';initSearchDates();$('#searchResults').innerHTML='<div class="empty">검색어를 입력하세요.</div>';$('#searchCount').textContent='';openDialog($('#searchDlg'));setTimeout(()=>$('#searchInput').focus(),50);};
+$('#searchInput').oninput=renderSearch;
+['searchStatus','searchFrom','searchTo'].forEach(id=>{const el=$(`#${id}`);if(el)el.onchange=renderSearch;});
+$('#closeSearch').onclick=()=>closeDialog($('#searchDlg'));$('#searchForm').onsubmit=e=>e.preventDefault();
 
 function setFixedAddMenu(open){
   const menu=$('#fixedAddMenu'), btn=$('#addFixed'); if(!menu||!btn) return;
@@ -6349,7 +6465,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.107',
+    appVersion:'2.108',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state

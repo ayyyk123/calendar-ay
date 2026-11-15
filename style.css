@@ -3855,3 +3855,32 @@ body.todayWorkPopup .wmDayScroll{padding:6px 8px!important}
 #calList .calRow.calDropBefore,#calList .calRow.calDropAfter{background:#eef5ff}
 .calReorderHint{display:block;margin:3px 1px 8px 9px;font-size:10px;line-height:1.35;color:#8090a4}
 @media(max-width:760px){#calList .calRow{grid-template-columns:19px auto 11px minmax(0,1fr) auto auto;column-gap:4px}#calList .calDragGrip{width:19px;min-width:19px;height:30px}}
+
+/* v2.108 날짜별 반복일정 검색 */
+#searchDlg{width:min(740px,96vw)}
+.searchFilters{display:grid;grid-template-columns:1.05fr 1fr 1fr;gap:8px;align-items:end}
+.searchFilters label{font-size:12px;color:#586172;font-weight:500;min-width:0}
+.searchFilters input,.searchFilters select{min-width:0;font-size:12px;padding:7px 6px}
+.searchHelp{font-size:11px;color:#697382;line-height:1.5;margin:-2px 0 0}
+.searchCount{font-size:12px;color:#374151;font-weight:500}
+.searchResultOccurrence,.searchResultOther{display:flex;align-items:center;gap:8px;cursor:default;min-width:0}
+.searchResultInfo{flex:1;min-width:0}
+.searchResultInfo b{font-size:13px;font-weight:600;display:block;overflow-wrap:anywhere}
+.searchResultInfo small{font-size:11px;line-height:1.4}
+.searchResultStatus{flex:none;font-size:11px;padding:3px 6px;border-radius:5px;background:#f5f5f5;color:#696f79;font-weight:500}
+.searchResultStatus.isDone{background:#eef1f2;color:#6c7780}
+.searchResultStatus.isPending{background:#f1f5fd;color:#40638f}
+.searchDateJump,.searchEdit{width:auto;flex:none;white-space:nowrap;border:1px solid #d8dfe6;border-radius:6px;background:#fff;padding:6px 8px;font-size:11px;font-weight:500;cursor:pointer;color:#334155}
+.searchDateJump:hover,.searchEdit:hover{border-color:#7a9ed7;background:#f1f6ff}
+.searchDateJump span{font-size:10px;color:#5d7190;margin-left:3px}
+.searchJumpHighlight{outline:2px solid #4f8bd6;outline-offset:2px;box-shadow:0 0 0 4px #4f8bd61a}
+.searchJumpHiddenEvent{margin:8px 8px 16px;padding:9px;border:1px solid #b1c9e7;background:#f7faff;border-radius:8px}
+.searchJumpHiddenEvent>b{font-size:11px;color:#586b86;display:block;margin-bottom:8px}
+@media(max-width:560px){
+ .searchFilters{grid-template-columns:1fr 1fr}
+ .searchFilters label:first-child{grid-column:1/-1}
+ .searchResultOccurrence{flex-wrap:wrap;gap:6px}
+ .searchResultInfo{flex-basis:calc(100% - 64px)}
+ .searchResultStatus{margin-left:auto}
+ .searchDateJump{margin-left:auto}
+}
