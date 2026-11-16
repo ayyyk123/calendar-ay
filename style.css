@@ -12,10 +12,10 @@ aside{border-right:1px solid var(--border);padding:14px;overflow:auto;background
 section{margin-bottom:24px}.secHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
 .calRow{display:grid;grid-template-columns:auto auto 1fr auto;align-items:center;gap:7px;padding:7px;border-radius:7px}.calRow:hover{background:#f6f6f6}.calRow input[type=checkbox]{width:auto}.calRow .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.calRow small{color:#777;white-space:nowrap}.dot{width:11px;height:11px;border-radius:50%}
 .fixed{padding:8px;margin:6px 0;border:1px solid #ddd;border-left:5px solid;border-radius:7px;background:#fff;cursor:grab}.fixed small{display:block;color:#777;margin-top:3px}.fixed.used{opacity:.72}.hint{color:#888;font-size:12px;line-height:1.45}.statusText{min-height:18px;font-size:12px;color:#666}.statusText.error{color:#c5221f}.statusText.ok{color:#16803c}#fixedFilter{width:100%;margin-bottom:7px;padding:6px}
-.week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));min-height:100%;min-width:0;width:100%}.dayCol{border-right:1px solid #e5e5e5;min-width:0;min-height:100%;overflow:hidden}.dayHead{position:sticky;top:0;background:#fff;border-bottom:1px solid #ddd;padding:8px 7px;text-align:center;z-index:5}.dayHead.today{background:#f3f8ff}.dayTopLine{display:flex;justify-content:center;align-items:center;gap:5px}.diaryBtn{border:0;padding:1px 4px;background:transparent;color:#888}.diaryBtn.hasDiary{color:#222}.dateNum{font-size:20px;font-weight:bold}.dayBody{padding:7px;min-height:calc(100dvh - var(--header-h) - 60px)}
-.group{margin-bottom:10px}.groupHead{display:flex;justify-content:space-between;gap:5px;padding:5px 6px;font-size:12px;font-weight:bold;border-radius:5px 5px 0 0}.groupHead>span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.item{border-left:4px solid;padding:6px 7px;margin:2px 0;background:#f7f7f7;border-radius:4px;cursor:pointer;position:relative}.item:hover{background:#f2f2f2}.item.done{opacity:.55}.item.done .itemTitle{text-decoration:line-through}.itemRow{display:flex;align-items:flex-start;gap:5px}.itemTitle{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;word-break:normal}.todoCheck{border:0;background:transparent;padding:0;line-height:1.2;font-size:16px}.todoCheck:hover{background:transparent}.item .meta{font-size:11px;color:#777;margin-top:2px;line-height:1.35}.repeatMark{font-size:10px;color:#888;margin-left:3px}.over{color:#d93025}.ok{color:#16803c}.dayTotal{font-size:11px;color:#666;padding:5px;border-top:1px dashed #ddd}.dayTotal.overallOver{color:#d93025;font-weight:bold}
-.month{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));min-width:0;width:100%}.month .weekdayHeader{position:sticky;top:0;background:#fff;border-bottom:1px solid #ddd;border-right:1px solid #eee;padding:7px;text-align:center;font-weight:bold;z-index:4}.month .cell{min-height:145px;border-right:1px solid #eee;border-bottom:1px solid #eee;padding:6px}.month .cell.other{background:#fafafa;color:#aaa}.month .mhead{display:flex;justify-content:space-between;align-items:center;font-weight:bold;margin-bottom:5px}.month .item{font-size:11px;padding:3px 5px}.month .item .meta{display:none}
-.listView{padding:18px;max-width:1000px;margin:0 auto}.listNote{font-size:12px;color:#777;margin-bottom:12px}.listDate{margin:18px 0 7px;font-weight:bold}.loadBar{height:7px;background:#eee;border-radius:5px;overflow:hidden;margin-top:3px}.loadBar i{display:block;height:100%;background:#777}.loadBar i.overBar{background:#d93025}.loadLine{margin:9px 0;font-size:12px}.ddayRow{display:flex;justify-content:space-between;gap:8px;padding:6px 2px;border-bottom:1px solid #eee}.ddayRow small{color:#777}.empty{color:#aaa;padding:15px;text-align:center}.daySingle{padding:20px;max-width:900px;margin:0 auto}.daySingle .group{margin-bottom:16px}.daySingle .diaryStrip{margin-bottom:12px}
+.week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));min-height:100%;min-width:0;width:100%}.dayCol{border-right:1px solid #e5e5e5;min-width:0;min-height:100%;overflow:hidden}.dayHead{position:sticky;top:0;background:#fff;border-bottom:1px solid #ddd;padding:8px 7px;text-align:center;z-index:5}.dayHead.today{background:#f3f8ff}.dayTopLine{display:flex;justify-content:center;align-items:center;gap:5px}.diaryBtn{border:0;padding:1px 4px;background:transparent;color:#888}.diaryBtn.hasDiary{color:#222}.dateNum{font-size:20px;font-weight:500}.dayBody{padding:7px;min-height:calc(100dvh - var(--header-h) - 60px)}
+.group{margin-bottom:10px}.groupHead{display:flex;justify-content:space-between;gap:5px;padding:5px 6px;font-size:12px;font-weight:500;border-radius:5px 5px 0 0}.groupHead>span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.item{border-left:4px solid;padding:6px 7px;margin:2px 0;background:#f7f7f7;border-radius:4px;cursor:pointer;position:relative}.item:hover{background:#f2f2f2}.item.done{opacity:.55}.item.done .itemTitle{text-decoration:line-through}.itemRow{display:flex;align-items:flex-start;gap:5px}.itemTitle{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;word-break:normal}.todoCheck{border:0;background:transparent;padding:0;line-height:1.2;font-size:16px}.todoCheck:hover{background:transparent}.item .meta{font-size:11px;color:#777;margin-top:2px;line-height:1.35}.repeatMark{font-size:10px;color:#888;margin-left:3px}.over{color:#d93025}.ok{color:#16803c}.dayTotal{font-size:11px;color:#666;padding:5px;border-top:1px dashed #ddd}.dayTotal.overallOver{color:#d93025;font-weight:500}
+.month{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));min-width:0;width:100%}.month .weekdayHeader{position:sticky;top:0;background:#fff;border-bottom:1px solid #ddd;border-right:1px solid #eee;padding:7px;text-align:center;font-weight:500;z-index:4}.month .cell{min-height:145px;border-right:1px solid #eee;border-bottom:1px solid #eee;padding:6px}.month .cell.other{background:#fafafa;color:#aaa}.month .mhead{display:flex;justify-content:space-between;align-items:center;font-weight:500;margin-bottom:5px}.month .item{font-size:11px;padding:3px 5px}.month .item .meta{display:none}
+.listView{padding:18px;max-width:1000px;margin:0 auto}.listNote{font-size:12px;color:#777;margin-bottom:12px}.listDate{margin:18px 0 7px;font-weight:500}.loadBar{height:7px;background:#eee;border-radius:5px;overflow:hidden;margin-top:3px}.loadBar i{display:block;height:100%;background:#777}.loadBar i.overBar{background:#d93025}.loadLine{margin:9px 0;font-size:12px}.ddayRow{display:flex;justify-content:space-between;gap:8px;padding:6px 2px;border-bottom:1px solid #eee}.ddayRow small{color:#777}.empty{color:#aaa;padding:15px;text-align:center}.daySingle{padding:20px;max-width:900px;margin:0 auto}.daySingle .group{margin-bottom:16px}.daySingle .diaryStrip{margin-bottom:12px}
 dialog{border:0;border-radius:12px;box-shadow:0 10px 40px #0003;width:min(560px,94vw);max-height:calc(100dvh - 24px);overflow:auto;padding:18px}dialog::backdrop{background:#0004}.smallDlg{width:min(440px,94vw)}form{display:grid;gap:11px}form h3{margin:0 0 4px}label{display:grid;gap:5px}.fieldLabel{margin-bottom:5px}input,select,textarea{width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;background:#fff}textarea{resize:vertical}.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.check{display:flex;align-items:center;gap:6px}.check input{width:auto}.durationInputs{display:grid;grid-template-columns:1fr auto 1fr auto;gap:5px;align-items:center}.durationInputs span{color:#666;font-size:12px}.repeatBox{border:1px solid #e3e3e3;background:#fafafa;border-radius:8px;padding:10px;display:grid;gap:10px}.weekdayChecks{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}.weekdayChecks label{display:flex;justify-content:center;align-items:center;gap:2px;padding:6px 2px;border:1px solid #ddd;background:#fff;border-radius:6px}.weekdayChecks input{width:auto}.authActions{display:grid;grid-template-columns:auto auto 1fr auto;gap:7px;align-items:center}menu{display:flex;gap:7px;padding:8px 0 0;margin:0;align-items:center}menu span{flex:1}.settingsLine{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #eee}.settingsLine b{overflow:hidden;text-overflow:ellipsis}.searchResults{max-height:52vh;overflow:auto;border:1px solid #eee;border-radius:8px;min-height:80px}.searchResult{padding:9px;border-bottom:1px solid #eee;cursor:pointer}.searchResult:last-child{border-bottom:0}.searchResult:hover{background:#f7f7f7}.searchResult small{display:block;color:#777;margin-top:2px}
 @media(max-width:760px){:root{--header-h:104px} .sidebarResizer{display:none!important}.layout.sidebarCollapsed{grid-template-columns:1fr} header{height:var(--header-h);padding:8px;flex-wrap:wrap;gap:6px}.brand{font-size:16px}.mobileOnly{display:inline-block}nav{order:2;width:100%;flex-basis:100%;overflow:auto}#jumpDate{width:126px}#range{font-size:13px}.views{margin-left:auto}.layout{grid-template-columns:1fr}.layout aside{position:fixed;left:0;top:var(--header-h);bottom:0;width:min(86vw,320px);transform:translateX(-102%);transition:transform .18s ease;box-shadow:4px 0 20px #0002;border-right:1px solid #ddd}.layout aside.open{transform:translateX(0)}main{grid-column:1}.week{grid-template-columns:repeat(7,minmax(0,1fr));min-width:0;width:100%;scroll-snap-type:none}.dayCol{scroll-snap-align:none;min-width:0}.month{grid-template-columns:repeat(7,minmax(0,1fr));min-width:0;width:100%}.month .cell{min-height:110px;padding:3px}.month .item{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.row{grid-template-columns:1fr}.authActions{grid-template-columns:1fr 1fr}.authActions span{display:none}.authActions .primary{grid-column:1/-1}.views button{padding:6px 8px}.daySingle{padding:12px}dialog{padding:15px}}
 .saveBadge{display:flex;align-items:center;gap:6px;max-width:260px;padding:5px 8px;border:1px solid #ddd;border-radius:999px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:#fafafa;color:#555}
@@ -32,15 +32,15 @@ dialog{border:0;border-radius:12px;box-shadow:0 10px 40px #0003;width:min(560px,
 /* v1.13: 월~일 배열 + 대한민국 공휴일 */
 .dayHead.saturday .dayTopLine>span,.dayHead.saturday .dateNum,.month .weekdayHeader.saturday,.month .cell.saturday .mhead>span{color:#356cc8}
 .dayHead.sunday .dayTopLine>span,.dayHead.sunday .dateNum,.dayHead.holiday .dayTopLine>span,.dayHead.holiday .dateNum,.month .weekdayHeader.sunday,.month .cell.sunday .mhead>span,.month .cell.holiday .mhead>span{color:#d33}
-.holidayName{font-size:11px;color:#d33;font-weight:600;line-height:1.25;margin-top:2px;white-space:normal;word-break:keep-all}
+.holidayName{font-size:11px;color:#d33;font-weight:500;line-height:1.25;margin-top:2px;white-space:normal;word-break:keep-all}
 .month .holidayName{margin:0 0 4px;font-size:10px}
-.dayHolidayBanner{margin:0 0 10px;padding:8px 10px;border:1px solid #f1cccc;background:#fff7f7;color:#c33;border-radius:8px;font-weight:700}
+.dayHolidayBanner{margin:0 0 10px;padding:8px 10px;border:1px solid #f1cccc;background:#fff7f7;color:#c33;border-radius:8px;font-weight:500}
 .listDate.holiday{color:#c33}
 
 
 /* v1.14: 수동 최신자료 저장 + 부속캘린더 */
-.manualSaveBtn{white-space:nowrap;padding:6px 10px;border-color:#cbd5e1;background:#fff;font-size:12px;font-weight:700}.manualSaveMobile{display:none}.manualSaveBtn:hover{background:#f7f9fc}.manualSaveBtn:disabled{opacity:.55;cursor:wait}
-.calRow.subCalendarRow{padding-left:calc(7px + var(--cal-depth,1)*14px)}.calRow.subCalendarRow .name{font-size:13px}.subCalGroup{margin:3px 0 7px;padding-left:calc(var(--sub-depth,1)*8px)}.subCalHead{display:flex;justify-content:space-between;gap:5px;padding:4px 6px;border-left:3px solid;background:#fafafa;font-size:11px;font-weight:700}.subCalGroup .item{margin-left:4px}.subLoad{margin-left:calc(var(--cal-depth,1)*12px);font-size:11px}.calendarTreeGroup>.groupHead{font-size:12px}
+.manualSaveBtn{white-space:nowrap;padding:6px 10px;border-color:#cbd5e1;background:#fff;font-size:12px;font-weight:500}.manualSaveMobile{display:none}.manualSaveBtn:hover{background:#f7f9fc}.manualSaveBtn:disabled{opacity:.55;cursor:wait}
+.calRow.subCalendarRow{padding-left:calc(7px + var(--cal-depth,1)*14px)}.calRow.subCalendarRow .name{font-size:13px}.subCalGroup{margin:3px 0 7px;padding-left:calc(var(--sub-depth,1)*8px)}.subCalHead{display:flex;justify-content:space-between;gap:5px;padding:4px 6px;border-left:3px solid;background:#fafafa;font-size:11px;font-weight:500}.subCalGroup .item{margin-left:4px}.subLoad{margin-left:calc(var(--cal-depth,1)*12px);font-size:11px}.calendarTreeGroup>.groupHead{font-size:12px}
 @media(max-width:760px){.manualSaveBtn{order:1;padding:4px 7px;font-size:11px}.manualSaveFull{display:none}.manualSaveMobile{display:inline}.calRow.subCalendarRow{padding-left:calc(7px + var(--cal-depth,1)*12px)}}
 
 
@@ -51,7 +51,7 @@ dialog{border:0;border-radius:12px;box-shadow:0 10px 40px #0003;width:min(560px,
 
 /* v1.16: 고정업무 드래그 안정화 + 자동반복/수동배치 구분 + 접기/펴기 */
 .fixedGroup{border:1px solid #e5e7eb;border-radius:8px;margin:7px 0;overflow:hidden;background:#fff}
-.fixedGroupHead{width:100%;border:0;border-radius:0;background:#f8fafc;padding:8px 9px;display:flex;justify-content:space-between;align-items:center;gap:8px;text-align:left;font-weight:700}
+.fixedGroupHead{width:100%;border:0;border-radius:0;background:#f8fafc;padding:8px 9px;display:flex;justify-content:space-between;align-items:center;gap:8px;text-align:left;font-weight:500}
 .fixedGroupHead:hover{background:#f2f5f8}.fixedGroupHead em{font-style:normal;font-size:10px;font-weight:500;color:#7b8490;margin-left:4px}.fixedGroupMeta{font-size:11px;color:#667085;white-space:nowrap}
 .fixedGroupBody{padding:3px 6px 6px}.fixedGroupBody.collapsed{display:none}.compactEmpty{padding:9px 6px;font-size:11px}
 .recurringFixed{cursor:pointer;background:#fbfbfb}.manualFixed{cursor:grab}.manualFixed:active{cursor:grabbing}.fixed.dragging,.item.dragging{opacity:.45}
@@ -62,9 +62,9 @@ dialog{border:0;border-radius:12px;box-shadow:0 10px 40px #0003;width:min(560px,
 /* v1.17: 고정업무 배치완료 잠금 + 미완료 일정 다음날 이월 */
 .manualFixed.disabledFixed{opacity:.48;background:#f1f1f1;color:#777;cursor:not-allowed;filter:saturate(.55)}
 .manualFixed.disabledFixed small{color:#8b8b8b}.manualFixed.disabledFixed:hover{background:#f1f1f1}
-.carryAction{width:100%;border:1px dashed #9aa8bd;background:#f8faff;color:#385273;font-weight:700;text-align:left}.carryAction:hover{background:#f1f5ff}
+.carryAction{width:100%;border:1px dashed #9aa8bd;background:#f8faff;color:#385273;font-weight:500;text-align:left}.carryAction:hover{background:#f1f5ff}
 .carryTargetLine{display:flex;justify-content:space-between;gap:12px;padding:9px 10px;border:1px solid #e3e8ef;border-radius:8px;background:#f8fafc}.carryTargetLine span{color:#687386}
-.carryBadge{display:inline-flex;align-items:center;margin-left:5px;padding:1px 5px;border-radius:999px;font-size:9px;font-weight:700;line-height:1.5;vertical-align:1px;white-space:nowrap}
+.carryBadge{display:inline-flex;align-items:center;margin-left:5px;padding:1px 5px;border-radius:999px;font-size:9px;font-weight:500;line-height:1.5;vertical-align:1px;white-space:nowrap}
 .carryBadge.carryIn{background:#eef4ff;color:#315fa8;border:1px dashed #8dacda}.carryBadge.carryOut{background:#fff5e8;color:#9a5b00;border:1px dashed #d9a85c}
 .item.carriedIn{border-left-style:dashed;background:#f8faff}.item.carriedOut{box-shadow:inset 0 0 0 1px #ead9bd}.item.carriedIn.carriedOut{background:#fbfaff}
 .month .carryBadge{font-size:8px;padding:0 4px;margin-left:3px}
@@ -82,8 +82,8 @@ dialog{border:0;border-radius:12px;box-shadow:0 10px 40px #0003;width:min(560px,
 
 /* v1.22: 캘린더 전체체크/해제 + 이름 클릭 목록 + 연필 수정 버튼 */
 .calSectionHead{gap:8px}.calHeadActions{display:flex;align-items:center;gap:4px}.calHeadActions button{padding:5px 7px;font-size:10px;white-space:nowrap}.calHeadActions #addCal{font-size:14px;padding:5px 8px}
-.calRow{grid-template-columns:auto auto minmax(0,1fr) auto auto}.calNameBtn{border:0;background:transparent!important;padding:0;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-radius:3px;min-width:0;color:inherit}.calNameBtn:hover{text-decoration:underline;color:#2459a6}.calEdit{border:0;background:transparent!important;padding:3px 5px;font-size:15px;line-height:1;color:#667085}.calEdit:hover{color:#111;background:#eceff3!important}.calRow.calendarFocused{background:#eef4ff;box-shadow:inset 3px 0 0 #4f7cff}.calRow.calendarFocused .calNameBtn{font-weight:700;color:#244f96}
-.calendarFocusHeader{display:flex;justify-content:space-between;align-items:center;gap:12px;border:1px solid #e2e7ef;border-left:5px solid;border-radius:9px;padding:11px 12px;margin-bottom:12px;background:#fafcff}.calendarFocusHeader>div{display:grid;gap:3px;min-width:0}.calendarFocusHeader b{font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.calendarFocusHeader small{color:#6b7280}.calendarFocusHeader button{white-space:nowrap}.calendarFocusFixed{border:1px solid #e5e7eb;border-radius:9px;padding:9px;margin-bottom:12px;display:grid;gap:6px}.calendarFocusFixed>b{font-size:12px}.focusFixedItem{display:grid;gap:2px;text-align:left;border-left:4px solid;padding:7px 8px;background:#fff}.focusFixedItem span{font-weight:700}.focusFixedItem small{color:#777}
+.calRow{grid-template-columns:auto auto minmax(0,1fr) auto auto}.calNameBtn{border:0;background:transparent!important;padding:0;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-radius:3px;min-width:0;color:inherit}.calNameBtn:hover{text-decoration:underline;color:#2459a6}.calEdit{border:0;background:transparent!important;padding:3px 5px;font-size:15px;line-height:1;color:#667085}.calEdit:hover{color:#111;background:#eceff3!important}.calRow.calendarFocused{background:#eef4ff;box-shadow:inset 3px 0 0 #4f7cff}.calRow.calendarFocused .calNameBtn{font-weight:500;color:#244f96}
+.calendarFocusHeader{display:flex;justify-content:space-between;align-items:center;gap:12px;border:1px solid #e2e7ef;border-left:5px solid;border-radius:9px;padding:11px 12px;margin-bottom:12px;background:#fafcff}.calendarFocusHeader>div{display:grid;gap:3px;min-width:0}.calendarFocusHeader b{font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.calendarFocusHeader small{color:#6b7280}.calendarFocusHeader button{white-space:nowrap}.calendarFocusFixed{border:1px solid #e5e7eb;border-radius:9px;padding:9px;margin-bottom:12px;display:grid;gap:6px}.calendarFocusFixed>b{font-size:12px}.focusFixedItem{display:grid;gap:2px;text-align:left;border-left:4px solid;padding:7px 8px;background:#fff}.focusFixedItem span{font-weight:500}.focusFixedItem small{color:#777}
 @media(max-width:760px){.calHeadActions button{font-size:9px;padding:4px 5px}.calRow{grid-template-columns:auto auto minmax(0,1fr) auto auto}.calRow small{font-size:10px}.calEdit{font-size:14px}.calendarFocusHeader{align-items:flex-start;flex-direction:column}.calendarFocusHeader button{width:100%}}
 
 
@@ -104,19 +104,19 @@ dialog{border:0;border-radius:12px;box-shadow:0 10px 40px #0003;width:min(560px,
 
 
 /* v1.27: 완료체크 가시성 + 반복업무 제목색 + 좌측 이번달 완료현황 */
-.todoCheck{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;min-height:22px;padding:2px 6px;border:1px solid #cfd5de;border-radius:6px;background:#fff;color:#4b5563;font-size:10px;font-weight:700;white-space:nowrap}
+.todoCheck{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;min-height:22px;padding:2px 6px;border:1px solid #cfd5de;border-radius:6px;background:#fff;color:#4b5563;font-size:10px;font-weight:500;white-space:nowrap}
 .todoCheck:hover{background:#f3f6fa;border-color:#aeb7c4}.item.done .todoCheck{background:#eef8f1;border-color:#b7dfc2;color:#23713b}
-.item.recurringItem .itemTitle{color:#5b4aa3;font-weight:700}.item.recurringItem .repeatMark{color:#7b6bc2;font-weight:800}.item.done.recurringItem .itemTitle{color:#8279a7}
+.item.recurringItem .itemTitle{color:#5b4aa3;font-weight:500}.item.recurringItem .repeatMark{color:#7b6bc2;font-weight:600}.item.done.recurringItem .itemTitle{color:#8279a7}
 .month .todoCheck{min-height:18px;padding:0 3px;border-radius:4px;font-size:10px}.month .itemRow{gap:3px}
-.monthProgress{display:block;margin-top:5px;padding-top:4px;border-top:1px dashed #e1e5ea;font-size:10px;font-weight:700;color:#8a5a00}.monthProgress.complete{color:#16803c}
+.monthProgress{display:block;margin-top:5px;padding-top:4px;border-top:1px dashed #e1e5ea;font-size:10px;font-weight:500;color:#8a5a00}.monthProgress.complete{color:#16803c}
 .fixed.monthComplete{background:#f7fbf8}.fixed.monthPending:not(.disabledFixed) .monthProgress{color:#8a5a00}.manualFixed.disabledFixed .monthProgress.complete{color:#4c7d5b}
 
 /* v1.30: 반복 삭제 범위 + 납부일정 + 드래그 이동 + 시간 자동소요 */
 .dragHandle{flex:0 0 auto;color:#9aa3ae;font-size:13px;line-height:1;letter-spacing:-3px;cursor:grab;padding:2px 3px 2px 0;user-select:none}.item[draggable="true"]{cursor:grab}.item[draggable="true"]:active,.item.dragging{cursor:grabbing}.itemRow{align-items:center}
 .paymentSectionHead{gap:8px}.paymentHeadActions{display:flex;gap:4px}.paymentHeadActions button{padding:5px 8px}.paymentPanel{display:grid;gap:5px;margin-top:7px}.paymentPanel.collapsed,#paymentList.collapsed{display:none}.paymentRow{display:grid;grid-template-columns:auto minmax(0,1fr);gap:5px;align-items:center;border:1px solid #e4e7eb;border-left:4px solid;border-radius:7px;background:#fff;padding:5px}.paymentRow.paid{background:#f5fbf7;opacity:.82}.paymentCheck{border:0;background:transparent!important;font-size:15px;padding:4px;color:#3b4a5a}.paymentOpen{border:0;background:transparent!important;text-align:left;padding:2px 3px;display:grid;gap:2px;min-width:0}.paymentOpen b{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.paymentOpen small{font-size:10px;color:#6b7280;white-space:normal;line-height:1.35}.paymentNoMonth{opacity:.65}.paymentCheck.muted{font-size:13px;text-align:center}
-.paymentFields{padding:9px;border:1px solid #e5e7eb;border-radius:8px;background:#fafcff}.paymentItem .itemTitle,.item.recurringItem.paymentItem .itemTitle{color:#8a5b00;font-weight:700}.paymentItem.done .itemTitle{color:#8a8170}.paymentItem .repeatMark{color:#a86f00}
+.paymentFields{padding:9px;border:1px solid #e5e7eb;border-radius:8px;background:#fafcff}.paymentItem .itemTitle,.item.recurringItem.paymentItem .itemTitle{color:#8a5b00;font-weight:500}.paymentItem.done .itemTitle{color:#8a8170}.paymentItem .repeatMark{color:#a86f00}
 .scopeActions{display:grid;gap:7px;margin:10px 0}.scopeActions button{display:grid;gap:2px;text-align:left;padding:10px 11px;background:#fff}.scopeActions button:hover{background:#f6f8fb}.scopeActions button b{font-size:13px}.scopeActions button small{font-size:11px;color:#6b7280}.scopeActions #deleteSeries{border-color:#e9b8b8;color:#9d2626}.scopeActions #deleteSeries small{color:#a65a5a}
-#durationAutoHint{display:block;margin-top:2px;color:#4d6a8e;font-weight:600}.durationField:has(#noDuration:disabled) .durationInputs{opacity:.45}.durationField:has(#noDuration:disabled) .durationInputs input{background:#f2f3f5;cursor:not-allowed}
+#durationAutoHint{display:block;margin-top:2px;color:#4d6a8e;font-weight:500}.durationField:has(#noDuration:disabled) .durationInputs{opacity:.45}.durationField:has(#noDuration:disabled) .durationInputs input{background:#f2f3f5;cursor:not-allowed}
 @media(max-width:760px){.dragHandle{display:none}.paymentFields .row{grid-template-columns:1fr}.scopeActions button{padding:12px 11px}}
 
 
@@ -153,7 +153,7 @@ dialog{border:0;border-radius:12px;box-shadow:0 10px 40px #0003;width:min(560px,
 /* v1.32: 날짜 헤더 정렬 + 납부일정 전용 구역 */
 .dayHead{height:54px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center}
 .dayTopLine{height:24px;min-height:24px;white-space:nowrap;line-height:1;gap:5px}
-.weekdayLabel{font-size:12px;font-weight:700}
+.weekdayLabel{font-size:12px;font-weight:500}
 .dayTopLine .dateNum{font-size:18px;line-height:1}
 .dayHead .holidayName{height:15px;min-height:15px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:15px}
 .holidayEmpty{visibility:hidden}
@@ -161,8 +161,8 @@ dialog{border:0;border-radius:12px;box-shadow:0 10px 40px #0003;width:min(560px,
 .month .holidayName{height:15px;min-height:15px;line-height:15px;margin:0 0 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 .paymentLane{margin:0 0 8px;border:1px solid #e6dfc9;border-radius:6px;background:#fffdf6;overflow:hidden}
-.paymentLaneHead{display:flex;align-items:center;justify-content:space-between;gap:4px;padding:4px 6px;border-bottom:1px solid #eee5ca;background:#faf5e7;color:#7d5a16;font-size:10px;font-weight:700}
-.paymentLaneHead small{font-size:9px;color:#9a7b42;font-weight:600;white-space:nowrap}
+.paymentLaneHead{display:flex;align-items:center;justify-content:space-between;gap:4px;padding:4px 6px;border-bottom:1px solid #eee5ca;background:#faf5e7;color:#7d5a16;font-size:10px;font-weight:500}
+.paymentLaneHead small{font-size:9px;color:#9a7b42;font-weight:500;white-space:nowrap}
 .paymentLaneItems{padding:3px}
 .paymentLane .paymentItem{margin:2px 0;background:#fffaf0}
 .paymentLane .paymentItem:first-child{margin-top:0}.paymentLane .paymentItem:last-child{margin-bottom:0}
@@ -189,17 +189,17 @@ dialog{border:0;border-radius:12px;box-shadow:0 10px 40px #0003;width:min(560px,
 /* v1.33: 자동반복/날짜지정/납부일정을 캘린더별로 그룹화 */
 .sidebarCalGroup{margin:6px 0;border:1px solid #e7e9ed;border-left:3px solid var(--group-color,#d0d4da);border-radius:7px;overflow:hidden;background:#fff}
 .sidebarCalGroupHead{width:100%;border:0;border-radius:0;background:#fff;padding:6px 7px;display:flex;align-items:center;justify-content:space-between;gap:6px;text-align:left}
-.sidebarCalGroupHead:hover{background:#f7f8fa}.sidebarCalGroupTitle{display:flex;align-items:center;gap:6px;min-width:0;font-size:11px;font-weight:700}.sidebarCalGroupTitle .dot{width:8px;height:8px;flex:0 0 auto}.sidebarCalGroupTitle span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.sidebarCalGroupMeta{font-size:10px;color:#667085;white-space:nowrap;flex:0 0 auto}
+.sidebarCalGroupHead:hover{background:#f7f8fa}.sidebarCalGroupTitle{display:flex;align-items:center;gap:6px;min-width:0;font-size:11px;font-weight:500}.sidebarCalGroupTitle .dot{width:8px;height:8px;flex:0 0 auto}.sidebarCalGroupTitle span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.sidebarCalGroupMeta{font-size:10px;color:#667085;white-space:nowrap;flex:0 0 auto}
 .sidebarCalGroupBody{padding:0 5px 5px}.sidebarCalGroup.collapsed .sidebarCalGroupBody{display:none}.sidebarCalGroup .fixed{margin:4px 0}.sidebarCalGroup .paymentRow{margin:4px 0}
 
 /* v1.34 */
-.item.manualPlacedItem .itemTitle{color:#b76000;font-weight:700}
+.item.manualPlacedItem .itemTitle{color:#b76000;font-weight:500}
 .item.done.manualPlacedItem .itemTitle{color:#9a7b59}
-.item.flexiblePlacedItem .itemTitle{color:#08768a;font-weight:700}
+.item.flexiblePlacedItem .itemTitle{color:#08768a;font-weight:500}
 .item.done.flexiblePlacedItem .itemTitle{color:#668d95}
 .flexibleFixed{cursor:grab;background:#f8fcfd}.flexibleFixed:active{cursor:grabbing}.flexHistory{display:block;margin-top:4px;padding-top:4px;border-top:1px dashed #dbe8eb;font-size:10px;color:#4f6f76;line-height:1.35;white-space:normal;word-break:keep-all}
 #flexibleList.collapsed .flexiblePanel{display:none}
-.moreEventsBtn{display:block;width:100%;margin:3px 0 0;padding:2px 4px;border:0;border-radius:4px;background:#eef2f7;color:#475467;font-size:10px;font-weight:700;text-align:left;cursor:pointer}
+.moreEventsBtn{display:block;width:100%;margin:3px 0 0;padding:2px 4px;border:0;border-radius:4px;background:#eef2f7;color:#475467;font-size:10px;font-weight:500;text-align:left;cursor:pointer}
 .moreEventsBtn:hover{background:#e2e8f0}
 .dayListDlg{width:min(560px,94vw)}.dayListBody{max-height:min(70vh,720px);overflow:auto;padding:2px}
 .month{--month-weeks:5;--month-cell-min:150px;grid-template-rows:auto repeat(var(--month-weeks),minmax(var(--month-cell-min),1fr));min-height:100%;align-content:stretch}
@@ -221,7 +221,7 @@ dialog{border:0;border-radius:12px;box-shadow:0 10px 40px #0003;width:min(560px,
 .paymentLane .paymentItem{background:color-mix(in srgb,var(--item-color,#d9d9d9) 20%, white)!important}
 .item.orderDropBefore{box-shadow:inset 0 3px 0 #4f7cff,0 0 0 1px #4f7cff55}
 .item.orderDropAfter{box-shadow:inset 0 -3px 0 #4f7cff,0 0 0 1px #4f7cff55}
-.capacityUnknown{color:#6b7280;font-weight:700}
+.capacityUnknown{color:#6b7280;font-weight:500}
 .unknownLoadBar{background:repeating-linear-gradient(135deg,#eceff3 0,#eceff3 6px,#f7f8fa 6px,#f7f8fa 12px)}
 .unknownCapacity>b{color:#525d6b}
 .capacityField{display:grid;gap:6px}.capacityUnknownField{margin-top:-2px;color:#5e6672}.capacityField:has(#ccapUnknown:checked) #ccap{background:#f1f3f5;color:#8a9098}
@@ -237,7 +237,7 @@ dialog{border:0;border-radius:12px;box-shadow:0 10px 40px #0003;width:min(560px,
 
 /* v1.37: Quick tasks appear at the top of each calendar group */
 .quickLane{margin:2px 0 5px;padding:4px;border:1px dashed #cbd5e1;border-radius:6px;background:rgba(248,250,252,.92)}
-.quickLaneHead{display:flex;align-items:center;justify-content:space-between;gap:6px;margin:0 1px 3px;font-size:10px;font-weight:800;color:#475569;text-transform:none}
+.quickLaneHead{display:flex;align-items:center;justify-content:space-between;gap:6px;margin:0 1px 3px;font-size:10px;font-weight:600;color:#475569;text-transform:none}
 .quickLaneItems .item{margin:1px 0;background:rgba(255,255,255,.82)}
 .quickLaneItems .itemTitle{font-size:11px}
 .month .quickLane{padding:2px;margin:1px 0 3px}
@@ -248,20 +248,20 @@ dialog{border:0;border-radius:12px;box-shadow:0 10px 40px #0003;width:min(560px,
 .item{padding:3px 5px!important;margin:1px 0!important;min-height:26px}
 .itemRow{align-items:center!important;gap:4px!important;min-height:20px;min-width:0}
 .itemTitle{line-height:20px!important;font-size:12px!important;font-weight:500;min-width:0}
-.durationPrefix{font-weight:700;color:#515151;margin-right:1px}
+.durationPrefix{font-weight:500;color:#515151;margin-right:1px}
 .todoCheck{
   appearance:none;-webkit-appearance:none;flex:0 0 14px;width:14px;height:14px;min-width:14px;min-height:14px;
   margin:0;padding:0!important;border:1px solid #aeb4bd!important;border-radius:2px;background:#fff!important;position:relative;cursor:pointer
 }
 .todoCheck:checked{border-color:#8a929d!important;background:#fff!important}
-.todoCheck:checked::after{content:'✓';position:absolute;left:1px;top:-3px;font-size:14px;line-height:16px;color:#5c6673;font-weight:800}
+.todoCheck:checked::after{content:'✓';position:absolute;left:1px;top:-3px;font-size:14px;line-height:16px;color:#5c6673;font-weight:600}
 .item.done .todoCheck{opacity:1}
 .item.done .itemTitle{text-decoration:none!important;color:#888!important}
 .item.done{opacity:.72!important}
 .inlineMeta{flex:0 0 auto;font-size:10px;color:#6f747b;white-space:nowrap}
 .repeatMark,.carryBadge{flex:0 0 auto;margin:0!important;font-size:10px}
 .checklistToggle{flex:0 0 auto;border:0;background:transparent!important;padding:1px 2px!important;font-size:9px;color:#657080;white-space:nowrap}
-.checklistToggle.on{color:#25364b;font-weight:700}
+.checklistToggle.on{color:#25364b;font-weight:500}
 .subtaskList{margin:3px 0 1px 42px;padding:4px 5px;border-top:1px dashed color-mix(in srgb,var(--item-color,#d9d9d9) 55%, #ddd);display:grid;gap:2px}
 .subtaskRow{display:flex;align-items:center;gap:4px;font-size:10px;min-width:0}
 .subtaskRow span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -269,7 +269,7 @@ dialog{border:0;border-radius:12px;box-shadow:0 10px 40px #0003;width:min(560px,
 .item .meta,.checklistCompact{display:none!important}
 
 .groupHead,.subCalHead{padding:0!important;overflow:hidden}
-.dayCalToggle{width:100%;border:0!important;border-radius:0!important;background:transparent!important;padding:4px 5px!important;display:flex;align-items:center;justify-content:space-between;gap:5px;text-align:left;font-weight:700;color:inherit;min-width:0}
+.dayCalToggle{width:100%;border:0!important;border-radius:0!important;background:transparent!important;padding:4px 5px!important;display:flex;align-items:center;justify-content:space-between;gap:5px;text-align:left;font-weight:500;color:inherit;min-width:0}
 .dayCalToggle:hover{background:rgba(255,255,255,.28)!important}
 .dayCalHeadLabel{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dayCalHeadRight{display:flex;align-items:center;gap:3px;flex:0 0 auto;white-space:nowrap}
@@ -306,12 +306,12 @@ aside{min-height:0}
 
 
 /* v1.42: 예약·약속 / 2~3주 보기 / 구매목록 / 클릭 팝업 완료처리 */
-.eventDoneWrap{position:absolute;right:18px;top:18px;display:inline-flex!important;align-items:center;gap:5px;padding:6px 9px;border:1px solid #d7dce3;border-radius:7px;background:#fff;font-weight:700;z-index:2}.eventDoneWrap.hidden{display:none!important}.eventDoneWrap input{width:16px;height:16px}
+.eventDoneWrap{position:absolute;right:18px;top:18px;display:inline-flex!important;align-items:center;gap:5px;padding:6px 9px;border:1px solid #d7dce3;border-radius:7px;background:#fff;font-weight:500;z-index:2}.eventDoneWrap.hidden{display:none!important}.eventDoneWrap input{width:16px;height:16px}
 /* 달력 카드에서는 완료 체크박스를 숨기고, 일정 클릭 후 팝업에서만 처리 */
 .item .todoCheck{display:none!important}
 /* 중요하지 않은 항목은 별표 공간 자체가 없음 */
 .importanceBtn{margin-right:1px}
-.appointmentLane{margin:0 0 7px;border:1px solid #d8e6ff;border-radius:6px;background:#f7faff;overflow:hidden}.appointmentLaneHead{display:flex;align-items:center;justify-content:space-between;padding:4px 6px;background:#eaf2ff;color:#285a9f;font-size:10px;font-weight:800}.appointmentLaneItems{padding:3px}.appointmentLane .item{margin:2px 0!important}.appointmentLane .itemTitle{font-weight:700;color:#214e87}
+.appointmentLane{margin:0 0 7px;border:1px solid #d8e6ff;border-radius:6px;background:#f7faff;overflow:hidden}.appointmentLaneHead{display:flex;align-items:center;justify-content:space-between;padding:4px 6px;background:#eaf2ff;color:#285a9f;font-size:10px;font-weight:600}.appointmentLaneItems{padding:3px}.appointmentLane .item{margin:2px 0!important}.appointmentLane .itemTitle{font-weight:500;color:#214e87}
 .compactAppointmentLane{margin-bottom:4px}.compactAppointmentLane .appointmentLaneHead{padding:2px 3px;font-size:8px}.compactAppointmentLane .appointmentLaneItems{padding:1px 2px}
 .multiWeek{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-auto-rows:minmax(230px,auto);min-width:0;width:100%;align-content:start}.multiWeek .multiDay{min-width:0;border-right:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;display:flex;flex-direction:column}.multiWeek .dayBody{flex:1;min-height:180px;padding:5px;overflow:visible}.multiWeek .dayHead{border-bottom:1px solid #e5e7eb}
 .purchaseRow{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:4px;margin:4px 0;padding:4px 5px;border:1px solid #e2e8f0;border-radius:6px;background:#fff}.purchaseRow.done{opacity:.62;background:#f6f7f8}.purchaseRow.done .purchaseOpen span{text-decoration:line-through}.purchaseCheck{border:0;background:transparent;padding:2px;font-size:13px;cursor:pointer}.purchaseOpen{border:0;background:transparent;padding:1px 2px;min-width:0;display:flex;justify-content:space-between;gap:6px;text-align:left}.purchaseOpen span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.purchaseOpen small{white-space:nowrap;color:#6b7280}
@@ -333,12 +333,12 @@ aside{min-height:0}
 .eventPopoverDetail{display:grid;grid-template-columns:36px minmax(0,1fr);gap:7px;align-items:start;padding:5px 7px;border:1px solid #edf0f3;border-radius:6px;background:#fff;font-size:10px;line-height:1.45;color:#3f4856}
 .eventPopoverDetail b{font-size:10px;color:#667085}
 .eventPopoverDetail span{min-width:0;white-space:pre-wrap;overflow-wrap:anywhere}
-.eventPopoverDone{display:flex;align-items:center;gap:6px;margin:9px 2px 4px;font-weight:700;cursor:pointer}.eventPopoverDone input{width:15px;height:15px;accent-color:#44546a}.eventPopoverDone.hidden{display:none!important}
+.eventPopoverDone{display:flex;align-items:center;gap:6px;margin:9px 2px 4px;font-weight:500;cursor:pointer}.eventPopoverDone input{width:15px;height:15px;accent-color:#44546a}.eventPopoverDone.hidden{display:none!important}
 .eventPopoverActions{display:flex;justify-content:flex-end;margin-top:7px}.eventPopoverActions button{padding:5px 9px;font-size:11px}
 
 .anniversaryLane{margin:0 0 7px;border:1px solid #f0d5e5;border-radius:6px;background:#fff8fc;overflow:hidden}
-.anniversaryLaneHead{display:flex;align-items:center;justify-content:space-between;padding:4px 6px;background:#fbeaf4;color:#9b3c74;font-size:10px;font-weight:800}
-.anniversaryLaneHead small{font-size:9px;color:#b16a94}.anniversaryLaneItems{padding:3px}.anniversaryLane .item{margin:2px 0!important}.anniversaryLane .itemTitle{font-weight:700;color:#873762}
+.anniversaryLaneHead{display:flex;align-items:center;justify-content:space-between;padding:4px 6px;background:#fbeaf4;color:#9b3c74;font-size:10px;font-weight:600}
+.anniversaryLaneHead small{font-size:9px;color:#b16a94}.anniversaryLaneItems{padding:3px}.anniversaryLane .item{margin:2px 0!important}.anniversaryLane .itemTitle{font-weight:500;color:#873762}
 .compactAnniversaryLane{margin-bottom:4px}.compactAnniversaryLane .anniversaryLaneHead{padding:2px 3px;font-size:8px}.compactAnniversaryLane .anniversaryLaneHead small{font-size:7px}.compactAnniversaryLane .anniversaryLaneItems{padding:1px 2px}
 
 .secTitleWithGrip{display:flex;align-items:center;gap:5px;min-width:0}.sidebarSectionGrip{display:inline-flex;align-items:center;justify-content:center;width:14px;color:#9aa3ae;letter-spacing:-3px;cursor:grab;user-select:none;font-size:12px}.sidebarSectionGrip:active{cursor:grabbing}.sidebarSectionDragging{opacity:.48}.sidebarSectionDrop{outline:1px dashed #9db4d5;outline-offset:2px}.sidebarSection{transition:opacity .12s ease}
@@ -348,7 +348,7 @@ aside{min-height:0}
 
 /* v1.44: 캘린더별 요일 가용시간 설정 */
 .weekdayCapacityField{display:block;margin-top:8px;padding:9px;border:1px solid #e1e5ea;border-radius:8px;background:#fafbfc}
-.weekdayCapacityField .capacityTitle{display:block;margin-bottom:7px;font-weight:700}
+.weekdayCapacityField .capacityTitle{display:block;margin-bottom:7px;font-weight:500}
 .weekdayCapacityGrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
 .weekdayCapacityCell{display:grid;grid-template-columns:1fr;gap:4px;min-width:0;padding:6px 5px;border:1px solid #e5e7eb;border-radius:7px;background:#fff;text-align:center}
 .weekdayCapacityCell b{font-size:11px}.weekdayCapacityCell input[type=number]{width:100%;min-width:0;padding:5px 4px;text-align:center}
@@ -358,7 +358,7 @@ aside{min-height:0}
 
 /* v1.45: 가용시간 공유 / 차단 일정 */
 .availabilityBlockFields{margin:4px 0 8px;padding:9px 10px;border:1px solid #e3e6ea;border-radius:8px;background:#fafbfc}
-.availabilityBlockFields>.check{margin:0;font-weight:700}
+.availabilityBlockFields>.check{margin:0;font-weight:500}
 .availabilityTargetWrap{margin-top:8px;padding-top:8px;border-top:1px dashed #d9dde3}
 .weekdayCapacityField.sharedFromParent{background:#f7f8fa}
 .weekdayCapacityField.sharedFromParent .weekdayCapacityGrid{opacity:.42}
@@ -470,18 +470,18 @@ aside{min-height:0}
 body{font-family:var(--ui-font);font-size:13px;color:var(--text);letter-spacing:-.012em;font-feature-settings:"tnum" 1,"ss01" 1}
 button,input,select,textarea{font-family:var(--ui-font);letter-spacing:-.01em}
 header{border-bottom-color:#e9ebef;box-shadow:0 1px 0 rgba(15,23,42,.025);gap:14px}
-.brand b{font-weight:760;letter-spacing:-.035em}.brand small{font-weight:520;color:#9097a2}
+.brand b{font-weight:600;letter-spacing:-.035em}.brand small{font-weight:500;color:#9097a2}
 button{border-color:#e0e4e9;color:#30343a;background:#fff}
 button:hover{background:#f7f8fa}
 .views .on,.primary{background:#22262d;border-color:#22262d}
-#range{font-weight:650;letter-spacing:-.025em}
+#range{font-weight:500;letter-spacing:-.025em}
 
 /* 날짜/그리드 선은 더 옅게 */
 .dayCol,.month .cell,.month .weekdayHeader,.multiWeek .multiDay{border-color:#edf0f3!important}
 .dayHead{border-bottom-color:#e8ebef;background:#fff}
 .dayHead.today{background:#f6f9fd}
-.weekdayLabel{font-weight:650;color:#5c6470}.dateNum{font-weight:760;letter-spacing:-.03em}
-.dayHead .holidayName{font-weight:600}
+.weekdayLabel{font-weight:500;color:#5c6470}.dateNum{font-weight:600;letter-spacing:-.03em}
+.dayHead .holidayName{font-weight:500}
 .dayBody{padding:6px}
 
 /* 캘린더 묶음: 헤더-본문 위계를 선명하게, 블록감은 줄임 */
@@ -492,8 +492,8 @@ button:hover{background:#f7f8fa}
   border-bottom:0;
   border-radius:6px 6px 0 0!important;
 }
-.dayCalToggle{min-height:24px;padding:4px 6px!important;font-size:10.5px;font-weight:700;letter-spacing:-.02em}
-.dayCalHeadRight{font-weight:650;color:#59616d}
+.dayCalToggle{min-height:24px;padding:4px 6px!important;font-size:10.5px;font-weight:500;letter-spacing:-.02em}
+.dayCalHeadRight{font-weight:500;color:#59616d}
 .subCalHead{background:#fafbfc!important;border-top:1px solid #eef0f3;border-right:1px solid #eef0f3;border-bottom:1px solid #eef0f3}
 .subCalGroup{margin-top:2px;margin-bottom:4px}
 
@@ -510,12 +510,12 @@ button:hover{background:#f7f8fa}
 }
 .item:hover{background:color-mix(in srgb,var(--item-color,#d9d9d9) 17%, white)!important;border-color:color-mix(in srgb,var(--item-color,#d9d9d9) 43%, #e1e5ea)!important}
 .itemRow{min-height:18px!important;gap:3px!important;align-items:center!important}
-.itemTitle{font-size:11.5px!important;line-height:18px!important;font-weight:570;letter-spacing:-.018em;color:#31353c}
-.durationPrefix{font-weight:720;color:#4c535e;margin-right:2px}
+.itemTitle{font-size:11.5px!important;line-height:18px!important;font-weight:500;letter-spacing:-.018em;color:#31353c}
+.durationPrefix{font-weight:600;color:#4c535e;margin-right:2px}
 .item.done{opacity:.55!important}.item.done .itemTitle{color:#7d838c!important}
-.item.recurringItem .itemTitle{color:#5f50a1;font-weight:650}
-.item.manualPlacedItem .itemTitle{color:#ad640e;font-weight:650}
-.item.flexiblePlacedItem .itemTitle{color:#157486;font-weight:650}
+.item.recurringItem .itemTitle{color:#5f50a1;font-weight:500}
+.item.manualPlacedItem .itemTitle{color:#ad640e;font-weight:500}
+.item.flexiblePlacedItem .itemTitle{color:#157486;font-weight:500}
 .importanceBtn{font-size:11px!important;color:#dc8d00!important}
 .repeatMark,.carryBadge,.checklistToggle{opacity:.72}
 
@@ -528,7 +528,7 @@ button:hover{background:#f7f8fa}
 
 /* 합계는 시선 방해를 줄임 */
 .dayTotal{margin-top:3px;padding:4px 3px;border-top:1px dashed #e3e6ea;color:#818895;font-size:9.5px;line-height:1.35}
-.dayTotal .ok,.dayTotal .over{font-weight:650}
+.dayTotal .ok,.dayTotal .over{font-weight:500}
 
 /* 월간도 같은 밀도 */
 .month .cell{padding:5px;background:#fff}
@@ -536,11 +536,11 @@ button:hover{background:#f7f8fa}
 .month .mhead{font-size:11px;margin-bottom:3px}
 .month .item{min-height:20px!important;padding:1px 4px!important;font-size:9px!important}
 .month .itemTitle{font-size:9px!important;line-height:16px!important}
-.month .weekdayHeader{font-weight:650;color:#59616d;background:#fbfcfd}
+.month .weekdayHeader{font-weight:500;color:#59616d;background:#fbfcfd}
 
 /* 좌측바도 카드보다는 목록형 */
 aside{background:#fbfcfd;border-right-color:#e8ebef}
-.sidebarSection{margin-bottom:20px}.secHead{margin-bottom:7px}.secHead b{font-weight:730;letter-spacing:-.025em}
+.sidebarSection{margin-bottom:20px}.secHead{margin-bottom:7px}.secHead b{font-weight:600;letter-spacing:-.025em}
 .calRow{padding:6px 5px;border-radius:6px}.calRow:hover{background:#f0f3f7}
 .fixed,.flexibleItem,.paymentSidebarItem,.purchaseRow{box-shadow:none}
 
@@ -556,7 +556,7 @@ input,select,textarea{border-color:#d9dee5}.repeatBox,.dataManage,.weekdayCapaci
   body{font-size:12px}
   .item{min-height:18px!important;padding:1px 2px!important;border-left-width:2px!important;border-radius:3px!important}
   .itemRow{min-height:15px!important;gap:1px!important}
-  .itemTitle{font-size:7.8px!important;line-height:15px!important;font-weight:570}
+  .itemTitle{font-size:7.8px!important;line-height:15px!important;font-weight:500}
   .durationPrefix{font-size:7px!important}
   .dayCalToggle{min-height:17px;padding:2px 1px!important;font-size:7px!important}
   .calendarTreeGroup>.groupHead{border-radius:3px 3px 0 0!important}
@@ -587,7 +587,7 @@ input,select,textarea{border-color:#d9dee5}.repeatBox,.dataManage,.weekdayCapaci
   border-bottom:1px dashed #d7dde5;
   background:transparent!important;
   font-size:10px!important;
-  font-weight:800;
+  font-weight:600;
   letter-spacing:-.01em;
 }
 .appointmentLaneHead{color:#315e99}
@@ -596,7 +596,7 @@ input,select,textarea{border-color:#d9dee5}.repeatBox,.dataManage,.weekdayCapaci
 .anniversaryLaneHead{color:#9b3c74}
 .appointmentLaneHead small,.quickLaneHead small,.paymentLaneHead small,.anniversaryLaneHead small{
   font-size:9px!important;
-  font-weight:700;
+  font-weight:500;
   color:#8a94a5!important;
 }
 .appointmentLaneItems,.paymentLaneItems,.anniversaryLaneItems,.quickLaneItems{
@@ -641,19 +641,19 @@ input,select,textarea{border-color:#d9dee5}.repeatBox,.dataManage,.weekdayCapaci
   border-bottom:1px dashed #d7dde5;
   color:#667085;
   font-size:10px;
-  font-weight:800;
+  font-weight:600;
 }
-.commonTopLaneHead small{font-size:9px;color:#98a2b3;font-weight:700}
+.commonTopLaneHead small{font-size:9px;color:#98a2b3;font-weight:500}
 .commonTopLaneItems{padding:0}
 .commonTopLane .item{margin:1px 0!important}
 .commonTopLane .kind-anniversary{
   background:color-mix(in srgb,#f8d8eb 38%,white)!important;
 }
-.commonTopLane .kind-anniversary .itemTitle{color:#8e3f70;font-weight:700}
+.commonTopLane .kind-anniversary .itemTitle{color:#8e3f70;font-weight:500}
 .commonTopLane .kind-appointment{
   background:color-mix(in srgb,#dbeafe 38%,white)!important;
 }
-.commonTopLane .kind-appointment .itemTitle{color:#2f5f99;font-weight:700}
+.commonTopLane .kind-appointment .itemTitle{color:#2f5f99;font-weight:500}
 .compactCommonTopLane{margin-bottom:4px}
 .compactCommonTopLane .commonTopLaneHead{font-size:8px;margin-bottom:1px;padding:0 1px 1px}
 .compactCommonTopLane .commonTopLaneHead small{font-size:7px}
@@ -790,13 +790,13 @@ input,select,textarea{border-color:#d9dee5}.repeatBox,.dataManage,.weekdayCapaci
 .scheduleLaneCell .itemTitle{font-size:10.5px!important}
 .scheduleLaneCell .dragHandle{display:none}
 .laneCellLoad{position:sticky;top:0;z-index:2;display:block;width:max-content;max-width:100%;margin:0 0 2px auto;padding:1px 4px;border-radius:8px;background:#ffffffdf;font-size:8.5px;line-height:14px;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 0 0 1px #eef0f3}
-.laneCellLoad.over{color:#c33;font-weight:700}.laneCellLoad.ok{color:#60706a}.laneCellLoad.unknown{color:#7b6a9b}
-.laneSubGroup{margin:2px 0 3px}.laneSubLabel{display:flex;align-items:center;gap:3px;height:15px;margin:1px 0;color:#697386;font-size:8.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.laneSubDot{width:5px;height:5px;border-radius:50%;flex:0 0 auto}
+.laneCellLoad.over{color:#c33;font-weight:500}.laneCellLoad.ok{color:#60706a}.laneCellLoad.unknown{color:#7b6a9b}
+.laneSubGroup{margin:2px 0 3px}.laneSubLabel{display:flex;align-items:center;gap:3px;height:15px;margin:1px 0;color:#697386;font-size:8.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.laneSubDot{width:5px;height:5px;border-radius:50%;flex:0 0 auto}
 .laneHeightResizer{height:6px;cursor:ns-resize;background:linear-gradient(to bottom,transparent 2px,#d6dbe2 2px,#d6dbe2 3px,transparent 3px);touch-action:none;opacity:.5}
 .laneHeightResizer:hover{opacity:1;background:linear-gradient(to bottom,transparent 1px,#9aa7b5 1px,#9aa7b5 4px,transparent 4px)}
 body.resizingLane{cursor:ns-resize!important;user-select:none!important}body.resizingLane *{cursor:ns-resize!important}
 .scheduleSummaryGrid{border-bottom:1px solid #dfe3e8;background:#fafbfc}.scheduleSummaryCell{min-height:24px;padding:4px 3px;border-right:1px solid #edf0f3;font-size:8.5px;color:#7a8390;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.multiLaneWeeks{display:grid;gap:12px;padding-bottom:20px}.multiLaneWeek{border-bottom:1px solid #dfe3e8}.multiLaneWeekLabel{position:sticky;top:0;z-index:9;padding:4px 8px;background:#f7f8fa;border-bottom:1px solid #e5e7eb;color:#667085;font-size:10px;font-weight:700}
+.multiLaneWeeks{display:grid;gap:12px;padding-bottom:20px}.multiLaneWeek{border-bottom:1px solid #dfe3e8}.multiLaneWeekLabel{position:sticky;top:0;z-index:9;padding:4px 8px;background:#f7f8fa;border-bottom:1px solid #e5e7eb;color:#667085;font-size:10px;font-weight:500}
 /* 최상단 3구역은 항상 존재하며, 상위 캘린더+부속캘린더는 한 레인 안에서 함께 표시 */
 .scheduleLane[data-lane-key="common"] .scheduleLaneHead{background:#fbf6fa}.scheduleLane[data-lane-key="quick"] .scheduleLaneHead{background:#f7f8fa}.scheduleLane[data-lane-key="payment"] .scheduleLaneHead{background:#fcf9ef}
 /* 새 레인 화면에서는 v1.51 날짜 내부 고정높이 규칙을 사용하지 않음 */
@@ -830,7 +830,7 @@ body.resizingLane{cursor:ns-resize!important;user-select:none!important}body.res
   background:#f8f9fb;
   color:#a0a7b1;
   font-size:9px;
-  font-weight:700;
+  font-weight:500;
 }
 .scheduleLane{
   display:grid!important;
@@ -936,7 +936,7 @@ body.resizingLane{cursor:ns-resize!important;user-select:none!important}body.res
   background:#f4f6f8;
   color:#8a94a5;
   font-size:9px;
-  font-weight:700;
+  font-weight:500;
 }
 .scheduleSummaryGrid{background:#fafbfc}
 .scheduleLane[data-lane-key="common"] .scheduleLaneSide{background:#fbf6fa}
@@ -1309,7 +1309,7 @@ body.resizingLaneLabel *{
   .mobileDayTab.today:not(.selected){background:#f7faff}
   .mobileDayTab.saturday .mobileDayDow,.mobileDayTab.saturday b{color:#2873c5}
   .mobileDayTab.sunday .mobileDayDow,.mobileDayTab.sunday b,.mobileDayTab.holiday .mobileDayDow,.mobileDayTab.holiday b{color:#d84444}
-  .mobileDayDow{font-size:9px;font-weight:650}
+  .mobileDayDow{font-size:9px;font-weight:500}
   .mobileDayTab b{font-size:15px;line-height:17px}
   .mobileDayTab small{font-size:8px;color:#7d8795;line-height:11px}
   .mobileDayDots{height:5px;display:flex;align-items:center;justify-content:center;gap:2px}
@@ -1365,7 +1365,7 @@ body.resizingLaneLabel *{
   .mobileAgendaSection.collapsed .mobileAgendaBody{display:none}
   .mobileAgendaSection.collapsed .mobileAgendaHead{border-radius:8px}
   .mobileAgendaEmpty{padding:6px 4px;color:#a1a8b2;font-size:10px}
-  .mobileSubLabel{padding:5px 3px 2px;color:#7a8390;font-size:9px;font-weight:700;border-bottom:1px dashed #edf0f3;margin-bottom:1px}
+  .mobileSubLabel{padding:5px 3px 2px;color:#7a8390;font-size:9px;font-weight:500;border-bottom:1px dashed #edf0f3;margin-bottom:1px}
   .mobileSubLabel:not(:first-child){margin-top:4px}
 
   /* 모바일 상세에서는 일정 제목을 읽을 수 있도록 PC 축소 규칙을 되돌림 */
@@ -1377,7 +1377,7 @@ body.resizingLaneLabel *{
     border-radius:7px!important;
   }
   .mobileScheduleView .itemRow{min-height:20px!important;gap:4px!important}
-  .mobileScheduleView .itemTitle{font-size:12px!important;line-height:20px!important;font-weight:560}
+  .mobileScheduleView .itemTitle{font-size:12px!important;line-height:20px!important;font-weight:500}
   .mobileScheduleView .durationPrefix{font-size:10px!important}
   .mobileScheduleView .repeatMark,.mobileScheduleView .carryBadge,.mobileScheduleView .checklistToggle{font-size:9px!important}
   .mobileScheduleView .importanceBtn{font-size:13px!important}
@@ -1680,7 +1680,7 @@ body.resizingLaneLabel *{
 .diaryMainHeading{display:grid;gap:2px}.diaryMainHeading>b{font-size:20px}.diaryMainHeading small{font-size:11px;color:#7a818c}
 .diaryMainActions{display:flex;gap:5px;align-items:center}.diaryMainActions button{padding:6px 10px}.diaryMainActions button.on{background:#222;color:#fff;border-color:#222}
 .diaryCalendarGrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-template-rows:auto repeat(var(--diary-weeks,5),minmax(112px,1fr));max-width:1180px;margin:0 auto;border-top:1px solid #e5e7eb;border-left:1px solid #e5e7eb;background:#fff}
-.diaryCalendarWeekday{padding:7px 5px;text-align:center;font-size:11px;font-weight:700;border-right:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;background:#fafbfc}.diaryCalendarWeekday.saturday{color:#3267aa}.diaryCalendarWeekday.sunday{color:#c23d3d}
+.diaryCalendarWeekday{padding:7px 5px;text-align:center;font-size:11px;font-weight:500;border-right:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;background:#fafbfc}.diaryCalendarWeekday.saturday{color:#3267aa}.diaryCalendarWeekday.sunday{color:#c23d3d}
 .diaryCalendarCell{min-width:0;min-height:112px;padding:8px;cursor:pointer;border-right:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;background:#fff;transition:background .12s ease}.diaryCalendarCell:hover{background:#f8fafc}.diaryCalendarCell.other{background:#fafafa;color:#a1a7b0}.diaryCalendarCell.today{box-shadow:inset 0 0 0 2px #dce8fa}.diaryCalendarCell.hasDiary{background:#fffdf8}
 .diaryCalendarCellHead{display:flex;align-items:center;justify-content:space-between;gap:5px}.diaryCalendarCellHead>b{font-size:13px}.diaryCalendarCell.saturday .diaryCalendarCellHead>b{color:#3267aa}.diaryCalendarCell.sunday .diaryCalendarCellHead>b{color:#c23d3d}.diaryCalendarGlyph .diaryGlyph{width:14px;height:14px}
 .diaryCalendarCellPreview{margin-top:9px;font-size:11px;line-height:1.45;color:#555d69;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}.diaryEmptyHint{color:#b8bec7;font-size:10px}
@@ -1723,7 +1723,7 @@ body.resizingLaneLabel *{
   text-decoration:none;
   font-family:var(--ui-font),sans-serif;
   font-size:17px;
-  font-weight:900;
+  font-weight:600;
   line-height:1;
   flex:0 0 auto;
   box-shadow:0 1px 2px rgba(15,23,42,.05);
@@ -1773,7 +1773,7 @@ body.resizingLaneLabel *{
 
 
 /* v1.75: 실제 업무시간 기록 + 주/월/연 업무시간 분석 */
-.workloadTabs{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin:1px 0 6px}.workloadTabs button{padding:5px 4px;font-size:10px;font-weight:700}.workloadTabs button.on{background:#222;color:#fff;border-color:#222}.workloadPeriodTitle{font-size:11px;font-weight:800;color:#59616d;margin:0 0 6px;padding:0 2px}.workloadDay{border:1px solid #e5e8ec;border-radius:8px;overflow:hidden;margin:0 0 7px;background:#fff}.workloadDayHead{display:grid;gap:2px;padding:6px 7px;background:#f7f8fa;border-bottom:1px solid #e9ebef}.workloadDayHead b{font-size:11px}.workloadDayHead span{font-size:9px;color:#6b7280;line-height:1.35}.workloadCalRow{padding:6px 7px;border-bottom:1px solid #f0f1f3}.workloadCalRow:last-child{border-bottom:0}.workloadCalTop{display:flex;align-items:center;justify-content:space-between;gap:5px}.workloadCalName{display:flex;align-items:center;gap:5px;min-width:0}.workloadCalName i,.workloadAggName i{width:7px;height:7px;border-radius:50%;background:var(--work-cal);flex:0 0 auto}.workloadCalName b{font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.workloadPlan{font-size:9px;color:#4b5563;white-space:nowrap}.workloadCalMeta{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:4px;font-size:9px;color:#747b86}.workloadCalMeta label{display:inline-flex;align-items:center;gap:2px;color:#384152;font-weight:700}.actualWorkInput{width:46px!important;padding:3px 4px!important;font-size:10px!important;border-radius:5px!important;text-align:right}.workloadBreakdown{display:flex;flex-wrap:wrap;gap:3px 6px;margin-top:4px;padding-top:4px;border-top:1px dashed #edf0f3}.workloadBreakdown span{display:inline-flex;align-items:center;gap:3px;font-size:8px;color:#737b86}.workloadBreakdown i{width:5px;height:5px;border-radius:50%;background:var(--work-cal)}.workDiffPlus{color:#b45309;font-weight:800}.workDiffMinus{color:#2563a8;font-weight:800}.workDiffZero{color:#16803c;font-weight:800}.workloadAggregateRow{border:1px solid #e5e8ec;border-radius:8px;padding:7px;margin:0 0 6px;background:#fff}.workloadAggName{display:flex;align-items:center;gap:5px;font-size:10px}.workloadAggNums{display:grid;grid-template-columns:1fr 1fr;gap:3px 7px;margin-top:5px;font-size:9px;color:#626b77}.workloadAggNums strong{color:#222}.workloadGrand{border:1px solid #d7dde5;background:#f8fafc;border-radius:8px;padding:7px;margin-top:7px}.workloadGrand>b{font-size:11px}.workloadGrand>div{display:flex;gap:4px 8px;flex-wrap:wrap;margin-top:4px;font-size:9px;color:#59616d}.workloadGrand strong{color:#111}.workMissing{color:#a16207!important;font-weight:700}.workloadHint{font-size:9px;color:#8a919b;line-height:1.4;margin:6px 1px 0}.sidebarSectionCollapsed #weekLoad{display:none}.sidebarSection[data-sidebar-section="load"] .secHead{margin-bottom:7px}@media(max-width:760px){.actualWorkInput{font-size:16px!important;width:58px!important}.workloadCalMeta{font-size:10px}.workloadDayHead span,.workloadAggNums,.workloadGrand>div{font-size:10px}}
+.workloadTabs{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin:1px 0 6px}.workloadTabs button{padding:5px 4px;font-size:10px;font-weight:500}.workloadTabs button.on{background:#222;color:#fff;border-color:#222}.workloadPeriodTitle{font-size:11px;font-weight:600;color:#59616d;margin:0 0 6px;padding:0 2px}.workloadDay{border:1px solid #e5e8ec;border-radius:8px;overflow:hidden;margin:0 0 7px;background:#fff}.workloadDayHead{display:grid;gap:2px;padding:6px 7px;background:#f7f8fa;border-bottom:1px solid #e9ebef}.workloadDayHead b{font-size:11px}.workloadDayHead span{font-size:9px;color:#6b7280;line-height:1.35}.workloadCalRow{padding:6px 7px;border-bottom:1px solid #f0f1f3}.workloadCalRow:last-child{border-bottom:0}.workloadCalTop{display:flex;align-items:center;justify-content:space-between;gap:5px}.workloadCalName{display:flex;align-items:center;gap:5px;min-width:0}.workloadCalName i,.workloadAggName i{width:7px;height:7px;border-radius:50%;background:var(--work-cal);flex:0 0 auto}.workloadCalName b{font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.workloadPlan{font-size:9px;color:#4b5563;white-space:nowrap}.workloadCalMeta{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:4px;font-size:9px;color:#747b86}.workloadCalMeta label{display:inline-flex;align-items:center;gap:2px;color:#384152;font-weight:500}.actualWorkInput{width:46px!important;padding:3px 4px!important;font-size:10px!important;border-radius:5px!important;text-align:right}.workloadBreakdown{display:flex;flex-wrap:wrap;gap:3px 6px;margin-top:4px;padding-top:4px;border-top:1px dashed #edf0f3}.workloadBreakdown span{display:inline-flex;align-items:center;gap:3px;font-size:8px;color:#737b86}.workloadBreakdown i{width:5px;height:5px;border-radius:50%;background:var(--work-cal)}.workDiffPlus{color:#b45309;font-weight:600}.workDiffMinus{color:#2563a8;font-weight:600}.workDiffZero{color:#16803c;font-weight:600}.workloadAggregateRow{border:1px solid #e5e8ec;border-radius:8px;padding:7px;margin:0 0 6px;background:#fff}.workloadAggName{display:flex;align-items:center;gap:5px;font-size:10px}.workloadAggNums{display:grid;grid-template-columns:1fr 1fr;gap:3px 7px;margin-top:5px;font-size:9px;color:#626b77}.workloadAggNums strong{color:#222}.workloadGrand{border:1px solid #d7dde5;background:#f8fafc;border-radius:8px;padding:7px;margin-top:7px}.workloadGrand>b{font-size:11px}.workloadGrand>div{display:flex;gap:4px 8px;flex-wrap:wrap;margin-top:4px;font-size:9px;color:#59616d}.workloadGrand strong{color:#111}.workMissing{color:#a16207!important;font-weight:500}.workloadHint{font-size:9px;color:#8a919b;line-height:1.4;margin:6px 1px 0}.sidebarSectionCollapsed #weekLoad{display:none}.sidebarSection[data-sidebar-section="load"] .secHead{margin-bottom:7px}@media(max-width:760px){.actualWorkInput{font-size:16px!important;width:58px!important}.workloadCalMeta{font-size:10px}.workloadDayHead span,.workloadAggNums,.workloadGrand>div{font-size:10px}}
 
 
 /* v1.77 - 2주/3주 보기 주간 간 드래그 이동 보강 */
@@ -1839,7 +1839,7 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
     white-space:nowrap;
     overflow:hidden;
   }
-  .views > .dateNavButtons #today{font-size:10.5px!important;font-weight:700}
+  .views > .dateNavButtons #today{font-size:10.5px!important;font-weight:500}
   nav{
     position:relative;
     display:flex!important;
@@ -1860,7 +1860,7 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
     overflow:visible!important;
     text-overflow:clip!important;
     font-size:11px!important;
-    font-weight:700;
+    font-weight:500;
     white-space:nowrap;
   }
 }
@@ -1903,7 +1903,7 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
   background:#fafbfc;
   color:#4f5661;
   font-size:10px;
-  font-weight:700;
+  font-weight:500;
 }
 .multiCompactWeekday.saturday{color:#356cc8}
 .multiCompactWeekday.sunday{color:#d33}
@@ -1931,7 +1931,7 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
   font-size:9px;
   line-height:18px;
 }
-.multiCompactDate>span{font-weight:650}
+.multiCompactDate>span{font-weight:500}
 .multiCompactDate>b{
   min-width:0;
   overflow:hidden;
@@ -1939,7 +1939,7 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
   white-space:nowrap;
   color:#d33;
   font-size:8px;
-  font-weight:650;
+  font-weight:500;
 }
 .multiCompactCell.saturday .multiCompactDate>span{color:#356cc8}
 .multiCompactCell.sunday .multiCompactDate>span,
@@ -1984,7 +1984,7 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
   background:transparent!important;
   color:#333!important;
   font-size:8px!important;
-  font-weight:700;
+  font-weight:500;
   line-height:14px;
 }
 .multiCompactMore:hover{text-decoration:underline}
@@ -2079,11 +2079,11 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 .ddayRow.selectedDday{background:#eef5ff;box-shadow:inset 3px 0 0 #4f7cff}
 .ddayInfo{min-width:0;flex:1;position:relative}
 .ddayInfo small{margin-left:2px}
-.ddaySelectedTag{display:inline-block;margin-left:5px;padding:1px 4px;border-radius:8px;background:#4f7cff;color:#fff;font-size:8px;font-style:normal;font-weight:700;vertical-align:1px}
+.ddaySelectedTag{display:inline-block;margin-left:5px;padding:1px 4px;border-radius:8px;background:#4f7cff;color:#fff;font-size:8px;font-style:normal;font-weight:500;vertical-align:1px}
 .ddayActions{display:flex;align-items:center;gap:4px;flex:0 0 auto}
 .ddayEditBtn{width:20px;height:20px;min-width:20px;padding:0!important;border:0!important;background:transparent!important;color:#87909d!important;font-size:11px!important;line-height:20px!important;border-radius:4px!important}
 .ddayEditBtn:hover{background:#e5e9ef!important;color:#303846!important}
-.selectedDdayMarker{display:block;min-width:0;color:#4f7cff;font-size:9px;font-weight:800;line-height:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
+.selectedDdayMarker{display:block;min-width:0;color:#4f7cff;font-size:9px;font-weight:600;line-height:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
 .scheduleDateHead.ddayTracked{height:66px}
 .scheduleDateHead .selectedDdayMarker{margin-top:1px}
 .multiCompactCell .selectedDdayMarker{height:12px;margin:-1px 0 1px;text-align:left;padding-left:1px;font-size:8px;line-height:12px}
@@ -2102,23 +2102,23 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 
 /* v1.86: 마감일 역산 준비기간 + 날짜별 계획 */
 .prepFields{margin:2px 0 8px;padding:9px 10px;border:1px solid #e1e6ed;border-radius:8px;background:#fbfcfe}
-.prepFields .prepEnable{font-weight:800;margin:0}
+.prepFields .prepEnable{font-weight:600;margin:0}
 .prepDetails{display:grid;gap:8px;margin-top:8px}
 .prepOptions{display:flex;gap:14px;flex-wrap:wrap}
 .prepOptions .check{margin:0}
-.prepCalcSummary{padding:7px 9px;border-radius:7px;background:#eef4ff;color:#36516f;font-size:11px;font-weight:700;line-height:1.45}
+.prepCalcSummary{padding:7px 9px;border-radius:7px;background:#eef4ff;color:#36516f;font-size:11px;font-weight:500;line-height:1.45}
 .prepCalcSummary.warn{background:#fff3e8;color:#9a4f19}
 .prepDailyEditor{border-top:1px solid #e4e8ee;padding-top:8px}
 .prepDailyHead{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin-bottom:6px}
 .prepDailyHead b{font-size:12px}.prepDailyHead small{font-size:10px;color:#7a8492;text-align:right}
 .prepDailyRows{display:grid;gap:5px;max-height:240px;overflow:auto;padding-right:2px}
 .prepDailyRow{display:grid;grid-template-columns:92px minmax(0,1fr);gap:7px;align-items:center}
-.prepDailyDate{font-size:11px;font-weight:800;color:#536070;white-space:nowrap}
+.prepDailyDate{font-size:11px;font-weight:600;color:#536070;white-space:nowrap}
 .prepDailyRow input{min-width:0;width:100%;padding:6px 7px}
 .item.prepDayItem{border-left-width:3px!important;background:#f3f7ff!important;box-shadow:inset 0 0 0 1px rgba(80,120,190,.12)}
-.item.prepDayItem .itemTitle{font-weight:700;color:#36516f}
+.item.prepDayItem .itemTitle{font-weight:500;color:#36516f}
 .item.prepDeadlineItem{box-shadow:inset 0 0 0 1px rgba(80,120,190,.12)}
-.item.prepDeadlineItem .itemTitle{font-weight:700;color:#36516f}
+.item.prepDeadlineItem .itemTitle{font-weight:500;color:#36516f}
 .prepPlanDlg{width:min(620px,calc(100vw - 24px));max-height:min(760px,calc(100vh - 24px));padding:0}
 .prepPlanDlg form{padding:16px;overflow:auto;max-height:calc(100vh - 28px)}
 .prepPlanHead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px}
@@ -2127,7 +2127,7 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 .prepPlanList{display:grid;gap:6px}
 .prepPlanRow{display:grid;grid-template-columns:106px minmax(0,1fr);gap:10px;align-items:start;padding:8px 9px;border:1px solid #e3e7ed;border-radius:8px;background:#fff}
 .prepPlanRow.deadline{border-color:#efb8b3;background:#fff7f6}
-.prepPlanDate{font-weight:800;font-size:11px;color:#4e5b6d}.prepPlanDate small{display:block;font-weight:600;color:#8a94a3;margin-top:2px}
+.prepPlanDate{font-weight:600;font-size:11px;color:#4e5b6d}.prepPlanDate small{display:block;font-weight:500;color:#8a94a3;margin-top:2px}
 .prepPlanText{font-size:12px;line-height:1.45;white-space:pre-wrap;word-break:keep-all}.prepPlanText.muted{color:#929aa7}
 #eventPopoverPlan.hidden{display:none!important}
 @media(max-width:760px){
@@ -2177,8 +2177,8 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 
 /* v1.92: 준비업무 전용 구역 + 자유 반복 준비업무 */
 .prepLane{margin:0 0 6px;padding:0;border:1px solid #dce5f5;border-radius:6px;background:#f8faff;overflow:hidden}
-.prepLaneHead{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:3px 5px;border-bottom:1px dashed #d6dfef;background:#f1f5fd;color:#49658b;font-size:9.5px;font-weight:800}
-.prepLaneHead small{font-size:8px;color:#8192aa;font-weight:700}
+.prepLaneHead{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:3px 5px;border-bottom:1px dashed #d6dfef;background:#f1f5fd;color:#49658b;font-size:9.5px;font-weight:600}
+.prepLaneHead small{font-size:8px;color:#8192aa;font-weight:500}
 .prepLaneItems{padding:2px 3px}
 .prepLaneItems .item{margin:1px 0!important}
 .compactPrepLane{margin-bottom:3px}
@@ -2189,7 +2189,7 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 .dayResizableSection .prepLaneItems{height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important;padding:2px 1px!important}
 .dayResizableSection .prepLaneHead{flex:0 0 auto}
 .item.prepDeadlineDayItem{background:#f3f7ff!important;box-shadow:inset 0 0 0 1px rgba(80,120,190,.12)!important;border-left-color:var(--item-color)!important}
-.item.prepDeadlineDayItem .itemTitle{color:#36516f!important;font-weight:700!important}
+.item.prepDeadlineDayItem .itemTitle{color:#36516f!important;font-weight:500!important}
 @media(max-width:760px){.prepLane{margin-bottom:4px}.prepLaneHead{font-size:8px}.prepLaneHead small{font-size:7px}}
 
 
@@ -2208,13 +2208,13 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 .prepCustomHead{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:2px 0 6px}.prepCustomHead b{font-size:12px}.prepCustomHead small{font-size:9px;color:#7c8798}
 
 /* v1.93: 준비계획 입력 도구와 하단 통합 진행계획 */
-.prepAutoEnable{margin:0 0 3px;font-weight:800;color:#536070}
+.prepAutoEnable{margin:0 0 3px;font-weight:600;color:#536070}
 .prepUnifiedPlan{margin-top:2px;border-top:1px solid #dfe5ed;padding-top:10px}
 .prepUnifiedPlan .prepDailyHead{margin-bottom:6px}
 .prepUnifiedPlan .prepDailyRows{max-height:300px}
 .prepPlanEditorRow{grid-template-columns:96px minmax(0,1fr) auto!important;align-items:center!important;background:#fff;border:1px solid #e4e8ee;border-radius:7px;padding:5px 6px}
-.prepPlanEditorRow .prepDailyDate{display:grid;gap:1px;font-weight:800}
-.prepPlanEditorRow .prepDailyDate small{font-size:8.5px;color:#8290a2;font-weight:700}
+.prepPlanEditorRow .prepDailyDate{display:grid;gap:1px;font-weight:600}
+.prepPlanEditorRow .prepDailyDate small{font-size:8.5px;color:#8290a2;font-weight:500}
 .prepPlanEditorText{min-width:0;font-size:11px;line-height:1.4;word-break:keep-all}
 .prepEditorRule{display:block;color:#5272a0!important}
 .prepInlineDelete{width:26px;height:26px;align-self:center}
@@ -2222,7 +2222,7 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 .prepPlanRow.focused{border-color:#7291bd!important;background:#eef4ff!important;box-shadow:0 0 0 1px rgba(74,111,164,.14)}
 .prepPlanRow.focused .prepPlanDate{color:#315f9f}
 .prepDeadlineMemo{margin-top:5px;padding-top:5px;border-top:1px dashed #d7dde6;font-size:11px;line-height:1.45;white-space:pre-wrap;color:#4f5967}
-.prepDeadlineMemo span{display:inline-block;margin-right:5px;font-size:9px;font-weight:800;color:#7c8796}
+.prepDeadlineMemo span{display:inline-block;margin-right:5px;font-size:9px;font-weight:600;color:#7c8796}
 @media(max-width:760px){
   .prepPlanEditorRow{grid-template-columns:80px minmax(0,1fr) auto!important;gap:5px!important}
   .prepUnifiedPlan .prepDailyRows{max-height:360px}
@@ -2241,7 +2241,7 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 }
 .laneAutoFitBtn:hover{border-color:#aeb8c6;background:#f7f9fc;color:#344054}
 .daySingle .diaryStrip{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.dayAutoFitBtn{padding:5px 9px;border:1px solid #d8dde5;border-radius:7px;background:#fff;color:#586474;font-size:11px;font-weight:700;white-space:nowrap}
+.dayAutoFitBtn{padding:5px 9px;border:1px solid #d8dde5;border-radius:7px;background:#fff;color:#586474;font-size:11px;font-weight:500;white-space:nowrap}
 .dayAutoFitBtn:hover{background:#f7f9fc;border-color:#aeb8c6}
 @media(max-width:760px){.laneAutoFitBtn,.dayAutoFitBtn{display:none!important}}
 
@@ -2260,11 +2260,11 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 
 
 /* v2.01: header simplification */
-.iconOnlyBtn{min-width:36px;height:36px;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;font-size:16px;font-weight:700}
+.iconOnlyBtn{min-width:36px;height:36px;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;font-size:16px;font-weight:500}
 #manualSaveBtn{font-size:16px;padding:0 10px}
 #jumpDateBtn{font-size:15px}
 .currentViewWrap{position:relative;display:inline-flex;align-items:center}
-#currentViewBtn{min-width:52px;height:36px;padding:0 12px;font-weight:700;white-space:nowrap}
+#currentViewBtn{min-width:52px;height:36px;padding:0 12px;font-weight:500;white-space:nowrap}
 .currentViewMenu{position:absolute;top:calc(100% + 6px);left:0;z-index:80;display:grid;gap:4px;min-width:72px;padding:6px;border:1px solid #dfe3e8;border-radius:9px;background:#fff;box-shadow:0 10px 26px #0002}
 .currentViewMenu::before{content:"";position:absolute;left:12px;top:-5px;width:9px;height:9px;background:#fff;border-left:1px solid #dfe3e8;border-top:1px solid #dfe3e8;transform:rotate(45deg)}
 .currentViewMenu button{width:100%;text-align:center;padding:7px 10px;border-radius:7px}
@@ -2304,12 +2304,12 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 
 /* v2.07: preparation task source-level editing */
 .prepRuleAdder.prepTaskEditing{border-color:#8caee6;background:#f7faff;box-shadow:0 0 0 2px #e7f0ff inset}
-.prepEditingSave{font-weight:800;border-color:#8caee6;background:#eef5ff}
+.prepEditingSave{font-weight:600;border-color:#8caee6;background:#eef5ff}
 .prepEditingSave:hover{background:#e5efff}
 
 
 /* v2.10: 반복일정 수정창 기준일 표시 + 반복 시작/종료 표시 통일 */
-.eventDialogTitleLine{display:flex;align-items:center;gap:9px;min-width:0}.eventDialogTitleLine h3{margin:0;white-space:nowrap}.eventOccurrenceDate{font-size:12px;color:#667085;font-weight:700;white-space:nowrap}.eventOccurrenceDate:empty{display:none}
+.eventDialogTitleLine{display:flex;align-items:center;gap:9px;min-width:0}.eventDialogTitleLine h3{margin:0;white-space:nowrap}.eventOccurrenceDate{font-size:12px;color:#667085;font-weight:500;white-space:nowrap}.eventOccurrenceDate:empty{display:none}
 
 /* v2.12: sidebar cleanup + multi-calendar filter + Quick calendar grouping */
 .sidebarSection>.secHead{
@@ -2353,7 +2353,7 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 #calList.hasCalendarSelection .calRow:not(.calendarFocused) .calNameBtn{color:#707986}
 #calList.hasCalendarSelection .calRow:not(.calendarFocused){background:transparent}
 .calRow.calendarFocused{background:#eaf2ff;box-shadow:inset 3px 0 0 #5f8fd6}
-.calRow.calendarFocused .calNameBtn{color:#244f96;font-weight:750}
+.calRow.calendarFocused .calNameBtn{color:#244f96;font-weight:600}
 
 /* Quick 구역 안에서도 캘린더별로 한 번만 이름을 보여준다. */
 .quickCalGroup{margin:0 0 4px;min-width:0}
@@ -2366,7 +2366,7 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
   border-left:3px solid var(--quick-cal-color,#cfd5dc);
   font-size:8.5px;
   line-height:14px;
-  font-weight:700;
+  font-weight:500;
   color:#68717e;
   white-space:nowrap;
   overflow:hidden;
@@ -2411,17 +2411,17 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 
 /* v2.14: 준비계획 완료 상태를 더 분명하게 표시 */
 .prepPlanTitleLine{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.prepPlanCompleteBadge{display:inline-flex;align-items:center;justify-content:center;padding:3px 8px;border:1px solid #a9d8b5;border-radius:999px;background:#edf8f0;color:#25713c;font-size:10px;font-weight:800;line-height:1.2;white-space:nowrap}
+.prepPlanCompleteBadge{display:inline-flex;align-items:center;justify-content:center;padding:3px 8px;border:1px solid #a9d8b5;border-radius:999px;background:#edf8f0;color:#25713c;font-size:10px;font-weight:600;line-height:1.2;white-space:nowrap}
 .prepPlanDlg.complete{box-shadow:0 10px 40px #0003, inset 0 4px 0 #6ab77c}
 .prepPlanDlg.complete .prepPlanHead{padding:9px 10px;margin:-4px -4px 10px;border-radius:8px;background:#f3faf5}
-.prepPlanDlg.complete .prepPlanHead p{color:#4f785b;font-weight:700}
+.prepPlanDlg.complete .prepPlanHead p{color:#4f785b;font-weight:500}
 .prepPlanRow.done{opacity:1!important;background:#f4f6f7!important;border-color:#e1e5e8!important}
 .prepPlanRow.done .prepPlanDate{color:#8a9199}
 .prepPlanRow.done .prepPlanDate small{color:#9aa1a8}
 .prepPlanRow.done .prepPlanText{text-decoration:line-through;color:#8b9299!important}
-.prepPlanRow.done .prepPlanCheck{background:#e9f5ec;border-color:#9cc9a7;color:#23713b;font-weight:800}
+.prepPlanRow.done .prepPlanCheck{background:#e9f5ec;border-color:#9cc9a7;color:#23713b;font-weight:600}
 .prepPlanRow.completeDeadline{background:#f1f3f4!important;border-color:#dfe3e6!important}
-.prepPlanRow.completeDeadline .prepPlanCheckSpacer{color:#23713b;font-size:15px;font-weight:900}
+.prepPlanRow.completeDeadline .prepPlanCheckSpacer{color:#23713b;font-size:15px;font-weight:600}
 .prepPlanDlg.complete #prepPlanList{opacity:.9}
 
 
@@ -2519,7 +2519,7 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 /* v2.22: always show day/week/2week/month; context menu only for 3week/4week/list */
 .currentViewWrap{position:relative;display:inline-flex;align-items:center;min-width:0}
 .primaryViewButtons{display:inline-flex;align-items:center;gap:4px}
-.primaryViewBtn{height:36px;min-width:44px;padding:0 11px;font-weight:700;white-space:nowrap;border-radius:7px}
+.primaryViewBtn{height:36px;min-width:44px;padding:0 11px;font-weight:500;white-space:nowrap;border-radius:7px}
 .primaryViewBtn.on{background:#222;color:#fff;border-color:#222}
 .primaryViewBtn.weekCompactActive{box-shadow:inset 0 -2px 0 currentColor}
 .currentViewMenu{left:0;right:auto;top:calc(100% + 6px);min-width:72px}
@@ -2653,7 +2653,7 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 
 /* v2.32: 준비업무 완료/못함 상태 + 못함 후 이후 계획 수정 흐름 */
 .prepPlanStatus{display:flex;align-items:center;gap:4px;flex-wrap:nowrap}
-.prepPlanMissed{height:24px;padding:0 6px;border:1px solid #d7b9b6;border-radius:6px;background:#fff;color:#a34a42;font-size:9px;font-weight:800;white-space:nowrap}
+.prepPlanMissed{height:24px;padding:0 6px;border:1px solid #d7b9b6;border-radius:6px;background:#fff;color:#a34a42;font-size:9px;font-weight:600;white-space:nowrap}
 .prepPlanMissed:hover{background:#fff4f3;border-color:#ca8f89}
 .prepPlanMissed.on{background:#fff0ee;border-color:#c97971;color:#9b2f28}
 .prepPlanRow.missed{opacity:1!important;background:#f4f6f7!important;border-color:#e1e5e8!important}
@@ -2663,7 +2663,7 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 .prepPlanRow.missed .prepPlanText::before{content:""!important}
 .prepMissedItem{background:color-mix(in srgb,var(--item-color,#d9d9d9) 28%, white)!important;opacity:.72!important;box-shadow:none!important}
 .prepMissedItem .itemTitle{color:#888!important;text-decoration:line-through!important}
-.prepMissedDlg .prepMissedInfo{margin:3px 0 10px;padding:9px 10px;border-radius:7px;background:#fff5f3;color:#84443e;font-size:12px;font-weight:700;line-height:1.45}
+.prepMissedDlg .prepMissedInfo{margin:3px 0 10px;padding:9px 10px;border-radius:7px;background:#fff5f3;color:#84443e;font-size:12px;font-weight:500;line-height:1.45}
 .prepMissedDlg .scopeActions .primary{background:#222;color:#fff;border-color:#222}
 .prepMissedEditFocus{outline:2px solid #7c9bca;outline-offset:3px;border-radius:8px;transition:outline-color .25s}
 @media(max-width:600px){.prepPlanStatus{gap:2px}.prepPlanMissed{padding:0 4px;font-size:8px}}
@@ -2675,7 +2675,7 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 
 
 /* v2.35: 못함 준비업무는 완료와 같은 톤 + X 표시, 업무명만 취소선 */
-.prepMissedMark{flex:0 0 auto;color:#888;font-size:10px;font-weight:800;line-height:1;text-decoration:none!important}
+.prepMissedMark{flex:0 0 auto;color:#888;font-size:10px;font-weight:600;line-height:1;text-decoration:none!important}
 .prepMissedItem .prepMissedMark{text-decoration:none!important}
 
 
@@ -2734,8 +2734,8 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 .scheduleDateHead .dateHeadRight .diaryBtn{position:static!important;display:grid!important;place-items:center;flex:0 0 13px;width:13px!important;height:16px!important;min-width:13px!important;padding:0!important;margin:0!important}
 .scheduleDateHead .dateHeadRight .diaryBtn .diaryGlyph{width:11px;height:11px}
 .daySingle .dayCompactTop{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:7px;min-height:24px;margin:0 0 5px;padding:1px 4px;border-bottom:1px solid #edf0f3}
-.dayCompactDate{font-size:12px;font-weight:700;white-space:nowrap}.dayCompactDday{min-width:0;overflow:hidden}.dayCompactDday .dayViewDdayOffset{display:block;min-width:0;margin:0!important;padding:0!important;border-radius:0;background:transparent;line-height:16px;font-size:10px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;text-align:center}
-.dayCompactRight{display:flex;align-items:center;justify-content:flex-end;gap:6px;min-width:0}.dayCompactHoliday{color:#d33;font-size:10px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dayCompactRight .diaryBtn{padding:1px 3px!important;min-width:22px;height:20px;line-height:18px}
+.dayCompactDate{font-size:12px;font-weight:500;white-space:nowrap}.dayCompactDday{min-width:0;overflow:hidden}.dayCompactDday .dayViewDdayOffset{display:block;min-width:0;margin:0!important;padding:0!important;border-radius:0;background:transparent;line-height:16px;font-size:10px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;text-align:center}
+.dayCompactRight{display:flex;align-items:center;justify-content:flex-end;gap:6px;min-width:0}.dayCompactHoliday{color:#d33;font-size:10px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dayCompactRight .diaryBtn{padding:1px 3px!important;min-width:22px;height:20px;line-height:18px}
 @media(max-width:760px){.scheduleDateHead,.scheduleDateHead.ddayTracked{height:20px!important;min-height:20px!important;padding:0 1px!important}.scheduleDateHead .dayTopLine.compactDateTop{height:18px!important;min-height:18px!important}.scheduleDateHead .dateHeadLeft .selectedDdayMarker,.scheduleDateHead .dateHeadRight .holidayName{font-size:7px!important;line-height:12px!important}.scheduleDateHead .dateHeadRight .diaryBtn{flex-basis:10px!important;min-width:10px!important;width:10px!important}.scheduleDateHead .dateHeadRight .diaryBtn .diaryGlyph{width:9px;height:9px}.daySingle .dayCompactTop{margin-bottom:3px;min-height:21px}.dayCompactHoliday{font-size:9px}}
 
 
@@ -2763,7 +2763,7 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
 }
 
 /* v2.39: 월 화면에서 특정 캘린더만 볼 때 공통일정 표시 선택 */
-.monthCommonToggle{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;white-space:nowrap;cursor:pointer;padding:3px 6px;border:1px solid #e2e6ea;border-radius:6px;background:#fff;color:#39424d;flex-shrink:0}
+.monthCommonToggle{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:500;white-space:nowrap;cursor:pointer;padding:3px 6px;border:1px solid #e2e6ea;border-radius:6px;background:#fff;color:#39424d;flex-shrink:0}
 .monthCommonToggle[hidden]{display:none!important}
 .monthCommonToggle input{margin:0;width:13px;height:13px;accent-color:#5773c5;cursor:pointer}
 @media(max-width:760px){.monthCommonToggle{font-size:10px;padding:2px 4px;gap:3px}.monthCommonToggle input{width:12px;height:12px}}
@@ -2776,7 +2776,7 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
   box-sizing:border-box!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;
   flex:0 0 24px!important;width:24px!important;min-width:24px!important;height:24px!important;
   padding:0!important;border:1px solid #cf7b75!important;border-radius:6px!important;
-  background:#fff!important;color:#b64a42!important;font-size:15px!important;font-weight:700!important;
+  background:#fff!important;color:#b64a42!important;font-size:15px!important;font-weight:500!important;
   line-height:1!important;cursor:pointer!important;
 }
 .prepPlanMissed:hover{background:#fff3f1!important;border-color:#b64a42!important}
@@ -2837,7 +2837,7 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
  header{height:var(--header-h)!important;min-height:var(--header-h)!important;display:flex!important;align-items:center!important;flex-wrap:nowrap!important;padding:0 12px!important;gap:12px!important;position:relative!important}
  header .brand{flex:0 0 auto!important;order:0!important;font-size:15px!important;min-width:0!important;margin-right:4px!important}
  header nav{order:1!important;display:flex!important;align-items:center!important;flex:1 1 auto!important;min-width:0!important;width:auto!important;gap:6px!important;margin:0!important;overflow:visible!important}
- header nav #range{order:0!important;flex:0 1 auto!important;margin:0 2px 0 0!important;max-width:240px!important;font-weight:700!important;font-size:13px!important;color:#202632;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+ header nav #range{order:0!important;flex:0 1 auto!important;margin:0 2px 0 0!important;max-width:240px!important;font-weight:500!important;font-size:13px!important;color:#202632;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
  header nav .dateNavButtons{order:1!important;display:inline-flex!important;align-items:center!important;gap:0!important;flex:none!important}
  header nav .dateNavButtons button{height:29px!important;min-width:24px!important;padding:0 7px!important;border:1px solid #c9c9c9!important;border-radius:0!important;background:white!important;font-size:12px!important;color:#333!important}
  header nav .dateNavButtons button+button{border-left:0!important}
@@ -2848,7 +2848,7 @@ body.calendarEventDragging .multiLaneWeekLabel::after{content:' · 다른 주 �
  header nav .primaryViewButtons{display:inline-flex!important;align-items:stretch!important;gap:0!important;border:1px solid #c9c9c9!important;background:#fff!important}
  header nav .primaryViewBtn,header nav #extraViewMenuToggle{height:29px!important;min-height:29px!important;min-width:39px!important;padding:0 9px!important;line-height:27px!important;border:0!important;border-right:1px solid #c9c9c9!important;border-radius:0!important;background:#fff!important;color:#202020!important;font-size:12px!important;font-weight:500!important;box-shadow:none!important}
  header nav #extraViewMenuToggle{min-width:21px!important;padding:0 4px!important;border-right:0!important}
- header nav .primaryViewBtn.on{background:#6758e9!important;color:#fff!important;border-color:#6758e9!important;font-weight:700!important}
+ header nav .primaryViewBtn.on{background:#6758e9!important;color:#fff!important;border-color:#6758e9!important;font-weight:500!important}
  header nav #currentViewMenu{top:calc(100% + 6px)!important;left:auto!important;right:0!important}
  header nav #monthCommonToggleLabel{order:5!important;position:absolute!important;top:calc(100% + 4px)!important;left:50%!important;transform:translateX(-50%)!important;background:#fff!important;border:1px solid #ddd!important;border-radius:5px!important;padding:3px 7px!important;z-index:30!important;white-space:nowrap!important}
  header nav #monthCommonToggleLabel[hidden]{display:none!important}
@@ -3003,8 +3003,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
 /* v2.53: compact date numerals; no view/header overlay, local Hancom Gothic. */
 :root{--ui-font:"Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;line-height:1.05!important}
-#main.month .monthDateNumber{font-size:11px!important;line-height:1.1!important;font-weight:700!important}
-#main.multiCompactView .multiCompactDatePair>span{font-size:11px!important;line-height:1.1!important;font-weight:700!important}
+#main.month .monthDateNumber{font-size:11px!important;line-height:1.1!important;font-weight:500!important}
+#main.multiCompactView .multiCompactDatePair>span{font-size:11px!important;line-height:1.1!important;font-weight:500!important}
 #main .dayCompactDate{font-size:12px!important;line-height:1.2!important}
 @media(max-width:760px){
  #main.laneView .scheduleDateHead .dateNum{font-size:11px!important}
@@ -3021,17 +3021,17 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 :root{--ui-font:"Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",sans-serif}
 body{font-weight:500}
 button,input,select,textarea{font-weight:500}
-.itemTitle,.month .itemTitle,#main .itemTitle{font-weight:600!important}
+.itemTitle,.month .itemTitle,#main .itemTitle{font-weight:500!important}
 #sidebar .calRow,#sidebar .ddayRow,#sidebar .purchaseRow,#sidebar .paymentRow,#sidebar .diaryArchiveRow{font-weight:500}
-#sidebar .calNameBtn,#sidebar .secHead,#sidebar .sidebarCalGroupTitle{font-weight:600}
+#sidebar .calNameBtn,#sidebar .secHead,#sidebar .sidebarCalGroupTitle{font-weight:500}
 .month .monthDateDow,.multiCompactDatePair small,.dayCompactDow{font-weight:500}
 .month .item .meta,.item .meta{font-weight:500}
-@media(max-width:760px){#main .itemTitle{font-weight:600!important}}
+@media(max-width:760px){#main .itemTitle{font-weight:500!important}}
 
 /* v2.56 — Noto Sans KR: 500 body, 600 event titles; preserve UI sizing and layout. */
 :root{--ui-font:"Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",sans-serif}
 body,button,input,select,textarea{font-family:var(--ui-font);font-weight:500}
-#main .itemTitle,.month .itemTitle{font-weight:600!important}
+#main .itemTitle,.month .itemTitle{font-weight:500!important}
 
 /* v2.58 — 종료된 반복일정은 접힌 보관함에 표시하고 시각적으로 구분 */
 .archivedRecurringGroup .fixedGroupHead{background:#f3f5f7;color:#5b6472}
@@ -3056,7 +3056,7 @@ body,button,input,select,textarea{font-family:var(--ui-font);font-weight:500}
 .recurringPreviewWeekdays span{text-align:center;font-size:11px;padding:6px 0;background:#f3f5f7;border:1px solid #e5e8ec}
 .recurringPreviewDay{min-width:0;min-height:60px;border:1px solid #e9edf2;padding:5px 3px;display:flex;flex-direction:column;gap:6px}
 .recurringPreviewDay.other{background:#fafafa;color:#a4acb6}
-.previewDayNumber{font-weight:600;font-size:12px}
+.previewDayNumber{font-weight:500;font-size:12px}
 .previewDayMarker{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:1px solid #e1e5ea;padding:2px 1px;text-align:center;background:#f5f7fa}
 .status-done .previewDayMarker{color:#16804a;background:#e9f7ef;border-color:#abd8bb}
 .status-failed .previewDayMarker{color:#b83b37;background:#fff0ef;border-color:#e9b0ab}
@@ -3084,8 +3084,8 @@ body,button,input,select,textarea{font-family:var(--ui-font);font-weight:500}
   background:#e9f0ff!important;border:2px solid #4269b5!important;
   box-shadow:inset 4px 0 0 #4269b5,0 0 0 1px rgba(66,105,181,.14)!important;
 }
-.prepPlanRow.focused .prepPlanDate{color:#173c82!important;font-weight:900!important}
-.prepPlanSelectedBadge{display:block;width:max-content;margin-top:3px;padding:2px 5px;border:1px solid #9bb7e5;background:#fff;color:#2557a1;font-size:10px;font-weight:800;line-height:1.25}
+.prepPlanRow.focused .prepPlanDate{color:#173c82!important;font-weight:600!important}
+.prepPlanSelectedBadge{display:block;width:max-content;margin-top:3px;padding:2px 5px;border:1px solid #9bb7e5;background:#fff;color:#2557a1;font-size:10px;font-weight:600;line-height:1.25}
 
 /* v2.64: compact event editor, with related fields side by side. */
 #eventForm{gap:10px}
@@ -3131,7 +3131,7 @@ body,button,input,select,textarea{font-family:var(--ui-font);font-weight:500}
 }
 
 /* v2.67: 종료된 납부일정 제목을 다른 사이드바 항목과 동일한 크기로 */
-.archivedPaymentPanel > summary {font-size:11px !important;font-weight:600 !important;line-height:1.45 !important;}
+.archivedPaymentPanel > summary {font-size:11px !important;font-weight:500 !important;line-height:1.45 !important;}
 
 /* v2.68: compact archived payment heading */
 #sidebar .archivedPaymentPanel > summary {font-size:10px !important;font-weight:500 !important;line-height:1.3 !important;padding:1px 0 !important;}
@@ -3141,7 +3141,7 @@ body,button,input,select,textarea{font-family:var(--ui-font);font-weight:500}
 .sidebarCalGroupToolbar>.sidebarCalGroupHead{flex:1;min-width:0}
 .sidebarCalGroupToolbar>.manualCalPreviewBtn{flex:0 0 26px;align-self:center;height:24px;margin:2px 4px 2px 0;padding:0;border:1px solid #d8dfe9;border-radius:0;background:#fff;color:#46617e;font-size:13px;line-height:1;cursor:pointer}
 .sidebarCalGroupToolbar>.manualCalPreviewBtn:hover{background:#ebf2fb}
-.manualPreviewFilter{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:600;margin:4px 0 10px}
+.manualPreviewFilter{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:500;margin:4px 0 10px}
 .manualPreviewFilter select{flex:1;min-width:0;border:1px solid #cbd5e1;border-radius:0;background:#fff;padding:6px;font:inherit}
 .manualPreviewItem{font-size:10px;line-height:1.35;margin-top:3px;padding:2px 3px;border-left:3px solid #c9d2df;background:#f4f6fa;overflow-wrap:anywhere;min-width:0}
 
@@ -3282,7 +3282,7 @@ body,button,input,select,textarea{font-family:var(--ui-font);font-weight:500}
 
 /* v2.77: individual repeated occurrence date editing */
 .eventRecurringDateHint{background:#f4f6fb;border:1px solid #dce2ee;color:#354258;font-size:11px;line-height:1.5;padding:6px 8px;margin:-2px 0 8px;}
-.repeatEditDateChange{font-size:12px;color:#4a3aac;font-weight:650;background:#f0edff;padding:8px 10px;border-left:3px solid #6859d8;margin:7px 0;}
+.repeatEditDateChange{font-size:12px;color:#4a3aac;font-weight:500;background:#f0edff;padding:8px 10px;border-left:3px solid #6859d8;margin:7px 0;}
 @media(max-width:760px){.eventRecurringDateHint{font-size:10.5px;padding:5px 6px;}}
 
 /* v2.78: 준비업무 전부 완료 시 팝업의 마감 ✓와 달력의 마감 카드를 동기화 */
@@ -3297,12 +3297,12 @@ body,button,input,select,textarea{font-family:var(--ui-font);font-weight:500}
 .item.prepDeadlineItem.prepDeadlineComplete .itemTitle::before{
   content:'✓ ';
   color:#23864a!important;
-  font-weight:900;
+  font-weight:600;
 }
 
 /* v2.80 · 오늘의 업무 메모 & 날짜별 매일업무 묶기 */
-.workMemoOpenBtn{border:1px solid #c5d4c8!important;background:#ecf6ef!important;color:#206446!important;font-weight:700!important;padding:0 9px!important;min-width:78px;white-space:nowrap;font-size:12px!important;cursor:pointer}
-.dailySummaryBtn{display:flex;align-items:center;justify-content:space-between;gap:5px;width:100%;min-width:0;text-align:left;background:#eef6ed;border:1px solid #a7c6aa;border-left:4px solid #3e9163;padding:5px 7px;margin:2px 0;color:#21583c;font-size:12px;font-weight:650;cursor:pointer;border-radius:4px}
+.workMemoOpenBtn{border:1px solid #c5d4c8!important;background:#ecf6ef!important;color:#206446!important;font-weight:500!important;padding:0 9px!important;min-width:78px;white-space:nowrap;font-size:12px!important;cursor:pointer}
+.dailySummaryBtn{display:flex;align-items:center;justify-content:space-between;gap:5px;width:100%;min-width:0;text-align:left;background:#eef6ed;border:1px solid #a7c6aa;border-left:4px solid #3e9163;padding:5px 7px;margin:2px 0;color:#21583c;font-size:12px;font-weight:500;cursor:pointer;border-radius:4px}
 .dailySummaryBtn b{font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums}
 .dailySummaryBtn.completed{background:#f0f2f4;color:#718077;border-color:#d1dbd4}
 .dailySummaryBtn:hover{outline:1px solid #54836b}
@@ -3321,11 +3321,11 @@ body,button,input,select,textarea{font-family:var(--ui-font);font-weight:500}
 .wmDateBar input{height:32px;min-width:0;flex:1;border:1px solid #cbd7cc;border-radius:5px;padding:4px 6px}
 .wmDateBar button,.wmNew button{border:1px solid #c1d1c5;border-radius:5px;background:#f2f8f4;padding:6px 10px;white-space:nowrap}
 .wmActions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:5px}
-.wmActions button{font-size:11px;font-weight:650;border:1px solid #c1d7c8;border-radius:5px;background:#f1f8f3;padding:8px 4px;line-height:1.3;white-space:normal}
+.wmActions button{font-size:11px;font-weight:500;border:1px solid #c1d7c8;border-radius:5px;background:#f1f8f3;padding:8px 4px;line-height:1.3;white-space:normal}
 .wmInfo{font-size:10px;color:#69806c;line-height:1.5;margin:4px 0 12px}
 .wmSection{margin:10px 0 12px;border:1px solid #e1e8e0;border-radius:6px;overflow:hidden}
-.wmSectionTitle{display:flex;align-items:center;justify-content:space-between;background:#f2f7f3;padding:7px 9px;font-size:12px;font-weight:800;color:#334b3a;border-bottom:1px solid #e1e8e0}
-.wmSectionTitle span,.wmSectionTitle b{font-size:10px;font-weight:600;color:#5c7961}
+.wmSectionTitle{display:flex;align-items:center;justify-content:space-between;background:#f2f7f3;padding:7px 9px;font-size:12px;font-weight:600;color:#334b3a;border-bottom:1px solid #e1e8e0}
+.wmSectionTitle span,.wmSectionTitle b{font-size:10px;font-weight:500;color:#5c7961}
 .wmTask{display:flex;gap:6px;justify-content:space-between;align-items:center;padding:7px 9px;border-bottom:1px solid #eef1ee;font-size:12px;line-height:1.45}
 .wmTask:last-child{border-bottom:none}
 .wmTask label{display:flex;align-items:flex-start;gap:8px;min-width:0;flex:1;cursor:pointer}
@@ -3333,7 +3333,7 @@ body,button,input,select,textarea{font-family:var(--ui-font);font-weight:500}
 .wmTaskLabel{min-width:0;overflow-wrap:anywhere}
 .wmTask.done .wmTaskLabel{text-decoration:line-through;color:#9baba0}
 .wmTask small{color:#8b9d8d;font-size:10px;white-space:nowrap}
-.wmOrigin{color:#9c5b27;font-weight:750;white-space:nowrap}
+.wmOrigin{color:#9c5b27;font-weight:600;white-space:nowrap}
 .wmEmpty{padding:13px 9px;color:#9aa99b;font-size:11px}
 .wmNew{display:flex;gap:6px;padding:8px}
 .wmNew input{flex:1;min-width:0;border:1px solid #cfdacb;border-radius:5px;padding:7px;font-size:12px}
@@ -3371,7 +3371,7 @@ body.wmBoardActive{overflow:hidden}
 .wmBoardTitle small{font-size:11px;color:#81909c}
 .wmBoardToolbar{display:flex;align-items:center;gap:7px;flex-wrap:nowrap;max-width:100%;min-width:0}
 .wmPanel button{font:inherit;cursor:pointer;line-height:1.35}
-.wmBoardToolbar button,.wmBoardTitle>button{background:#fff;border:1px solid #ccd5df;color:#344b61;border-radius:5px;padding:7px 10px;font-size:12px;font-weight:650;white-space:nowrap}
+.wmBoardToolbar button,.wmBoardTitle>button{background:#fff;border:1px solid #ccd5df;color:#344b61;border-radius:5px;padding:7px 10px;font-size:12px;font-weight:500;white-space:nowrap}
 .wmBoardToolbar button:hover,.wmBoardTitle>button:hover{background:#eef3fa}
 .wmBoardToolbar strong{font-size:13px;color:#47596c;white-space:nowrap;min-width:80px;text-align:center}
 .wmBoardToolbar input[type=date]{width:137px;min-width:0;background:#fff;border:1px solid #ccd5df;border-radius:5px;height:31px;padding:0 6px;font-size:12px}
@@ -3387,7 +3387,7 @@ body.wmBoardActive{overflow:hidden}
 .wmDayHead small{font-size:11px;color:#7e8da0;white-space:nowrap}
 .wmDayScroll{overflow:auto;flex:1;min-height:0;padding:10px 11px;overscroll-behavior:contain}
 .wmDayActions{display:flex;gap:6px}
-.wmDayActions button{flex:1;min-width:0;padding:7px 4px;border:1px solid #cbd8e7;background:#f3f7fc;color:#39536f;border-radius:5px;font-size:11px;font-weight:600}
+.wmDayActions button{flex:1;min-width:0;padding:7px 4px;border:1px solid #cbd8e7;background:#f3f7fc;color:#39536f;border-radius:5px;font-size:11px;font-weight:500}
 .wmDayActions button.active{background:#fff1e7;color:#ab5434}
 .wmDayCard .wmSection{margin:10px 0;border-color:#e1e7ee;border-radius:6px}
 .wmDayCard .wmSectionTitle{background:#f5f7fa;border-color:#e1e7ee;color:#394e65}
@@ -3402,7 +3402,7 @@ body.wmBoardActive{overflow:hidden}
 .wmDailySettings{flex:none;overflow:auto;max-height:38vh;border-bottom:1px solid #cad7e5;background:#f8fafd;padding:12px 18px}
 .wmDailySettings.hidden{display:none!important}
 .wmDailyConfig{max-width:900px;margin:0 auto}
-.wmDailyConfigTitle{display:flex;align-items:center;justify-content:space-between;margin:4px 0 10px;font-size:14px;font-weight:800}
+.wmDailyConfigTitle{display:flex;align-items:center;justify-content:space-between;margin:4px 0 10px;font-size:14px;font-weight:600}
 .wmDailyConfigTitle small{font-size:12px;color:#687b8e;font-weight:500}
 .wmConfigRow{display:flex;align-items:center;gap:11px;padding:7px 8px;border-bottom:1px solid #e2e8f0;font-size:12px;cursor:pointer}
 .wmConfigRow input{accent-color:#3977bb;width:17px;height:17px}
@@ -3426,7 +3426,7 @@ header .views > #workMemoOpenBtn{width:68px!important;min-width:68px!important;m
 /* v2.82 · 아도라블 업무 메모 표시 위치 선택 */
 .wmDailyOptIn{display:flex!important;flex-direction:column;align-items:stretch;gap:7px;padding:11px 12px}
 .wmDailyOptIn.hidden{display:none!important}
-.wmDailyOptIn label{font-weight:700;font-size:13px}
+.wmDailyOptIn label{font-weight:500;font-size:13px}
 .wmDailyOptIn select{height:37px;min-height:37px;width:100%;max-width:100%;box-sizing:border-box;background:#fff;color:#20354a;border:1px solid #c6d1e0;border-radius:4px;padding:5px 9px;font-size:13px}
 .wmDailyOptIn>small{font-size:11px;color:#5d7790;line-height:1.5}
 .wmConfigRow select{width:auto;min-width:125px;max-width:155px;border:1px solid #cbd5e1;border-radius:4px;background:#fff;padding:6px 5px;font-size:12px;color:#24374a}
@@ -3439,13 +3439,13 @@ header .views > #workMemoOpenBtn{width:68px!important;min-width:68px!important;m
 .sidebarSeriesApply label{display:grid;gap:6px;font-size:13px}
 .sidebarSeriesApply input[type=date]{width:100%;min-height:40px;box-sizing:border-box}
 .sidebarSeriesApply p{margin:0;color:#50647b;font-size:11px;line-height:1.6}
-.sidebarSeriesApply button{width:100%;min-height:42px;font-weight:700}
+.sidebarSeriesApply button{width:100%;min-height:42px;font-weight:500}
 #repeatEditDlg .scopeActions.hidden{display:none!important}
 #eventForm input.seriesAnchorReadonly{background:#f3f5f8;color:#687383;cursor:not-allowed}
 
 /* v2.84 · 업무 분류별 묶음과 완료 상태를 명확히 구분 */
-.dailySummaryBtn.wmGroupSummary{background:#f3f5f8!important;color:#3b4d63!important;border:1px solid #cfd7e2!important;border-left:3px solid #8796aa!important;border-radius:4px!important;padding:5px 7px!important;font-weight:650!important}
-.dailySummaryBtn.wmGroupSummary .wmGroupMark{font-style:normal;font-weight:800;color:#8391a4;margin-right:2px}
+.dailySummaryBtn.wmGroupSummary{background:#f3f5f8!important;color:#3b4d63!important;border:1px solid #cfd7e2!important;border-left:3px solid #8796aa!important;border-radius:4px!important;padding:5px 7px!important;font-weight:500!important}
+.dailySummaryBtn.wmGroupSummary .wmGroupMark{font-style:normal;font-weight:600;color:#8391a4;margin-right:2px}
 .dailySummaryBtn.wmGroupSummary.completed{background:#eef8f0!important;color:#246443!important;border-color:#a9cfb5!important;border-left-color:#3d985c!important}
 .dailySummaryBtn.wmGroupSummary.completed .wmGroupMark{color:#228c4b}
 .dailySummaryBtn.wmGroupSummary.pending .wmGroupMark{color:#9aa6b5}
@@ -3457,7 +3457,7 @@ header .views > #workMemoOpenBtn{width:68px!important;min-width:68px!important;m
 /* v2.87 업무 화면 직접 추가 + 달력 업무 묶음 드래그 목록 */
 .wmNewTaskForm{display:flex;gap:5px;margin:10px 0;padding:7px;border:1px solid #c7d9ee;border-radius:5px;background:#f5f9ff}
 .wmNewTaskForm input{flex:1;min-width:0;padding:8px;border:1px solid #cad5e3;border-radius:4px;background:white;font-size:12px}
-.wmNewTaskForm button{flex:none;background:#2c68ae;color:white;border:1px solid #2c68ae;border-radius:4px;padding:6px 9px;font-size:12px;font-weight:600}
+.wmNewTaskForm button{flex:none;background:#2c68ae;color:white;border:1px solid #2c68ae;border-radius:4px;padding:6px 9px;font-size:12px;font-weight:500}
 .wmGroupPopup{position:fixed;z-index:2800;box-sizing:border-box;background:#fff;border:1px solid #98b5db;border-radius:7px;box-shadow:0 10px 26px #1b36583b;padding:0;max-height:min(72vh,560px);display:flex;flex-direction:column;overflow:hidden;color:#233e5c;text-align:left}
 .wmGroupPopup.hidden{display:none!important}
 .wmGroupPopupHeader{background:#edf4ff;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:7px;border-bottom:1px solid #c9d9ec}
@@ -3534,7 +3534,7 @@ header .views > #workMemoOpenBtn{width:68px!important;min-width:68px!important;m
 
 /* v2.94 · 업무 등록·수정과 달력 추가업무 표시 개선 */
 .wmBoardNewRow{margin:9px 0 11px;display:flex;min-width:0}
-.wmBoardNewRow button{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:9px 7px;background:#edf5ff;border:1px solid #abc7e6;color:#245b9a;border-radius:5px;font-size:12px;font-weight:750;cursor:pointer}
+.wmBoardNewRow button{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:9px 7px;background:#edf5ff;border:1px solid #abc7e6;color:#245b9a;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer}
 .wmBoardNewRow button:hover{background:#e3effe}
 .wmBoardNewRow button small{font-size:10px;font-weight:500;white-space:nowrap;color:#607995}
 .wmTaskEditBtn{flex:0 0 auto!important;width:26px!important;min-width:26px!important;height:26px!important;padding:2px!important;background:#fff!important;color:#536c88!important;border:1px solid #d5deea!important;border-radius:4px!important;font-size:13px!important;cursor:pointer}
@@ -3615,7 +3615,7 @@ body.todayWorkPopup #wmClose{margin-left:auto!important}
 
 /* v2.94: 업무 묶음 카드 글자 크기 회복 – 다른 일정과 같은 가독성 */
 .dailySummaryBtn.wmGroupSummary{font-size:12px!important;line-height:1.45!important;min-height:22px!important;padding:2px 4px!important;letter-spacing:0!important}
-.dailySummaryBtn.wmGroupSummary .wmGroupNameBtn,.dailySummaryBtn.wmGroupSummary .wmGroupCountBtn{font-size:inherit!important;line-height:inherit!important;font-weight:600!important;padding:2px 3px!important}
+.dailySummaryBtn.wmGroupSummary .wmGroupNameBtn,.dailySummaryBtn.wmGroupSummary .wmGroupCountBtn{font-size:inherit!important;line-height:inherit!important;font-weight:500!important;padding:2px 3px!important}
 .scheduleLaneCell .wmGroupSummary,.scheduleLaneCell .wmGroupSummary button{font-size:10.5px!important;line-height:17px!important}
 .multiCompactView.weeks1 .wmGroupSummary,.multiCompactView.weeks1 .wmGroupSummary button,.multiCompactView.weeks2 .wmGroupSummary,.multiCompactView.weeks2 .wmGroupSummary button{font-size:11px!important;line-height:19px!important}
 .multiCompactView.weeks3 .wmGroupSummary,.multiCompactView.weeks3 .wmGroupSummary button{font-size:10px!important;line-height:17px!important}
@@ -3744,7 +3744,7 @@ body.todayWorkPopup .wmDayScroll{padding:6px 8px!important}
 }
 .prepPlanRow.focused.done .prepPlanDate {
   color:#8a9199!important;
-  font-weight:700!important;
+  font-weight:500!important;
 }
 
 /* v2.101: render-based, per-preparation-entry completion state.
@@ -3781,8 +3781,8 @@ body.todayWorkPopup .wmDayScroll{padding:6px 8px!important}
 
 /* v2.104 — D-Day: separate upcoming and elapsed anniversaries (presentation only). */
 #sidebar .ddayTabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:1px 0 7px}
-#sidebar .ddayTab{display:flex;align-items:center;justify-content:center;gap:4px;min-width:0;min-height:26px;padding:4px 3px!important;border:1px solid #d5dde7!important;border-radius:2px!important;background:#f7f9fb!important;color:#59677a!important;font-size:10px!important;font-weight:600!important;cursor:pointer}
-#sidebar .ddayTab span{font-weight:700;font-variant-numeric:tabular-nums;color:#6b7788}
+#sidebar .ddayTab{display:flex;align-items:center;justify-content:center;gap:4px;min-width:0;min-height:26px;padding:4px 3px!important;border:1px solid #d5dde7!important;border-radius:2px!important;background:#f7f9fb!important;color:#59677a!important;font-size:10px!important;font-weight:500!important;cursor:pointer}
+#sidebar .ddayTab span{font-weight:500;font-variant-numeric:tabular-nums;color:#6b7788}
 #sidebar .ddayTab.on{border-color:#7e9dc8!important;background:#e8f0ff!important;color:#254c83!important}
 #sidebar .ddayTab.on span{color:#254c83}
 #sidebar .ddayTab:focus-visible{outline:2px solid #476ea8;outline-offset:1px}
@@ -3830,12 +3830,12 @@ body.todayWorkPopup .wmDayScroll{padding:6px 8px!important}
 #wmGroupPopup details.wmSubtaskList .wmSubtaskBody{padding-top:3px}
 #wmGroupPopup .wmGroupPopupDetails{display:flex;flex-direction:column;min-height:0;overflow:hidden}
 #wmGroupPopup .wmGroupPopupDetails:not([open]){display:block}
-#wmGroupPopup .wmGroupPopupFold{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 11px;background:#f5f8fc;color:#415c77;font-size:11px;font-weight:650;border-bottom:1px solid #e2e9f2}
-#wmGroupPopup .wmGroupPopupFold b{font-size:10px;margin-left:auto;font-weight:600}
+#wmGroupPopup .wmGroupPopupFold{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 11px;background:#f5f8fc;color:#415c77;font-size:11px;font-weight:500;border-bottom:1px solid #e2e9f2}
+#wmGroupPopup .wmGroupPopupFold b{font-size:10px;margin-left:auto;font-weight:500}
 #wmGroupPopup .wmGroupPopupList{flex:1;min-height:0;overflow-y:auto}
 
 /* v2.105 · Important event star shared by work board, daily PIP and grouped popup. */
-.wmImportantStar{display:inline-block;flex:0 0 auto;color:#e2a322;font-weight:800;font-size:13px;line-height:1;vertical-align:baseline;margin-right:4px;text-decoration:none!important;white-space:nowrap}
+.wmImportantStar{display:inline-block;flex:0 0 auto;color:#e2a322;font-weight:600;font-size:13px;line-height:1;vertical-align:baseline;margin-right:4px;text-decoration:none!important;white-space:nowrap}
 .wmTask label>.wmImportantStar{align-self:center;margin-right:0}
 .wmPanel .wmTask label>.wmImportantStar{font-size:12px}
 #wmGroupPopup .wmImportantStar{font-size:12px;margin-right:5px}
@@ -3865,7 +3865,7 @@ body.todayWorkPopup .wmDayScroll{padding:6px 8px!important}
 .searchCount{font-size:12px;color:#374151;font-weight:500}
 .searchResultOccurrence,.searchResultOther{display:flex;align-items:center;gap:8px;cursor:default;min-width:0}
 .searchResultInfo{flex:1;min-width:0}
-.searchResultInfo b{font-size:13px;font-weight:600;display:block;overflow-wrap:anywhere}
+.searchResultInfo b{font-size:13px;font-weight:500;display:block;overflow-wrap:anywhere}
 .searchResultInfo small{font-size:11px;line-height:1.4}
 .searchResultStatus{flex:none;font-size:11px;padding:3px 6px;border-radius:5px;background:#f5f5f5;color:#696f79;font-weight:500}
 .searchResultStatus.isDone{background:#eef1f2;color:#6c7780}
@@ -3951,3 +3951,30 @@ body.todayWorkPopup .wmDayScroll{padding:6px 8px!important}
   body:not(.todayWorkPopup) > .layout { height:calc(100dvh - var(--header-h))!important; }
   body:not(.todayWorkPopup) > .layout aside { top:var(--header-h)!important; }
 }
+
+
+/* v2.111 — light, calm Naver-style typography.
+   Presentation only: preserves all calendar logic, events and responsive layout. */
+:root{--ui-font:"Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",sans-serif}
+body{font-family:var(--ui-font);font-size:13px;font-weight:400!important}
+button,input,select,textarea{font-family:var(--ui-font);font-weight:400}
+button,.primaryViewBtn,.dateNavButtons button,.views button,#sidebar .secHead button,
+#sidebar .sidebarCalGroupHead,.dayCalToggle,.manualSaveBtn{font-weight:500!important}
+/* Regular-weight events and supporting text across day/week/month/search. */
+#main .itemTitle,#main.month .itemTitle,.month .itemTitle,
+.itemTitle,.item.manualPlacedItem .itemTitle,.item.flexiblePlacedItem .itemTitle,
+.appointmentLane .itemTitle,.quickLaneItems .itemTitle,
+#main .item .meta,.item .meta,.inlineMeta,.repeatMark,
+.searchResult,.searchResult small{font-weight:400!important}
+.itemTitle{font-size:11px!important}
+#sidebar .calRow,#sidebar .ddayRow,#sidebar .purchaseRow,
+#sidebar .paymentRow,#sidebar .diaryArchiveRow{font-weight:400!important}
+#sidebar .calNameBtn,#sidebar .sidebarCalGroupTitle,#sidebar .secHead,
+.groupHead,.subCalHead,.dateNum,.weekdayLabel,.month .weekdayHeader,
+.month .mhead,.listDate,#range{font-weight:500!important}
+/* Restrained emphasis instead of extra-bold 700–900. */
+.item .importanceBtn.on,.importantField,.eventPopoverHead b,
+.item .carryBadge,.selectedDdayMarker{font-weight:600!important}
+/* Keep small-screen title sizes from existing responsive rules. */
+@media(max-width:760px){.itemTitle,#main .itemTitle{font-size:10px!important}}
+@media(max-width:470px){.itemTitle,#main .itemTitle{font-size:8px!important}}
