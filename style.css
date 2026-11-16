@@ -462,7 +462,7 @@ aside{min-height:0}
 
 /* v1.48: 시각 정돈 + Pretendard 타이포그래피 */
 :root{
-  --ui-font:"Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+  --ui-font:"Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", sans-serif;
   --border:#e7eaf0;
   --text:#24272d;
   --muted2:#7b8492;
@@ -2972,7 +2972,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
 
 /* v2.49 — Noto Sans KR + fit all seven weekdays to viewport. */
-:root{--ui-font:"Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;min-width:0!important;max-width:100%!important}
+:root{--ui-font:"Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", sans-serif;min-width:0!important;max-width:100%!important}
   #main.laneView .scheduleDateGrid,
   #main.laneView .scheduleSummaryGrid,
   #main.laneView .scheduleLane,
@@ -2996,13 +2996,13 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
 /* v2.51 — Consistent Noto Sans KR typography in every view and panel.
    Preserve emoji-specific glyph fonts for diary icons. */
-:root{--ui-font:"Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+:root{--ui-font:"Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", sans-serif;
 }
 /* Keep the original emoji shapes for diary indicators. */
 .diaryBtn,.mobileDiaryBtn,.naverMemoShortcutIcon{font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif!important}
 
 /* v2.53: compact date numerals; no view/header overlay, local Hancom Gothic. */
-:root{--ui-font:"Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;line-height:1.05!important}
+:root{--ui-font:"Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", sans-serif;line-height:1.05!important}
 #main.month .monthDateNumber{font-size:11px!important;line-height:1.1!important;font-weight:500!important}
 #main.multiCompactView .multiCompactDatePair>span{font-size:11px!important;line-height:1.1!important;font-weight:500!important}
 #main .dayCompactDate{font-size:12px!important;line-height:1.2!important}
@@ -3018,7 +3018,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
 
 /* v2.55 — Noto Sans KR: balanced weight than v2.49, without changing sizes/layout. */
-:root{--ui-font:"Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",sans-serif}
+:root{--ui-font:"Malgun Gothic","맑은 고딕","Apple SD Gothic Neo",sans-serif}
 body{font-weight:500}
 button,input,select,textarea{font-weight:500}
 .itemTitle,.month .itemTitle,#main .itemTitle{font-weight:500!important}
@@ -3029,7 +3029,7 @@ button,input,select,textarea{font-weight:500}
 @media(max-width:760px){#main .itemTitle{font-weight:500!important}}
 
 /* v2.56 — Noto Sans KR: 500 body, 600 event titles; preserve UI sizing and layout. */
-:root{--ui-font:"Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",sans-serif}
+:root{--ui-font:"Malgun Gothic","맑은 고딕","Apple SD Gothic Neo",sans-serif}
 body,button,input,select,textarea{font-family:var(--ui-font);font-weight:500}
 #main .itemTitle,.month .itemTitle{font-weight:500!important}
 
@@ -3306,7 +3306,7 @@ body,button,input,select,textarea{font-family:var(--ui-font);font-weight:500}
 .dailySummaryBtn b{font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums}
 .dailySummaryBtn.completed{background:#f0f2f4;color:#718077;border-color:#d1dbd4}
 .dailySummaryBtn:hover{outline:1px solid #54836b}
-.wmPanel{position:fixed;right:22px;top:100px;width:min(430px,calc(100vw - 30px));max-height:calc(100dvh - 112px);display:flex;flex-direction:column;z-index:1200;background:#fff;border:1px solid #a6b8ac;border-radius:10px;box-shadow:0 13px 38px rgba(0,0,0,.22);overflow:hidden;color:#283530;font-family:'Noto Sans KR',sans-serif}
+.wmPanel{position:fixed;right:22px;top:100px;width:min(430px,calc(100vw - 30px));max-height:calc(100dvh - 112px);display:flex;flex-direction:column;z-index:1200;background:#fff;border:1px solid #a6b8ac;border-radius:10px;box-shadow:0 13px 38px rgba(0,0,0,.22);overflow:hidden;color:#283530;font-family:var(--ui-font),sans-serif}
 .wmPanel.hidden{display:none!important}
 .wmPanel button{cursor:pointer;font:inherit}
 .wmTop{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;gap:6px;background:#e5f0e7;border-bottom:1px solid #c1d4c5;touch-action:none;cursor:move;user-select:none}
@@ -3547,7 +3547,7 @@ header .views > #workMemoOpenBtn{width:68px!important;min-width:68px!important;m
 
 /* v2.94 · 업무 묶음은 일반 일정과 동일한 글꼴·크기, 완료 시 연하게 */
 .dailySummaryBtn.wmGroupSummary{
-  font-family:var(--ui-font),'Noto Sans KR',sans-serif!important;
+  font-family:var(--ui-font),sans-serif!important;
   font-size:10px!important;font-weight:500!important;letter-spacing:-.01em!important;
   line-height:1.3!important;min-height:0!important;
   border:1px solid #d7dce3!important;border-left:2px solid #bdc6d1!important;
@@ -3955,7 +3955,7 @@ body.todayWorkPopup .wmDayScroll{padding:6px 8px!important}
 
 /* v2.111 — light, calm Naver-style typography.
    Presentation only: preserves all calendar logic, events and responsive layout. */
-:root{--ui-font:"Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",sans-serif}
+:root{--ui-font:"Malgun Gothic","맑은 고딕","Apple SD Gothic Neo",sans-serif}
 body{font-family:var(--ui-font);font-size:13px;font-weight:400!important}
 button,input,select,textarea{font-family:var(--ui-font);font-weight:400}
 button,.primaryViewBtn,.dateNavButtons button,.views button,#sidebar .secHead button,
