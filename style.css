@@ -3978,3 +3978,144 @@ button,.primaryViewBtn,.dateNavButtons button,.views button,#sidebar .secHead bu
 /* Keep small-screen title sizes from existing responsive rules. */
 @media(max-width:760px){.itemTitle,#main .itemTitle{font-size:10px!important}}
 @media(max-width:470px){.itemTitle,#main .itemTitle{font-size:8px!important}}
+
+
+/* v2.113 — compact mobile toolbar (PC layout and event style unchanged).
+   Row 1: title/status/save/menu
+   Row 2: work + day/week/month/list/2week
+   Row 3: shortcuts + displayed range + ‹today› */
+.viewMobileLabel{display:none}
+@media(max-width:760px){
+  :root{--header-h:121px}
+  body:not(.todayWorkPopup) > header{
+    height:var(--header-h)!important;
+    min-height:var(--header-h)!important;
+    display:grid!important;
+    box-sizing:border-box!important;
+    grid-template-columns:auto minmax(0,1fr) auto auto!important;
+    grid-template-rows:32px 32px 32px!important;
+    grid-template-areas:
+      "brand badge save menu"
+      "mainbar mainbar mainbar mainbar"
+      "toolsbar toolsbar toolsbar toolsbar"!important;
+    gap:4px 5px!important;
+    padding:6px 7px!important;
+    align-content:center!important;
+    align-items:center!important;
+    overflow:visible!important;
+  }
+  body:not(.todayWorkPopup) > header nav,
+  body:not(.todayWorkPopup) > header .views{display:none!important}
+  body:not(.todayWorkPopup) > header .brand{grid-area:brand!important}
+  body:not(.todayWorkPopup) > header #saveBadge{grid-area:badge!important;max-width:none!important}
+  body:not(.todayWorkPopup) > header #manualSaveBtn{grid-area:save!important;min-width:32px!important;width:32px!important;height:32px!important;padding:0!important}
+  body:not(.todayWorkPopup) > header #sidebarToggle{grid-area:menu!important;min-width:33px!important;width:33px!important;height:32px!important}
+  .mobileToolbar{display:none}
+  body:not(.todayWorkPopup) > header #mobileToolbarMain{
+    grid-area:mainbar;
+    display:flex!important;align-items:center;gap:4px;
+    height:32px;min-width:0;width:100%;
+  }
+  body:not(.todayWorkPopup) > header #mobileToolbarTools{
+    grid-area:toolsbar;
+    display:flex!important;align-items:center;gap:3px;
+    height:32px;min-width:0;width:100%;
+  }
+  #mobileToolbarMain > #workMemoOpenBtn{
+    display:inline-flex!important;align-items:center;justify-content:center;
+    flex:0 0 62px!important;width:62px!important;min-width:0!important;
+    height:31px!important;margin:0!important;padding:0 3px!important;
+    font-size:11px!important;white-space:nowrap;
+  }
+  #mobileToolbarMain > #workMemoOpenBtn span{font-size:12px!important;margin:0 3px 0 0!important}
+  #mobileToolbarMain > #workTodayWindowBtn{display:none!important}
+  #mobileToolbarMain > #currentViewWrap{
+    display:flex!important;align-items:stretch!important;
+    flex:1 1 auto!important;min-width:0!important;max-width:none!important;
+    position:relative!important;left:auto!important;right:auto!important;top:auto!important;
+    transform:none!important;margin:0!important;
+  }
+  #mobileToolbarMain .primaryViewButtons{
+    display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr)) 20px!important;
+    align-items:stretch!important;gap:0!important;
+    width:100%!important;min-width:0!important;
+    border:1px solid #cbd0d8!important;background:white;
+  }
+  #mobileToolbarMain .primaryViewBtn,
+  #mobileToolbarMain #extraViewMenuToggle{
+    display:flex!important;align-items:center!important;justify-content:center!important;
+    width:100%!important;min-width:0!important;max-width:none!important;
+    height:30px!important;min-height:30px!important;
+    padding:0!important;margin:0!important;
+    font-size:12px!important;font-weight:500!important;line-height:1!important;
+    border:0!important;border-right:1px solid #cbd0d8!important;border-radius:0!important;
+    white-space:nowrap!important;overflow:hidden;
+  }
+  #mobileToolbarMain #extraViewMenuToggle{border-right:0!important}
+  #mobileToolbarMain .primaryViewBtn.on{background:#6758e9!important;color:white!important;border-color:#6758e9!important}
+  #mobileToolbarMain .viewFullLabel{display:none!important}
+  #mobileToolbarMain .viewMobileLabel{display:inline!important}
+  #mobileToolbarMain #currentViewMenu{right:0!important;left:auto!important;top:calc(100% + 4px)!important}
+  #mobileToolbarTools > #naverMailShortcut,
+  #mobileToolbarTools > #accountBookShortcut,
+  #mobileToolbarTools > #diaryMainShortcut,
+  #mobileToolbarTools > #searchBtn,
+  #mobileToolbarTools > #settingsBtn{
+    display:inline-flex!important;align-items:center!important;justify-content:center!important;
+    flex:0 0 30px!important;width:30px!important;min-width:0!important;
+    height:30px!important;min-height:30px!important;
+    margin:0!important;padding:0!important;
+    box-sizing:border-box!important;line-height:1!important;
+    border-radius:2px!important;
+  }
+  #mobileToolbarTools > #searchBtn,
+  #mobileToolbarTools > #settingsBtn{font-size:15px!important}
+  #mobileToolbarTools > #naverMailShortcut{font-size:17px!important}
+  #mobileToolbarTools > #accountBookShortcut{font-size:16px!important}
+  #mobileToolbarTools > #range{
+    flex:1 1 auto!important;display:block!important;width:auto!important;min-width:0!important;
+    max-width:none!important;margin:0 1px 0 3px!important;padding:0!important;
+    font-size:11px!important;line-height:1.1!important;
+    font-weight:500!important;text-align:center!important;white-space:nowrap!important;
+    overflow:hidden!important;text-overflow:clip!important;
+  }
+  #mobileToolbarTools > .dateNavButtons{
+    display:grid!important;grid-template-columns:22px 35px 22px!important;
+    align-items:center!important;gap:1px!important;
+    flex:0 0 81px!important;min-width:81px!important;width:81px!important;height:30px!important;
+    margin:0!important;
+  }
+  #mobileToolbarTools > .dateNavButtons button{
+    width:100%!important;min-width:0!important;height:30px!important;
+    margin:0!important;padding:0!important;font-size:13px!important;
+    line-height:1!important;border-radius:2px!important;overflow:hidden!important;
+  }
+  #mobileToolbarTools > .dateNavButtons #today{font-size:10px!important;min-width:0!important;font-weight:500!important}
+  body:not(.todayWorkPopup) > .layout{height:calc(100dvh - var(--header-h))!important}
+  body:not(.todayWorkPopup) > .layout aside{top:var(--header-h)!important}
+}
+@media(max-width:390px){
+  #mobileToolbarMain > #workMemoOpenBtn{flex-basis:55px!important;width:55px!important;font-size:10px!important}
+  #mobileToolbarMain .primaryViewButtons{grid-template-columns:repeat(5,minmax(0,1fr)) 17px!important}
+  #mobileToolbarMain .primaryViewBtn{font-size:11px!important}
+  #mobileToolbarTools{gap:2px!important}
+  #mobileToolbarTools > #naverMailShortcut,
+  #mobileToolbarTools > #accountBookShortcut,
+  #mobileToolbarTools > #diaryMainShortcut,
+  #mobileToolbarTools > #searchBtn,
+  #mobileToolbarTools > #settingsBtn{
+    flex-basis:25px!important;width:25px!important;height:29px!important;min-height:29px!important;
+  }
+  #mobileToolbarTools > #naverMailShortcut{font-size:15px!important}
+  #mobileToolbarTools > #accountBookShortcut{font-size:14px!important}
+  #mobileToolbarTools > #searchBtn,
+  #mobileToolbarTools > #settingsBtn{font-size:14px!important}
+  #mobileToolbarTools > #range{font-size:10px!important;margin-left:1px!important;margin-right:0!important}
+  #mobileToolbarTools > .dateNavButtons{
+    grid-template-columns:19px 30px 19px!important;
+    flex-basis:70px!important;min-width:70px!important;width:70px!important;
+  }
+  #mobileToolbarTools > .dateNavButtons button{height:29px!important;font-size:11px!important}
+  #mobileToolbarTools > .dateNavButtons #today{font-size:9px!important}
+}
+@media(min-width:761px){.mobileToolbar{display:none!important}}

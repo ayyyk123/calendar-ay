@@ -6186,18 +6186,34 @@ $('#prev').onclick=()=>{ const step=view==='week'?7:view==='2week'?14:view==='3w
 $('#next').onclick=()=>{ const step=view==='week'?7:view==='2week'?14:view==='3week'?21:view==='4week'?28:1; cursor=(view==='month'||view==='diary')?new Date(cursor.getFullYear(),cursor.getMonth()+1,1):add(cursor,step); mobileSelectedDate=''; render(); };
 $('#today').onclick=()=>{cursor=new Date();mobileSelectedDate=ds(new Date());render();};
 
-// v1.79: 모바일에서는 ‹ 오늘 › 날짜이동 묶음을 보기 버튼 줄의 맨 오른쪽으로 이동한다.
-// 데스크톱으로 돌아오면 기존 nav 위치로 복원해 PC 배치는 그대로 유지한다.
-function syncDateNavPlacement(){
-  const group=document.querySelector('.dateNavButtons');
-  const views=document.querySelector('header .views');
-  const nav=document.querySelector('header nav');
-  const jump=$('#jumpDate');
-  if(!group||!views||!nav) return;
-  if(window.matchMedia('(max-width:760px)').matches){
-    if(group.parentElement!==views) views.appendChild(group);
-  }else if(group.parentElement!==nav){
-    nav.insertBefore(group,jump||nav.firstChild);
+// v2.113: 모바일에서는 헤더 버튼만 두 줄로 재배치한다.
+// HTML 요소 자체를 이동하므로 기존 이벤트 연결과 Firebase 데이터 처리에는 영향이 없다.
+function syncMobileHeaderToolbars(){
+  const header=document.querySelector('header');
+  const nav=header?.querySelector('nav');
+  const views=header?.querySelector('.views');
+  const top=$('#mobileToolbarMain');
+  const bottom=$('#mobileToolbarTools');
+  const range=$('#range');
+  const dateNav=header?.querySelector('.dateNavButtons');
+  const viewWrap=$('#currentViewWrap');
+  if(!header||!nav||!views||!top||!bottom||!range||!dateNav||!viewWrap) return;
+  const mobile=window.matchMedia('(max-width:760px)').matches;
+  const work=$('#workMemoOpenBtn');
+  const workPopup=$('#workTodayWindowBtn');
+  const shortcuts=['naverMailShortcut','accountBookShortcut','diaryMainShortcut','searchBtn','settingsBtn']
+    .map(id=>document.getElementById(id)).filter(Boolean);
+  if(mobile){
+    [work,workPopup,viewWrap].filter(Boolean).forEach(el=>top.appendChild(el));
+    [...shortcuts,range,dateNav].forEach(el=>bottom.appendChild(el));
+  }else{
+    // PC 원래 구조를 복원한다. 각각의 id와 클릭 동작은 그대로 유지된다.
+    nav.insertBefore(range,nav.firstChild);
+    const jump=$('#jumpDateBtn');
+    nav.insertBefore(dateNav,jump||viewWrap);
+    nav.appendChild(viewWrap);
+    // 작업/바로가기 원래 순서. 저장 상태와 저장 버튼은 아래에서 제 위치로 옮긴다.
+    [work,workPopup,...shortcuts].filter(Boolean).forEach(el=>views.appendChild(el));
   }
 }
 function syncSaveControlsPlacement(){
@@ -6211,13 +6227,13 @@ function syncSaveControlsPlacement(){
   if(window.matchMedia('(max-width:760px)').matches){
     if(badge.parentElement!==header) header.insertBefore(badge,menu||header.children[1]||null);
     if(saveBtn.parentElement!==header) header.insertBefore(saveBtn,menu||header.children[1]||null);
-  }else if(naver){
-    if(badge.parentElement!==views) views.insertBefore(badge,naver);
-    if(saveBtn.parentElement!==views) views.insertBefore(saveBtn,naver);
+  }else if(naver && naver.parentElement===views){
+    if(badge.parentElement!==views || badge.nextElementSibling!==saveBtn) views.insertBefore(badge,naver);
+    if(saveBtn.parentElement!==views || saveBtn.nextElementSibling!==naver) views.insertBefore(saveBtn,naver);
   }
 }
 function syncHeaderResponsivePlacement(){
-  syncDateNavPlacement();
+  syncMobileHeaderToolbars();
   syncSaveControlsPlacement();
 }
 syncHeaderResponsivePlacement();
@@ -6483,7 +6499,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.111',
+    appVersion:'2.113',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
