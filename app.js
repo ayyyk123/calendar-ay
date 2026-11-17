@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '2.111',
+  version: '2.114',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -366,7 +366,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '2.111',
+    version: '2.114',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -417,6 +417,7 @@ function normalizeState(raw){
       excludedDates:Array.isArray(e.excludedDates)?e.excludedDates.map(String):[],
       done:!!e.done,
       doneDates:Array.isArray(e.doneDates)?e.doneDates:[],
+      skipDates:Array.isArray(e.skipDates)?[...new Set(e.skipDates.map(String).filter(v=>/^\d{4}-\d{2}-\d{2}$/.test(v)))]:[],
       checklist:Array.isArray(e.checklist)?e.checklist.filter(x=>x&&String(x.text||'').trim()).map((x,i)=>({id:String(x.id||`cl-${i}-${uid()}`),text:String(x.text||'').trim()})):[],
       checklistDoneByDate:(e.checklistDoneByDate&&typeof e.checklistDoneByDate==='object')?Object.fromEntries(Object.entries(e.checklistDoneByDate).map(([k,v])=>[k,Array.isArray(v)?v.map(String):[]])):{},
       orderByDate:(e.orderByDate&&typeof e.orderByDate==='object')?Object.fromEntries(Object.entries(e.orderByDate).map(([k,v])=>[k,Number(v)||0])):{},
@@ -804,7 +805,7 @@ function capacitySidebarLabel(c){
   if(new Set(vals).size===1){ const [flag,val]=vals[0].split(':'); return flag==='u'?'미정':`${val}h`; }
   return '요일별';
 }
-function workloadDuration(e){ return e?.availabilityBlock ? 0 : duration(e); }
+function workloadDuration(e){ return e?.availabilityBlock || isSkipped(e) ? 0 : duration(e); }
 function fmtH(h){
   const value = Math.max(0, Number(h) || 0);
   const rounded = Math.round(value * 100) / 100;
@@ -1314,7 +1315,19 @@ function buildOccurrenceMap(rangeStart, rangeEnd, options={}){
   }
   return map;
 }
+// v2.114: '안 함' means not needed, not completed and not pending.
+// It is saved by occurrence date; a repeated event's other dates stay untouched.
+function isSkipped(e){
+  return !!e && Array.isArray(e.skipDates) && e.skipDates.includes(e._occurrenceStart||e.date);
+}
+function canSkipEvent(e){
+  return !!e && e.kind!=='anniversary' && !e.prepEnabled && !e._prepDay && !e._purchaseDue && e.sourceType!=='purchase';
+}
+function clearSkipped(e,occ){
+  if(e && Array.isArray(e.skipDates)) e.skipDates=e.skipDates.filter(x=>x!==(occ||e.date));
+}
 function isDone(e){
+  if(isSkipped(e)) return false;
   if((e.repeat||'none')==='none') return !!e.done;
   return (e.doneDates||[]).includes(e._occurrenceStart||e.date);
 }
@@ -1408,6 +1421,7 @@ function checklistProgress(e,occ=''){
 function setOccurrenceDoneState(e,occ,done){
   if(!e) return;
   const key=occ||e.date;
+  if(done) clearSkipped(e,key);
   if((e.repeat||'none')==='none') e.done=!!done;
   else{
     e.doneDates=Array.isArray(e.doneDates)?e.doneDates:[];
@@ -1439,7 +1453,7 @@ function eventItemHtml(e, compact=false){
   // 팝업과 달력 모두 동일한 키로 판정한다. 마감 자체는 모두 처리되면 종료 표시만 한다.
   const done=prepDay?preparationEntryDone(e,e._prepKey)
     :deadlineItem && deadlineProgress.total>0?deadlineClosed:isDone(e);
-  const missed=prepDay?preparationEntryMissed(e,e._prepKey):false, checkable=e.kind!=='anniversary' && !prepDay;
+  const missed=prepDay?preparationEntryMissed(e,e._prepKey):false, skipped=!prepDay&&isSkipped(e), checkable=e.kind!=='anniversary' && !prepDay;
   const recurring=(e.repeat||'none')!=='none';
   const payment=e.kind==='payment';
   const checklist=prepDay?[]:checklistItems(e), checklistState=prepDay?{done:0,total:0}:checklistProgress(e);
@@ -1471,7 +1485,7 @@ function eventItemHtml(e, compact=false){
   if(inLabel) detail.push(inLabel);
   if(outRecord) detail.push(`${outRecord.toDate}로 이월`);
   if(deadlineItem) detail.unshift(preparationSummary(e));
-  const tooltip=[shownTitle,...detail].filter(Boolean).join(' · ');
+  const tooltip=[shownTitle,skipped?'안 함으로 기록됨':'',...detail].filter(Boolean).join(' · ');
   const dragHandle=deadlineItem?'':`<span class="dragHandle" title="${prepDay?'드래그: 준비일정을 다른 날짜로 이동':'드래그: 같은 날짜에서는 순서 변경 · 다른 날짜에서는 이동'}" aria-hidden="true">⋮⋮</span>`;
   const mainCheck=prepDay?`<button type="button" class="todoCheck prepCheck" data-action="prep-toggle" title="${done?'완료 해제':'완료 처리'}">${done?'☑':'☐'}</button>`:'';
   const checklistKey=checklistExpandKey(e), expanded=!prepDay&&expandedChecklistKeys.has(checklistKey);
@@ -1479,8 +1493,8 @@ function eventItemHtml(e, compact=false){
   const repeatBadge=!prepDay&&recurring?`<span class="repeatMark" title="${esc(repeatRuleLabel(e))}">↻</span>`:'';
   const carryBadge=inLabel?`<span class="carryBadge carryIn" title="${esc(inLabel)}">↪</span>`:'';
   const amountInline=!prepDay&&payment&&Number(e.paymentAmount)>0?`<span class="inlineMeta">₩${Number(e.paymentAmount).toLocaleString('ko-KR')}</span>`:'';
-  return `<div class="item ${done?'done':''} ${missed?'prepMissedItem':''} kind-${esc(e.kind||'event')} ${recurring&&!prepDay?'recurringItem':''} ${payment&&!prepDay?'paymentItem':''} ${e.fixedId?'manualPlacedItem':''} ${e.flexibleId?'flexiblePlacedItem':''} ${inLabel?'carriedIn':''} ${outRecord?'carriedOut':''} ${prepDay?'prepDayItem':''} ${prepDeadlineDay?'prepDeadlineDayItem':''} ${deadlineItem?'prepDeadlineItem':''} ${deadlineItem&&deadlineComplete?'prepDeadlineComplete':''} ${deadlineItem&&deadlineClosed&&!deadlineComplete?'prepDeadlineClosed':''}" draggable="${drag}" data-eid="${esc(e.id)}" data-occurrence="${esc(e._occurrenceStart||e.date)}" data-render-date="${esc(renderDate)}" data-cal-id="${esc(e.calId)}" data-lane="${payment?'payment':'work'}" data-prep-day="${prepDay?'1':''}" data-prep-completed="${prepDay?(done?'yes':'no'):''}" data-prep-key="${prepDay?esc(e._prepKey||''):''}" data-prep-source-date="${prepDay?esc(e._prepSourceDate||''):''}" data-prep-type="${prepDay?esc(e._prepType||''):''}" data-prep-rule-id="${prepDay?esc(e._prepRuleId||''):''}" data-prep-event="${e.prepEnabled?'1':''}" data-purchase-due="${purchaseDue?'1':''}" data-purchase-id="${purchaseDue?esc(e.purchaseId||''):''}" style="--item-color:${esc(c.color)};border-left-color:${esc(c.color)};${prepDay&&done?'background:#f1f3f5!important;box-shadow:none!important;opacity:.66!important;border-color:#d8dfe5!important;':''}">
-    <div class="itemRow">${dragHandle}${!prepDay&&e.important?`<button type="button" class="importanceBtn on" data-action="importance" aria-label="중요 표시 해제" title="중요 표시 해제">★</button>`:''}${mainCheck}${missed?`<span class="prepMissedMark" title="못함">✕</span>`:''}<div class="itemTitle" title="${esc(tooltip)}">${timePrefix}<span class="durationPrefix">${esc(durationPrefix)}</span>${!prepDay&&payment?'₩ ':(!checkable&&!prepDay?kindPrefix(e):'')}${esc(shownTitle)}</div>${amountInline}${repeatBadge}${carryBadge}${checklistButton}</div>
+  return `<div class="item ${done?'done':''} ${skipped?'skipped':''} ${missed?'prepMissedItem':''} kind-${esc(e.kind||'event')} ${recurring&&!prepDay?'recurringItem':''} ${payment&&!prepDay?'paymentItem':''} ${e.fixedId?'manualPlacedItem':''} ${e.flexibleId?'flexiblePlacedItem':''} ${inLabel?'carriedIn':''} ${outRecord?'carriedOut':''} ${prepDay?'prepDayItem':''} ${prepDeadlineDay?'prepDeadlineDayItem':''} ${deadlineItem?'prepDeadlineItem':''} ${deadlineItem&&deadlineComplete?'prepDeadlineComplete':''} ${deadlineItem&&deadlineClosed&&!deadlineComplete?'prepDeadlineClosed':''}" draggable="${drag}" data-eid="${esc(e.id)}" data-occurrence="${esc(e._occurrenceStart||e.date)}" data-render-date="${esc(renderDate)}" data-cal-id="${esc(e.calId)}" data-lane="${payment?'payment':'work'}" data-prep-day="${prepDay?'1':''}" data-prep-completed="${prepDay?(done?'yes':'no'):''}" data-prep-key="${prepDay?esc(e._prepKey||''):''}" data-prep-source-date="${prepDay?esc(e._prepSourceDate||''):''}" data-prep-type="${prepDay?esc(e._prepType||''):''}" data-prep-rule-id="${prepDay?esc(e._prepRuleId||''):''}" data-prep-event="${e.prepEnabled?'1':''}" data-purchase-due="${purchaseDue?'1':''}" data-purchase-id="${purchaseDue?esc(e.purchaseId||''):''}" style="--item-color:${esc(c.color)};border-left-color:${esc(c.color)};${prepDay&&done?'background:#f1f3f5!important;box-shadow:none!important;opacity:.66!important;border-color:#d8dfe5!important;':''}">
+    <div class="itemRow">${dragHandle}${!prepDay&&e.important?`<button type="button" class="importanceBtn on" data-action="importance" aria-label="중요 표시 해제" title="중요 표시 해제">★</button>`:''}${mainCheck}${missed?`<span class="prepMissedMark" title="못함">✕</span>`:''}<div class="itemTitle" title="${esc(tooltip)}">${timePrefix}<span class="durationPrefix">${esc(durationPrefix)}</span>${!prepDay&&payment?'₩ ':(!checkable&&!prepDay?kindPrefix(e):'')}${esc(shownTitle)}</div>${skipped?'<span class="skipBadge" title="안 함 · 기록은 유지됨">안 함</span>':''}${amountInline}${repeatBadge}${carryBadge}${checklistButton}</div>
     ${expanded?checklistHtml(e,false):''}
   </div>`;
 }
@@ -1786,9 +1800,10 @@ function recurringMonthProgress(e){
     const k=ds(d);
     return k>=startKey && k<=endKey && !(e.excludedDates||[]).includes(k);
   });
-  const doneSet=new Set(e.doneDates||[]);
-  let total=starts.length;
-  let done=starts.reduce((n,d)=>n+(doneSet.has(ds(d))?1:0),0);
+  const doneSet=new Set(e.doneDates||[]),skippedSet=new Set(e.skipDates||[]);
+  let skipped=starts.filter(d=>skippedSet.has(ds(d))).length;
+  let total=starts.length-skipped;
+  let done=starts.reduce((n,d)=>n+(!skippedSet.has(ds(d))&&doneSet.has(ds(d))?1:0),0);
   // 이동된 회차는 반복 원본에 더 이상 속하지 않지만 원본 업무의 실적이다.
   // 이동된 날짜를 기준으로 집계하며, 완료/미완료 모두 반영한다.
   const moved=state.events.filter(x=>
@@ -1796,7 +1811,8 @@ function recurringMonthProgress(e){
     (x.repeat||'none')==='none' &&
     typeof x.date==='string' && x.date>=startKey && x.date<=endKey
   );
-  total+=moved.length;
+  total+=moved.filter(x=>!isSkipped(x)).length;
+  skipped+=moved.filter(isSkipped).length;
   done+=moved.filter(x=>isDone(x)).length;
   if(!total){
     // 원래 생성되어야 했던 월 회차가 사용자의 삭제로 제외된 경우만 '삭제됨'.
@@ -1806,16 +1822,20 @@ function recurringMonthProgress(e){
     const movedOrigins=new Set(state.events.filter(x=>String(x.detachedFromRepeatId||'')===String(e.id)).map(x=>x.detachedOccurrence||x.detachedOriginalDate||x.originalOccurrenceDate||x.originalDate||x.movedFromDate).filter(Boolean));
     const removed=scheduled.filter(k=>excluded.has(k)&&!movedOrigins.has(k));
     if(removed.length) return {total:0,done:0,label:`이번 달 삭제됨 (${removed.length}건)`,complete:false};
-    return {total:0,done:0,label:'이번 달 해당 없음',complete:false};
+    return {total:0,done:0,label:skipped?`이번 달 안 함 ${skipped}건`:'이번 달 해당 없음',complete:false};
   }
-  if(done===total) return {total,done,label:`✓ 이번 달 완료 ${done}/${total}`,complete:true};
-  return {total,done,label:`이번 달 ${done}/${total} 완료`,complete:false};
+  const skippedLabel=skipped?` · 안 함 ${skipped}`:'';
+  if(done===total) return {total,done,label:`✓ 이번 달 완료 ${done}/${total}${skippedLabel}`,complete:true};
+  return {total,done,label:`이번 달 ${done}/${total} 완료${skippedLabel}`,complete:false};
 }
 function manualMonthProgress(placed){
   if(!placed.length) return {label:'이번 달 미배치',complete:false};
-  const done=placed.filter(e=>isDone(e)).length;
-  if(done===placed.length) return {label:`✓ 이번 달 완료${placed.length>1?` ${done}/${placed.length}`:''}`,complete:true};
-  return {label:placed.length>1?`이번 달 ${done}/${placed.length} 완료`:'이번 달 미완료',complete:false};
+  const active=placed.filter(e=>!isSkipped(e));
+  const done=active.filter(e=>isDone(e)).length, skipped=placed.length-active.length;
+  if(!active.length) return {label:`이번 달 안 함 ${skipped}건`,complete:false};
+  const suffix=skipped?` · 안 함 ${skipped}`:'';
+  if(done===active.length) return {label:`✓ 이번 달 완료${active.length>1?` ${done}/${active.length}`:''}${suffix}`,complete:true};
+  return {label:active.length>1?`이번 달 ${done}/${active.length} 완료${suffix}`:`이번 달 미완료${suffix}`,complete:false};
 }
 
 // v2.77: restore last archive collapse choice even when an older Firebase snapshot arrives.
@@ -1947,18 +1967,18 @@ function recurringPreviewEntries(e,start,end){
   const addEntry=(date,status)=>{
     if(!date||date<start||date>end)return;
     const prior=byDate.get(date);
-    const rank={deleted:0,planned:1,failed:2,done:3};
+    const rank={deleted:0,planned:1,skipped:2,failed:3,done:4};
     if(!prior||rank[status]>rank[prior])byDate.set(date,status);
   };
   const excluded=new Set(e.excludedDates||[]),done=new Set(e.doneDates||[]);
   for(const d of generateOccurrenceStarts(e,start,end)){
     const k=ds(d);
     const moved=state.events.some(x=>String(x.detachedFromRepeatId||'')===String(e.id)&&x.detachedOccurrence===k);
-    if(!moved)addEntry(k,excluded.has(k)?'deleted':done.has(k)?'done':'planned');
+    if(!moved)addEntry(k,excluded.has(k)?'deleted':isSkipped({...e,_occurrenceStart:k})?'skipped':done.has(k)?'done':'planned');
   }
   for(const x of state.events){
     if(String(x.detachedFromRepeatId||'')!==String(e.id))continue;
-    addEntry(x.date,x.failed||x.notDone||x.skipped?'failed':isDone(x)?'done':'planned');
+    addEntry(x.date,isSkipped(x)?'skipped':x.failed||x.notDone?'failed':isDone(x)?'done':'planned');
   }
   return byDate;
 }
@@ -1974,11 +1994,11 @@ function renderRecurringPreview(){
   const names=['월','화','수','목','금','토','일'];
   const cells=Array.from({length:weekCount*7},(_,i)=>{
     const d=add(s,i),k=ds(d),st=items.get(k),other=d.getMonth()!==m;
-    return `<div class="recurringPreviewDay ${other?'other':''} ${st?'status-'+st:''}" title="${k}${st?' · '+({done:'완료',planned:'예정',failed:'못함',deleted:'삭제된 회차'}[st]):''}"><span class="previewDayNumber">${d.getDate()}</span>${st?`<span class="previewDayMarker">${{done:'✓ 완료',planned:'● 배치',failed:'✕ 못함',deleted:'— 삭제'}[st]}</span>`:''}</div>`;
+    return `<div class="recurringPreviewDay ${other?'other':''} ${st?'status-'+st:''}" title="${k}${st?' · '+({done:'완료',planned:'예정',skipped:'안 함',failed:'못함',deleted:'삭제된 회차'}[st]):''}"><span class="previewDayNumber">${d.getDate()}</span>${st?`<span class="previewDayMarker">${{done:'✓ 완료',planned:'● 배치',skipped:'− 안 함',failed:'✕ 못함',deleted:'— 삭제'}[st]}</span>`:''}</div>`;
   }).join('');
   $('#recurringPreviewTitle').textContent=e.title;
   $('#recurringPreviewMonth').textContent=`${y}년 ${m+1}월`;
-  box.innerHTML=`<div class="recurringPreviewWeekdays">${names.map(x=>`<span>${x}</span>`).join('')}</div><div class="recurringPreviewGrid">${cells}</div><div class="recurringPreviewLegend"><span>● 예정</span><span>✓ 완료</span><span>✕ 못함</span><span>— 삭제</span></div><p class="recurringPreviewNote">선택한 반복업무만 표시합니다. 날짜를 옮긴 회차도 이동 후 날짜에 표시돼요.</p>`;
+  box.innerHTML=`<div class="recurringPreviewWeekdays">${names.map(x=>`<span>${x}</span>`).join('')}</div><div class="recurringPreviewGrid">${cells}</div><div class="recurringPreviewLegend"><span>● 예정</span><span>✓ 완료</span><span>− 안 함</span><span>✕ 못함</span><span>— 삭제</span></div><p class="recurringPreviewNote">선택한 반복업무만 표시합니다. 날짜를 옮긴 회차도 이동 후 날짜에 표시돼요.</p>`;
 }
 $('#recurringPreviewPrev').onclick=()=>{recurringPreviewCursor=new Date(recurringPreviewCursor.getFullYear(),recurringPreviewCursor.getMonth()-1,1);renderRecurringPreview();};
 $('#recurringPreviewNext').onclick=()=>{recurringPreviewCursor=new Date(recurringPreviewCursor.getFullYear(),recurringPreviewCursor.getMonth()+1,1);renderRecurringPreview();};
@@ -2760,9 +2780,17 @@ function openEventPopover(anchor,id,occ){
   const canComplete=true;
   doneWrap.classList.toggle('hidden',false);
   done.checked=!!isDone(e); doneText.textContent=base.kind==='payment'?'납부완료':'완료';
+  const skipBtn=$('#eventPopoverSkip');
+  skipBtn?.classList.toggle('hidden',!canSkipEvent(base));
+  refreshSkipButton(skipBtn,isSkipped(e));
   positionEventPopover(anchor);
 }
 $('#eventPopoverClose').onclick=closeEventPopover;
+$('#eventPopoverSkip').onclick=()=>{
+  const {id,occ}=eventPopoverState;
+  if(!id)return;
+  closeEventPopover();toggleSkip(id,occ);
+};
 $('#eventPopoverEdit').onclick=()=>{
   const {id,occ}=eventPopoverState; if(!id) return;
   closeEventPopover(); openEvent(occ,id);
@@ -3004,14 +3032,17 @@ function moveRecurringOccurrenceOnly(e,newDate,occ){
   e.excludedDates=Array.isArray(e.excludedDates)?e.excludedDates:[];
   if(!e.excludedDates.includes(occ)) e.excludedDates.push(occ);
   const wasDone=(e.doneDates||[]).includes(occ);
+  const wasSkipped=(e.skipDates||[]).includes(occ);
   const movedChecklistDone=Array.isArray(e.checklistDoneByDate?.[occ])?[...e.checklistDoneByDate[occ]]:[];
   // Preserve the original work-board group when splitting a recurring occurrence.
   // Without this, a monthly payment moved one day earlier becomes repeat='none'
   // and is incorrectly rendered as an extra task.
   const sourceGroup=workMemoGroup(e);
-  const detached={...structuredClone(e),id:uid(),date:newDate,endDate:ds(add(parse(newDate),span)),repeat:'none',repeatRule:null,excludedDates:[],done:wasDone,doneDates:[],checklistDoneByDate:movedChecklistDone.length?{[newDate]:movedChecklistDone}:{},orderByDate:{},repeatOrder:0,fixedId:null,detachedFromRepeatId:e.id,detachedOccurrence:occ,
+  const detached={...structuredClone(e),id:uid(),date:newDate,endDate:ds(add(parse(newDate),span)),repeat:'none',repeatRule:null,excludedDates:[],done:wasDone,doneDates:[],skipDates:wasSkipped?[newDate]:[],checklistDoneByDate:movedChecklistDone.length?{[newDate]:movedChecklistDone}:{},orderByDate:{},repeatOrder:0,fixedId:null,detachedFromRepeatId:e.id,detachedOccurrence:occ,
     memoCategory:sourceGroup,memoEnabled:sourceGroup!=='off'};
   if(e.checklistDoneByDate?.[occ]) delete e.checklistDoneByDate[occ];
+  clearSkipped(e,occ);
+  e.doneDates=(e.doneDates||[]).filter(d=>d!==occ);
   detached.carryoverHistory=[];
   state.events.push(detached);
 }
@@ -3030,6 +3061,7 @@ function moveRecurringFuture(e,newDate,occ){
   }
   future.excludedDates=shiftedDateArray(e.excludedDates,delta,d=>String(d)>=occ);
   future.doneDates=shiftedDateArray(e.doneDates,delta,d=>String(d)>=occ);
+  future.skipDates=shiftedDateArray(e.skipDates,delta,d=>String(d)>=occ);
   future.checklistDoneByDate=shiftedDateMap(e.checklistDoneByDate,delta,d=>String(d)>=occ);
   future.orderByDate=shiftedDateMap(e.orderByDate,delta,d=>String(d)>=occ);
   future.detachedFromRepeatId=''; future.detachedOccurrence='';
@@ -3043,6 +3075,7 @@ function moveRecurringFuture(e,newDate,occ){
     e.repeatRule=pastRule;
     e.excludedDates=(e.excludedDates||[]).filter(d=>String(d)<occ);
     e.doneDates=(e.doneDates||[]).filter(d=>String(d)<occ);
+    e.skipDates=(e.skipDates||[]).filter(d=>String(d)<occ);
     e.checklistDoneByDate=Object.fromEntries(Object.entries(e.checklistDoneByDate||{}).filter(([k])=>k<occ));
     e.orderByDate=Object.fromEntries(Object.entries(e.orderByDate||{}).filter(([k])=>k<occ));
     state.events.push(future);
@@ -3057,6 +3090,7 @@ function moveRecurringWholeSeries(e,newDate,occ){
   e.repeatRule=shiftedRule;
   e.excludedDates=shiftedDateArray(e.excludedDates,delta);
   e.doneDates=shiftedDateArray(e.doneDates,delta);
+  e.skipDates=shiftedDateArray(e.skipDates,delta);
   e.checklistDoneByDate=shiftedDateMap(e.checklistDoneByDate,delta);
   e.orderByDate=shiftedDateMap(e.orderByDate,delta);
   if(e.carryoverHistory?.length){
@@ -3132,6 +3166,7 @@ function moveEventToDate(id,newDate,occurrence='',sourceDay=''){
     const oldDate=e.date; e.date=newDate; e.endDate=ds(add(parse(newDate),span));
     if(e.orderByDate){ delete e.orderByDate[oldDate]; delete e.orderByDate[newDate]; }
     if(e.checklistDoneByDate?.[oldDate]){ e.checklistDoneByDate[newDate]=e.checklistDoneByDate[oldDate]; delete e.checklistDoneByDate[oldDate]; }
+    if((e.skipDates||[]).includes(oldDate)){clearSkipped(e,oldDate);e.skipDates.push(newDate);}
     save(); return;
   }
   const occ=occurrence||e.date;
@@ -3183,16 +3218,33 @@ function toggleDone(id,occ){
     save();
     return;
   }
-  if((e.repeat||'none')==='none') e.done=!e.done;
-  else {
-    e.doneDates=Array.isArray(e.doneDates)?e.doneDates:[];
-    const set=new Set(e.doneDates);
-    set.has(occ)?set.delete(occ):set.add(occ);
-    e.doneDates=[...set].sort();
+  const key=occ||e.date;
+  setOccurrenceDoneState(e,key,!isDone({...e,_occurrenceStart:key}));
+  save();
+}
+function toggleSkip(id,occ){
+  const e=state.events.find(x=>x.id===id);
+  if(!canSkipEvent(e)) return;
+  const key=occ||e.date;
+  e.skipDates=Array.isArray(e.skipDates)?e.skipDates:[];
+  const currentlySkipped=e.skipDates.includes(key);
+  if(currentlySkipped){
+    clearSkipped(e,key);
+  }else{
+    // The user did not finish this task. A saved checklist or done flag must not count as completed.
+    setOccurrenceDoneState(e,key,false);
+    if(e.checklistDoneByDate?.[key]) delete e.checklistDoneByDate[key];
+    e.skipDates=[...new Set([...e.skipDates,key])].sort();
   }
   save();
 }
-
+function refreshSkipButton(button,skipped){
+  if(!button) return;
+  button.classList.toggle('active',skipped);
+  button.setAttribute('aria-pressed',String(skipped));
+  button.textContent=skipped?'↩ 미완료로':'− 안 함';
+  button.title=skipped?'안 함 상태를 해제하고 미완료로 되돌리기':'실행할 필요가 없었던 일로 기록 (일정 유지)';
+}
 
 const LANE_MIN_HEIGHT=40;
 const LANE_HEIGHT_DEFAULTS={common:72,prep:84,quick:64,payment:64,calendar:112};
@@ -4214,7 +4266,7 @@ function workMemoTasks(date,includeAll=false){
   function push(e,kind,key=workMemoRef(e)){
     if(seen.has(key)||transferred.has(key)||!isAdorableCalendar(e.calId))return;
     seen.add(key);
-    rows.push({key,kind,e,title:workMemoTitle(e),done:workMemoIsDone(e),originDate:e.memoOriginalDate||'',sourceDate:date});
+    rows.push({key,kind,e,title:workMemoTitle(e),done:workMemoIsDone(e),skipped:isSkipped(e),originDate:e.memoOriginalDate||'',sourceDate:date});
   }
   // Calendar is the single source of tasks: no manual import is required.
   // The same occurrence ID is used for the memo and calendar checkbox.
@@ -4228,11 +4280,23 @@ function workMemoTasks(date,includeAll=false){
   for(const x of note.custom){
     if(x.movedTo)continue;
     const key=`custom|${x.id}`;
-    if(!seen.has(key)){seen.add(key);rows.push({key,kind:'extra',custom:x,title:x.title,done:!!x.done,originDate:x.originDate||'',sourceDate:date});}
+    if(!seen.has(key)){seen.add(key);rows.push({key,kind:'extra',custom:x,title:x.title,done:!!x.done,skipped:false,originDate:x.originDate||'',sourceDate:date});}
   }
   return rows;
 }
 function workMemoSave(){save();}
+function workMemoStats(rows,moved=0){
+  const active=rows.filter(x=>!x.skipped);
+  const done=active.filter(x=>x.done).length,skipped=rows.length-active.length;
+  const base=moved?`${done}/${active.length}/${active.length+moved}`:`${done}/${active.length}`;
+  return {done,total:active.length,skipped,complete:active.length>0&&done===active.length,
+    label:`${base}${skipped?` · 안 함 ${skipped}`:''}`};
+}
+function workMemoToggleSkip(key,date){
+  const row=workMemoTasks(date).find(x=>x.key===key);
+  if(!row?.e || !canSkipEvent(row.e))return;
+  toggleSkip(row.e.id,row.e._occurrenceStart||row.e.date);
+}
 // 달력 묶음 클릭 시 달력을 가리지 않는 목록을 열어 드래그 이동할 수 있습니다.
 let workGroupPopupState=null;
 function closeWorkGroupPopup(){
@@ -4255,10 +4319,10 @@ function refreshWorkGroupPopup(){
   const rows=workMemoTasks(date).filter(x=>x.kind===kind);
   const currentScroll=pop.querySelector('.wmGroupPopupList')?.scrollTop||0;
   const popupFoldKey=`popup|${date}|${kind}`;
-  pop.innerHTML=`<div class="wmGroupPopupHeader"><strong>${esc(workMemoShortDate(date))} ${esc(label)} <small>${rows.filter(x=>x.done).length}/${rows.length}</small></strong><button type="button" data-wm-popup-close aria-label="목록 닫기">✕</button></div><details class="wmGroupPopupDetails" data-wm-fold-key="${esc(popupFoldKey)}"${wmFoldOpen(popupFoldKey)}><summary class="wmGroupPopupFold">${esc(label)} 목록 <b>${rows.length}건</b></summary><p class="wmGroupPopupHelp">미완료 업무를 잡아 달력의 다른 날짜로 드래그하세요. 휴대폰은 날짜를 선택해 이동할 수 있어요.</p><div class="wmGroupPopupList">${rows.length?rows.map(row=>{
-    const moveable=!row.done && (!!row.e || !!row.custom);
+  pop.innerHTML=`<div class="wmGroupPopupHeader"><strong>${esc(workMemoShortDate(date))} ${esc(label)} <small>${esc(workMemoStats(rows).label)}</small></strong><button type="button" data-wm-popup-close aria-label="목록 닫기">✕</button></div><details class="wmGroupPopupDetails" data-wm-fold-key="${esc(popupFoldKey)}"${wmFoldOpen(popupFoldKey)}><summary class="wmGroupPopupFold">${esc(label)} 목록 <b>${rows.length}건</b></summary><p class="wmGroupPopupHelp">미완료 업무를 잡아 달력의 다른 날짜로 드래그하세요. 휴대폰은 날짜를 선택해 이동할 수 있어요.</p><div class="wmGroupPopupList">${rows.length?rows.map(row=>{
+    const moveable=!row.done && !row.skipped && (!!row.e || !!row.custom);
     const origin=row.originDate&&row.originDate!==date?` <small>(${esc(workMemoShortDate(row.originDate))})</small>`:'';
-    return `<div class="wmPopupTask ${row.done?'completed':''}" data-wm-popup-key="${esc(row.key)}" ${moveable?'draggable="true"':''}><div class="wmPopupTaskMain"><input type="checkbox" data-wm-popup-check="${esc(row.key)}" ${row.done?'checked':''} ${row.e?.kind==='anniversary'?'disabled':''}><span title="${moveable?'드래그해서 날짜 이동':''}">${moveable?'<span class="wmDragGrip">⠿</span> ':''}${workMemoStarMarkup(row)}${esc(row.title)}${origin}</span></div>${workMemoSubtasksMarkup(row)}<div class="wmPopupTaskActions"><button type="button" data-wm-popup-edit>✎ 수정·삭제</button>${moveable?`<input type="date" aria-label="이동할 날짜" value="${date}"><button type="button" data-wm-popup-move>이동</button>`:''}</div></div>`;
+    return `<div class="wmPopupTask ${row.done?'completed':''} ${row.skipped?'skipped':''}" data-wm-popup-key="${esc(row.key)}" ${moveable?'draggable="true"':''}><div class="wmPopupTaskMain"><input type="checkbox" data-wm-popup-check="${esc(row.key)}" ${row.done?'checked':''} ${(row.e?.kind==='anniversary'||row.skipped)?'disabled':''}><span title="${moveable?'드래그해서 날짜 이동':''}">${moveable?'<span class="wmDragGrip">⠿</span> ':''}${workMemoStarMarkup(row)}${esc(row.title)}${origin}</span></div>${workMemoSubtasksMarkup(row)}<div class="wmPopupTaskActions">${row.skipped?'<span class="wmSkippedMark">안 함</span>':''}${row.e&&canSkipEvent(row.e)?`<button type="button" class="wmSkipAction" data-wm-popup-skip>${row.skipped?'↩ 되돌리기':'− 안 함'}</button>`:''}<button type="button" data-wm-popup-edit>✎ 수정·삭제</button>${moveable?`<input type="date" aria-label="이동할 날짜" value="${date}"><button type="button" data-wm-popup-move>이동</button>`:''}</div></div>`;
   }).join(''):'<div class="wmGroupPopupEmpty">해당 날짜의 업무가 없습니다.</div>'}</div></details>`;
   pop.classList.remove('hidden');
   const list=pop.querySelector('.wmGroupPopupList');if(list)list.scrollTop=currentScroll;
@@ -4272,6 +4336,13 @@ function initWorkGroupPopup(){
   const pop=$('#wmGroupPopup');if(!pop)return;
   pop.addEventListener('click',e=>{
     if(e.target.closest('[data-wm-popup-close]')){closeWorkGroupPopup();return;}
+    const skip=e.target.closest('[data-wm-popup-skip]');
+    if(skip){
+      const info=workGroupPopupState,item=skip.closest('[data-wm-popup-key]');
+      const row=info&&item?workMemoTasks(info.date).find(x=>x.key===item.dataset.wmPopupKey&&x.kind===info.kind):null;
+      if(row)workMemoToggleSkip(row.key,info.date);
+      return;
+    }
     const edit=e.target.closest('[data-wm-popup-edit]');
     if(edit){
       const info=workGroupPopupState,item=edit.closest('[data-wm-popup-key]');
@@ -4298,7 +4369,7 @@ function initWorkGroupPopup(){
     const item=e.target.closest('[data-wm-popup-key][draggable=true]'),info=workGroupPopupState;
     if(!item||!info){e.preventDefault();return;}
     const row=workMemoTasks(info.date).find(x=>x.key===item.dataset.wmPopupKey&&x.kind===info.kind);
-    if(!row||row.done){e.preventDefault();return;}
+    if(!row||row.done||row.skipped){e.preventDefault();return;}
     activeDrag={type:'memoTask',key:row.key,sourceDate:info.date,kind:info.kind};
     e.dataTransfer.effectAllowed='move';
     try{e.dataTransfer.setData('application/x-calendar-event',JSON.stringify(activeDrag));}catch(_e){}
@@ -4351,15 +4422,14 @@ function compactDailyEventsInCalendar(){
     // Raw DOM can contain an occurrence whose outdated movedOut record used to
     // hide it in the popup after its date was manually changed back.
     const visible=workMemoTasks(date).filter(x=>x.kind===kind && keys.has(x.key));
-    const done=visible.filter(x=>x.done).length;
     const moved=workMemoActiveMovedOut(date).filter(x=>{
       const ev=state.events.find(e=>e.id===x.eventId);
       const rowGroup=x.group||(x.daily?'daily':'extra');
       return rowGroup===kind && ev && isAdorableCalendar(ev.calId) && (!calendarFocusIds.size || focusedCalendarIds()?.has(ev.calId));
     });
-    const count=visible.length,total=count+moved.length;
-    const label=moved.length?`${done}/${count}/${total}`:`${done}/${count}`;
-    const complete=count>0 && done===count;
+    const statsWithMoved=workMemoStats(visible,moved.length);
+    const label=statsWithMoved.label;
+    const complete=statsWithMoved.complete;
     const name=WM_GROUPS.find(x=>x[0]===kind)?.[1]||'업무';
     // 이름과 숫자는 서로 다른 동작: 이름은 해당 날짜의 업무 화면, 숫자는 상세 팝업.
     // button 안에 button을 중첩하지 않도록 묶음 컨테이너는 div로 구성합니다.
@@ -4395,9 +4465,9 @@ function compactDailyEventsInCalendar(){
         if(root.querySelector(`[data-daily-summary="${date}"][data-work-group="${kind}"]`))continue;
         const rows=tasks.filter(row=>row.kind===kind);
         if(!rows.length)continue;
-        const done=rows.filter(row=>row.done).length,complete=done===rows.length;
         const moved=workMemoActiveMovedOut(date).filter(x=>(x.group||(x.daily?'daily':'extra'))===kind).length;
-        const label=moved?`${done}/${rows.length}/${rows.length+moved}`:`${done}/${rows.length}`;
+        const stats=workMemoStats(rows,moved),complete=stats.complete;
+        const label=stats.label;
         const sum=document.createElement('div');
         sum.className=`dailySummaryBtn wmGroupSummary wmGroup-${kind} ${complete?'completed':'pending'}`;
         sum.dataset.dailySummary=date;sum.dataset.workGroup=kind;
@@ -4493,30 +4563,30 @@ function workMemoSubtasksMarkup(row){
   const foldKey=`sub|${row.sourceDate||''}|${row.key}`;
   return `<details class="wmSubtaskList" data-wm-fold-key="${esc(foldKey)}" aria-label="${esc(row.title)} 세부 체크리스트"${wmFoldOpen(foldKey)}>
     <summary class="wmSubtaskHead">세부 체크리스트 <span>${completed}/${items.length}</span></summary>
-    <div class="wmSubtaskBody">${items.map(x=>{const checked=doneSet.has(String(x.id));return `<label class="wmSubtask ${checked?'done':''}"><input type="checkbox" data-wm-subcheck="${esc(row.key)}" data-wm-subid="${esc(x.id)}" ${checked?'checked':''}><span>${esc(x.text)}</span></label>`;}).join('')}</div>
+    <div class="wmSubtaskBody">${items.map(x=>{const checked=doneSet.has(String(x.id));return `<label class="wmSubtask ${checked?'done':''}"><input type="checkbox" data-wm-subcheck="${esc(row.key)}" data-wm-subid="${esc(x.id)}" ${checked?'checked':''} ${row.skipped?'disabled':''}><span>${esc(x.text)}</span></label>`;}).join('')}</div>
   </details>`;
 }
 function workMemoToggleSubtask(key,subId,date){
   const row=workMemoTasks(date).find(x=>x.key===key);
-  if(!row?.e || row.e._prepDay || row.e._purchaseDue)return;
+  if(!row?.e || row.e._prepDay || row.e._purchaseDue || row.skipped)return;
   const e=row.e;
   // 캘린더의 기존 toggleSubtask와 동일한 원본 ID/반복 회차를 사용합니다.
   toggleSubtask(e.id,checklistOccurrenceKey(e),subId);
 }
 function workMemoTaskMarkup(row,date){
-  const done=!!row.done,origin=row.originDate && row.originDate!==date;
+  const done=!!row.done,skipped=!!row.skipped,origin=row.originDate && row.originDate!==date;
   const label=origin?` <span class="wmOrigin">(${esc(workMemoShortDate(row.originDate))})</span>`:'';
   const kind=['daily','weekly','monthly','extra'].includes(row.kind)?row.kind:'extra';
   const type=row.e?row.e.kind==='payment'?'납부':row.e._prepDay?'준비':row.e._purchaseDue?'구매':row.e.kind==='appointment'?'약속':'일정':'';
-  const noCheck=!!row.e?.kind && row.e.kind==='anniversary';
+  const noCheck=(!!row.e?.kind && row.e.kind==='anniversary')||skipped;
   const subtasks=workMemoSubtasksMarkup(row);
-  return `<div class="wmTask ${done?'done':''} ${subtasks?'wmTaskWithSubtasks':''}" data-wm-task="${esc(row.key)}" data-wm-kind="${kind}"><label><input type="checkbox" data-wm-check="${esc(row.key)}" ${done?'checked':''} ${noCheck?'disabled':''}>${workMemoStarMarkup(row)}<span class="wmTaskLabel">${esc(row.title)}${label}</span></label>${type&&row.kind!=='daily'?`<small>${esc(type)}</small>`:''}<button type="button" class="wmTaskEditBtn" data-wm-edit="${esc(row.key)}" title="수정 · 삭제" aria-label="${esc(row.title)} 수정 또는 삭제">✎</button>${subtasks}</div>`;
+  return `<div class="wmTask ${done?'done':''} ${skipped?'skipped':''} ${subtasks?'wmTaskWithSubtasks':''}" data-wm-task="${esc(row.key)}" data-wm-kind="${kind}"><label><input type="checkbox" data-wm-check="${esc(row.key)}" ${done?'checked':''} ${noCheck?'disabled':''}>${workMemoStarMarkup(row)}<span class="wmTaskLabel">${esc(row.title)}${label}</span>${skipped?'<span class="wmSkippedMark">안 함</span>':''}</label>${type&&row.kind!=='daily'?`<small>${esc(type)}</small>`:''}${row.e&&canSkipEvent(row.e)?`<button type="button" class="wmSkipAction" data-wm-skip="${esc(row.key)}">${skipped?'↩ 되돌리기':'− 안 함'}</button>`:''}<button type="button" class="wmTaskEditBtn" data-wm-edit="${esc(row.key)}" title="수정 · 삭제" aria-label="${esc(row.title)} 수정 또는 삭제">✎</button>${subtasks}</div>`;
 }
 function workMemoMissedTasks(date){
   const previous=ds(add(parse(date),-1)),note=workMemoDay(previous);
   const rows=workMemoTasks(previous,false);
   const alreadyMoved=new Set(workMemoActiveMovedOut(previous,note).map(x=>x.key));
-  return rows.filter(x=>!x.done && x.e?.kind!=='anniversary' && !alreadyMoved.has(x.key));
+  return rows.filter(x=>!x.done && !x.skipped && x.e?.kind!=='anniversary' && !alreadyMoved.has(x.key));
 }
 const workMemoMissedByDate=new Map();
 let workMemoSettingsShown=false;
@@ -4529,7 +4599,7 @@ function workMemoDayCard(date){
   const n=workMemoDay(date),rows=workMemoTasks(date);
   const activeMoved=workMemoActiveMovedOut(date,n);
   const wd=['일','월','화','수','목','금','토'][parse(date).getDay()],today=date===ds(new Date());
-  const progress=rows.filter(x=>x.done).length;
+  const dayStats=workMemoStats(rows);
   const list=items=>items.length?items.map(x=>workMemoTaskMarkup(x,date)).join(''):'<div class="wmEmpty">등록된 업무 없음</div>';
   let missed='';
   if(workMemoMissedDates.has(date)){
@@ -4539,14 +4609,14 @@ function workMemoDayCard(date){
     missed=`<details class="wmMissedArea" data-wm-fold-key="${esc(missedKey)}"${wmFoldOpen(missedKey)}><summary class="wmSectionTitle">${esc(workMemoShortDate(prev))} 미완료 <b>${pending.length}건</b></summary>${pending.length?pending.map((x,i)=>`<div class="wmMissed" data-wm-missed="${i}"><strong>${workMemoStarMarkup(x)}${esc(x.title)}${x.originDate?` (${esc(workMemoShortDate(x.originDate))})`:''}</strong><div class="wmMissedAction"><button type="button" data-wm-today="${i}">오늘로</button><input type="date" value="${date}" aria-label="이동 날짜"><button type="button" data-wm-move="${i}">날짜 지정</button></div></div>`).join(''):'<div class="wmEmpty">전날 미완료 업무 없음</div>'}</details>`;
   }
   const sections=WM_GROUPS.map(([kind,title])=>{
-    const items=rows.filter(x=>x.kind===kind),done=items.filter(x=>x.done).length;
+    const items=rows.filter(x=>x.kind===kind);
     const moved=activeMoved.filter(x=>(x.group||(x.daily?'daily':'extra'))===kind);
-    const stat=moved.length?`${done}/${items.length}/${items.length+moved.length}`:`${done}/${items.length}`;
+    const stat=workMemoStats(items,moved.length).label;
     const foldKey=`group|${date}|${kind}`;
     return `<details class="wmSection wmSection-${kind}" data-wm-section="${kind}" data-wm-fold-key="${esc(foldKey)}"${wmFoldOpen(foldKey)}><summary class="wmSectionTitle">${title} <b>${stat}</b></summary>${list(items)}</details>`;
   }).join('');
   return `<article class="wmDayCard ${today?'wmTodayCard':''}" data-wm-date="${date}">
-    <div class="wmDayHead"><div><strong>${Number(date.slice(5,7))}/${Number(date.slice(8,10))} <span>(${wd})</span></strong>${today?'<em>오늘</em>':''}</div><div class="wmDayHeadActions">${isTodayWorkPopup?`<button type="button" class="wmCompactNav" data-wm-compact-prev aria-label="이전 날짜">‹</button><input class="wmCompactDate" type="date" data-wm-compact-date value="${date}" aria-label="업무 날짜 선택"><button type="button" class="wmCompactNav" data-wm-compact-next aria-label="다음 날짜">›</button>`:''}<small>${progress}/${rows.length}</small>${!isTodayWorkPopup?`<button type="button" data-wm-popout="${date}" title="${esc(workMemoShortDate(date))} 업무를 별도 창에서 보기">↗ 팝업</button>`:''}</div></div>
+    <div class="wmDayHead"><div><strong>${Number(date.slice(5,7))}/${Number(date.slice(8,10))} <span>(${wd})</span></strong>${today?'<em>오늘</em>':''}</div><div class="wmDayHeadActions">${isTodayWorkPopup?`<button type="button" class="wmCompactNav" data-wm-compact-prev aria-label="이전 날짜">‹</button><input class="wmCompactDate" type="date" data-wm-compact-date value="${date}" aria-label="업무 날짜 선택"><button type="button" class="wmCompactNav" data-wm-compact-next aria-label="다음 날짜">›</button>`:''}<small>${esc(dayStats.label)}</small>${!isTodayWorkPopup?`<button type="button" data-wm-popout="${date}" title="${esc(workMemoShortDate(date))} 업무를 별도 창에서 보기">↗ 팝업</button>`:''}</div></div>
     <div class="wmDayScroll"><div class="wmDayActions"><button type="button" data-wm-missed-toggle="${date}" class="${workMemoMissedDates.has(date)?'active':''}">전날 못한 일 ${workMemoMissedDates.has(date)?'접기':'불러오기'}</button></div><div class="wmInfo" data-wm-info="${date}">아도라블 일정 자동 연동 · 캘린더와 업무 화면에서 등록·수정 가능</div>
     <div class="wmBoardNewRow"><button type="button" data-wm-create="${date}">＋ 업무 등록 <small>일 · 주 · 월 · 추가업무</small></button></div>
     ${missed}
@@ -4637,7 +4707,7 @@ function workMemoCreateTask(date){
 }
 function workMemoMoveRow(row,dest){
   if(!row||!workMemoDateValid(dest))return false;
-  if(row.done){alert('완료한 업무는 미완료 업무로 이동할 수 없어.');return false;}
+  if(row.done||row.skipped){alert('완료 또는 안 함 상태의 업무는 먼저 미완료로 되돌린 뒤 이동해 줘.');return false;}
   const from=row.sourceDate, key=row.key;
   if(dest===from){alert('원래 날짜와 같아. 다른 날짜를 선택해 줘.');return false;}
   const origin=row.originDate||from;
@@ -4765,6 +4835,7 @@ function initWorkMemo(){
     if(btn.hasAttribute('data-wm-compact-next')){setWorkMemoPopupDate(ds(add(parse(workMemoDate),1)));return;}
     if(btn.dataset.wmPopout){openTodayWorkWindow(btn.dataset.wmPopout);return;}
     if(btn.dataset.wmCreate){workMemoCreateTask(btn.dataset.wmCreate);return;}
+    if(btn.dataset.wmSkip){const date=btn.closest('[data-wm-date]')?.dataset.wmDate;if(date)workMemoToggleSkip(btn.dataset.wmSkip,date);return;}
     if(btn.dataset.wmEdit){const date=btn.closest('[data-wm-date]')?.dataset.wmDate;const row=date?workMemoTasks(date).find(x=>x.key===btn.dataset.wmEdit):null;if(row)workMemoEditTask(row,date);return;}
     const date=btn.closest('[data-wm-date]')?.dataset.wmDate;
     if(btn.dataset.wmMissedToggle){const d=btn.dataset.wmMissedToggle;workMemoMissedDates.has(d)?workMemoMissedDates.delete(d):workMemoMissedDates.add(d);renderWorkMemoPanel();return;}
@@ -5363,6 +5434,9 @@ function openEvent(date,id,options={}){
     doneWrap.classList.toggle('hidden',!canComplete);
     if(canComplete){ doneInput.checked=!!isDone(occurrenceView); doneText.textContent=e.kind==='payment'?'납부완료':'완료'; }
   }
+  const skipBtn=$('#eventSkipBtn');
+  skipBtn?.classList.toggle('hidden',!canSkipEvent(e));
+  refreshSkipButton(skipBtn,!!e&&isSkipped(occurrenceView));
   $('#carryEvent').classList.toggle('hidden',!e || e.kind==='anniversary' || e.kind==='payment' || (occurrenceView&&isDone(occurrenceView)));
   updateAllDayUI(); updateKindUI(); setRepeatRule(e||{date:$('#date').value,repeat:$('#repeat').value,repeatRule:null}); updateDurationMode(); updatePrepUI(); updateMemoDailyOptIn();
   showRecurringDateEditHint(e,activeEventOccurrence);
@@ -5447,7 +5521,7 @@ function applyWholeRecurringFormEdit(old,obj,occ,target,ruleEdited){
   if(delta) moveRecurringWholeSeries(old,target,occ);
   const movedDate=old.date,movedEndDate=old.endDate,movedRule=old.repeatRule;
   const records={
-    excludedDates:old.excludedDates,doneDates:old.doneDates,
+    excludedDates:old.excludedDates,doneDates:old.doneDates,skipDates:old.skipDates,
     checklistDoneByDate:cleanedChecklistDoneMap(old.checklistDoneByDate,obj.checklist),
     orderByDate:old.orderByDate,done:old.done,
     carryoverHistory:old.carryoverHistory
@@ -5464,10 +5538,11 @@ function repeatEditOccurrenceOnly(old,obj,occ){
   const targetEnd=ds(add(parse(targetDate),formSpan));
   old.excludedDates=Array.isArray(old.excludedDates)?old.excludedDates:[];
   if(!old.excludedDates.includes(occ)) old.excludedDates.push(occ);
-  const done=(old.doneDates||[]).includes(occ);
+  const done=(old.doneDates||[]).includes(occ), skipped=(old.skipDates||[]).includes(occ);
   old.doneDates=(old.doneDates||[]).filter(d=>d!==occ);
+  clearSkipped(old,occ);
   const doneIds=Array.isArray(obj.checklistDoneByDate?.[occ])?[...obj.checklistDoneByDate[occ]]:[];
-  const detached={...structuredClone(old),...structuredClone(obj),id:uid(),date:targetDate,endDate:targetEnd,repeat:'none',repeatRule:null,excludedDates:[],done,doneDates:[],checklistDoneByDate:doneIds.length?{[targetDate]:doneIds}:{},orderByDate:{},repeatOrder:0,fixedId:null,detachedFromRepeatId:old.id,detachedOccurrence:occ};
+  const detached={...structuredClone(old),...structuredClone(obj),id:uid(),date:targetDate,endDate:targetEnd,repeat:'none',repeatRule:null,excludedDates:[],done,doneDates:[],skipDates:skipped?[targetDate]:[],checklistDoneByDate:doneIds.length?{[targetDate]:doneIds}:{},orderByDate:{},repeatOrder:0,fixedId:null,detachedFromRepeatId:old.id,detachedOccurrence:occ};
   detached.carryoverHistory=[];
   state.events.push(detached);
 }
@@ -5491,6 +5566,7 @@ function repeatEditFuture(old,obj,occ){
   const moveDelta=diffDays(occ,targetDate);
   future.excludedDates=shiftedDateArray(old.excludedDates,moveDelta,d=>String(d)>=occ);
   future.doneDates=shiftedDateArray(old.doneDates,moveDelta,d=>String(d)>=occ);
+  future.skipDates=shiftedDateArray(old.skipDates,moveDelta,d=>String(d)>=occ);
   future.checklistDoneByDate=shiftedDateMap(obj.checklistDoneByDate,moveDelta,d=>String(d)>=occ);
   future.orderByDate=shiftedDateMap(old.orderByDate,moveDelta,d=>String(d)>=occ);
 
@@ -5499,6 +5575,7 @@ function repeatEditFuture(old,obj,occ){
   old.repeatRule=pastRule;
   old.excludedDates=(old.excludedDates||[]).filter(d=>String(d)<occ);
   old.doneDates=(old.doneDates||[]).filter(d=>String(d)<occ);
+  old.skipDates=(old.skipDates||[]).filter(d=>String(d)<occ);
   old.checklistDoneByDate=Object.fromEntries(Object.entries(old.checklistDoneByDate||{}).filter(([k])=>k<occ));
   old.orderByDate=Object.fromEntries(Object.entries(old.orderByDate||{}).filter(([k])=>k<occ));
   state.events.push(future);
@@ -5534,7 +5611,7 @@ function applySidebarSeriesEditFromDate(old,formObj,from,ruleEdited=false){
   if(from<=old.date){
     const records={
       date:old.date,endDate:old.endDate,
-      doneDates:old.doneDates||[],excludedDates:old.excludedDates||[],
+      doneDates:old.doneDates||[],skipDates:old.skipDates||[],excludedDates:old.excludedDates||[],
       checklistDoneByDate:old.checklistDoneByDate||{},orderByDate:old.orderByDate||{},
       carryoverHistory:old.carryoverHistory||[]
     };
@@ -5563,12 +5640,14 @@ function applySidebarSeriesEditFromDate(old,formObj,from,ruleEdited=false){
   pastRule.endType='date';pastRule.until=beforeDate;
   // 새 객체/ID 준비가 끝난 후에만 원본 수정 (validation failure = no mutation).
   future.doneDates=(old.doneDates||[]).filter(d=>d>=from);
+  future.skipDates=(old.skipDates||[]).filter(d=>d>=from);
   future.excludedDates=(old.excludedDates||[]).filter(d=>d>=from);
   future.checklistDoneByDate=Object.fromEntries(Object.entries(old.checklistDoneByDate||{}).filter(([date])=>date>=from));
   future.orderByDate=Object.fromEntries(Object.entries(old.orderByDate||{}).filter(([date])=>date>=from));
   future.carryoverHistory=(old.carryoverHistory||[]).filter(x=>String(x.fromDate||'')>=from);
   old.repeatRule=pastRule;
   old.doneDates=(old.doneDates||[]).filter(d=>d<from);
+  old.skipDates=(old.skipDates||[]).filter(d=>d<from);
   old.excludedDates=(old.excludedDates||[]).filter(d=>d<from);
   old.checklistDoneByDate=Object.fromEntries(Object.entries(old.checklistDoneByDate||{}).filter(([date])=>date<from));
   old.orderByDate=Object.fromEntries(Object.entries(old.orderByDate||{}).filter(([date])=>date<from));
@@ -5670,7 +5749,7 @@ $('#eventForm').onsubmit=e=>{
     memoEnabled:isAdorableCalendar($('#cal').value) ? ($('#memoTaskPlacement').disabled ? old?.memoEnabled!==false : $('#memoTaskPlacement').value!=='off') : old?.memoEnabled,
     memoDaily:isAdorableCalendar($('#cal').value) && !$('#memoTaskPlacement').disabled && $('#memoTaskPlacement').value==='daily',
     checklist, checklistDoneByDate, orderByDate:old?.orderByDate||{},
-    done:old?.done||false, doneDates:old?.doneDates||[], excludedDates:old?.excludedDates||[], fixedId:old?.fixedId||null
+    done:old?.done||false, doneDates:old?.doneDates||[], skipDates:old?.skipDates||[], excludedDates:old?.excludedDates||[], fixedId:old?.fixedId||null
   };
   if(!obj.title) return;
   if(isRecurringEdit){
@@ -5720,12 +5799,22 @@ $('#editWholeSeries').onclick=()=>{
 };
 $('#cancelRepeatEdit').onclick=()=>{ pendingRepeatEdit=null; sidebarSeriesEditActive=false; closeDialog($('#repeatEditDlg')); };
 $('#cancelEvent').onclick=()=>{ activeEventOccurrence=null; sidebarSeriesEditActive=false; openedSidebarNonEndFingerprint=''; closeDialog($('#eventDlg')); };
+$('#eventSkipBtn').onclick=()=>{
+  const id=$('#eid').value,ev=state.events.find(x=>x.id===id);
+  if(!canSkipEvent(ev))return;
+  const occ=activeEventOccurrence||ev.date;
+  toggleSkip(id,occ);
+  const updated={...ev,_occurrenceStart:occ};
+  refreshSkipButton($('#eventSkipBtn'),isSkipped(updated));
+  $('#eventDone').checked=isDone(updated);
+};
 $('#eventDone').onchange=()=>{
   const id=$('#eid').value, ev=state.events.find(x=>x.id===id); if(!ev) return;
   const occ=activeEventOccurrence||ev.date;
   const want=!!$('#eventDone').checked;
   const now=isDone({...ev,_occurrenceStart:occ});
   if(now!==want) toggleDone(id,occ);
+  refreshSkipButton($('#eventSkipBtn'),isSkipped({...ev,_occurrenceStart:occ}));
 };
 $('#importMemoChecklist').onclick=()=>{
   const lines=$('#memo').value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
@@ -5758,6 +5847,7 @@ $('#deleteOccurrenceOnly').onclick=()=>{
   ev.excludedDates=Array.isArray(ev.excludedDates)?ev.excludedDates:[];
   if(!ev.excludedDates.includes(occ)) ev.excludedDates.push(occ);
   ev.doneDates=(ev.doneDates||[]).filter(x=>x!==occ);
+  clearSkipped(ev,occ);
   finishRepeatDelete();
 };
 $('#deleteFuture').onclick=()=>{
@@ -5772,7 +5862,7 @@ $('#cancelRepeatDelete').onclick=()=>{ pendingRepeatDeleteId=''; closeDialog($('
 
 $('#copyEvent').onclick=()=>{
   const id=$('#eid').value, src=state.events.find(x=>x.id===id); if(!src) return;
-  const copy={...structuredClone(src),id:uid(),title:`${src.title} 복사`,done:false,doneDates:[],checklistDoneByDate:{},orderByDate:{},repeatOrder:0,fixedId:null,flexibleId:null,carryoverCount:0,carryoverFromDate:'',carryoverRootId:'',carryoverParentId:'',carryoverHistory:[]};
+  const copy={...structuredClone(src),id:uid(),title:`${src.title} 복사`,done:false,doneDates:[],skipDates:[],checklistDoneByDate:{},orderByDate:{},repeatOrder:0,fixedId:null,flexibleId:null,carryoverCount:0,carryoverFromDate:'',carryoverRootId:'',carryoverParentId:'',carryoverHistory:[]};
   state.events.push(copy); activeEventOccurrence=null; closeDialog($('#eventDlg')); save();
 };
 
@@ -6063,10 +6153,11 @@ function collectSearchResults(query, status, from, to){
     for(const d of starts){
       const occ=ds(d);
       if((custom && (occ<from || occ>to)) || (e.excludedDates||[]).includes(occ)) continue;
-      const done=isDone({...e,_occurrenceStart:occ});
-      if(active==='done' && !done || active==='pending' && done) continue;
+      const occurrenceView={...e,_occurrenceStart:occ};
+      const done=isDone(occurrenceView),skipped=isSkipped(occurrenceView);
+      if(active==='done' && !done || active==='pending' && (done||skipped)) continue;
       const dateEnd=span?ds(add(d,span)):'';
-      matches.push({type:'event',id:e.id,occ,date:occ,done,title:e.title,calendar:calendarPath(e.calId),
+      matches.push({type:'event',id:e.id,occ,date:occ,done,skipped,title:e.title,calendar:calendarPath(e.calId),
         meta:`${repeat?'반복 일정 · ':''}${dateEnd?`~ ${dateEnd} · `:''}${calendarPath(e.calId)}`});
       if(matches.length>=SEARCH_MAX_CANDIDATES){limited=true;break;}
     }
@@ -6141,7 +6232,7 @@ function renderSearch(){
     if(r.type==='event'){
       return `<div class="searchResult searchResultOccurrence">
         <div class="searchResultInfo"><b>${esc(r.title)}</b><small>${esc(r.meta)}</small></div>
-        <span class="searchResultStatus ${r.done?'isDone':'isPending'}">${r.done?'완료':'미완료'}</span>
+        <span class="searchResultStatus ${r.skipped?'isSkipped':r.done?'isDone':'isPending'}">${r.skipped?'안 함':r.done?'완료':'미완료'}</span>
         <button type="button" class="searchDateJump" data-search-idx="${i}" title="${esc(r.date)} 날짜로 이동">${esc(r.date)} <span>이동</span></button>
         <button type="button" class="searchEdit" data-search-idx="${i}" title="${esc(r.date)} 회차 수정">수정</button>
       </div>`;
@@ -6186,7 +6277,7 @@ $('#prev').onclick=()=>{ const step=view==='week'?7:view==='2week'?14:view==='3w
 $('#next').onclick=()=>{ const step=view==='week'?7:view==='2week'?14:view==='3week'?21:view==='4week'?28:1; cursor=(view==='month'||view==='diary')?new Date(cursor.getFullYear(),cursor.getMonth()+1,1):add(cursor,step); mobileSelectedDate=''; render(); };
 $('#today').onclick=()=>{cursor=new Date();mobileSelectedDate=ds(new Date());render();};
 
-// v2.113: 모바일에서는 헤더 버튼만 두 줄로 재배치한다.
+// v2.114: 모바일에서는 헤더 버튼만 두 줄로 재배치한다.
 // HTML 요소 자체를 이동하므로 기존 이벤트 연결과 Firebase 데이터 처리에는 영향이 없다.
 function syncMobileHeaderToolbars(){
   const header=document.querySelector('header');
@@ -6499,7 +6590,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.113',
+    appVersion:'2.114',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state

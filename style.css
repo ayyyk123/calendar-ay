@@ -4119,3 +4119,26 @@ button,.primaryViewBtn,.dateNavButtons button,.views button,#sidebar .secHead bu
   #mobileToolbarTools > .dateNavButtons #today{font-size:9px!important}
 }
 @media(min-width:761px){.mobileToolbar{display:none!important}}
+
+/* v2.114 — 취소가 아니라 기록 보관을 위한 '안 함' 상태. 글씨체/크기는 v2.113 그대로. */
+.skipStateBtn{border:1px solid #d9dee7!important;border-radius:4px!important;padding:6px 9px!important;background:#fff!important;color:#5e6b7a!important;font-size:12px!important;font-weight:500!important;cursor:pointer;white-space:nowrap;line-height:1.35}
+.skipStateBtn.active{background:#edf0f3!important;border-color:#b8c1cd!important;color:#405369!important}
+.skipStateBtn.hidden{display:none!important}
+#eventForm .eventDialogTitleLine #eventSkipBtn{flex:0 0 auto;margin-left:0}
+#eventForm .eventDialogTitleLine #eventDoneWrap{margin-left:auto}
+.eventPopoverActions{align-items:center;gap:6px}
+.eventPopoverActions #eventPopoverSkip{margin-right:auto;min-height:29px}
+.item.skipped{opacity:.75!important;filter:saturate(.48);background-color:#f1f3f5!important;border-color:#ccd3dc!important}
+.item.skipped .itemTitle{text-decoration:none!important;color:#637080!important}
+.item .skipBadge{display:inline-block;flex:0 0 auto;border-radius:3px;border:1px solid #cdd4dc;background:#e8ecf1;color:#536172;font-size:10px;line-height:1.25;padding:1px 3px;font-weight:500}
+.wmTask.skipped,.wmPopupTask.skipped{opacity:.8;background:#f4f5f7!important}
+.wmTask.skipped .wmTaskLabel,.wmPopupTask.skipped .wmPopupTaskMain{color:#677280!important}
+.wmSkippedMark{display:inline-flex;align-items:center;padding:2px 5px;border-radius:3px;background:#e5eaf0;color:#526176;font-size:10px;font-weight:500;white-space:nowrap}
+.wmTask .wmSkipAction,.wmPopupTaskActions .wmSkipAction{border:1px solid #dce1e7!important;border-radius:4px;background:#fff!important;color:#657184!important;padding:3px 6px!important;font-size:10px!important;white-space:nowrap;cursor:pointer}
+.wmPopupTaskActions .wmSkippedMark{margin-right:3px}
+.searchResultStatus.isSkipped{background:#eff2f5;color:#586778}
+@media(max-width:760px){
+  #eventForm .eventDialogTitleLine #eventSkipBtn{padding:5px 7px!important;font-size:11px!important}
+  .eventPopoverActions #eventPopoverSkip{min-height:38px}
+  .wmTask .wmSkipAction{padding:3px 5px!important}
+}
