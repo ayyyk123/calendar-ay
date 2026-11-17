@@ -4142,3 +4142,37 @@ button,.primaryViewBtn,.dateNavButtons button,.views button,#sidebar .secHead bu
   .eventPopoverActions #eventPopoverSkip{min-height:38px}
   .wmTask .wmSkipAction{padding:3px 5px!important}
 }
+
+
+/* v2.115 — "− 안 함" 긴 버튼 대신 회색 × 아이콘. 기존 상태·데이터 처리 그대로. */
+.skipStateBtn{
+  display:inline-flex!important;align-items:center!important;justify-content:center!important;
+  flex:0 0 27px!important;width:27px!important;min-width:27px!important;height:27px!important;min-height:27px!important;
+  margin:0!important;padding:0!important;box-sizing:border-box!important;
+  border:1px solid transparent!important;border-radius:5px!important;
+  background:transparent!important;color:#818c99!important;
+  font-family:"Malgun Gothic", "맑은 고딕",sans-serif!important;
+  font-size:18px!important;font-weight:400!important;line-height:1!important;
+  box-shadow:none!important;vertical-align:middle!important;
+}
+.skipStateBtn:hover{border-color:#dce2e9!important;background:#f4f6f8!important;color:#4e6073!important}
+.skipStateBtn.active{border-color:#dce2e9!important;background:#eef1f5!important;color:#526274!important}
+.eventPopoverActions #eventPopoverSkip{min-height:27px!important;margin-right:auto!important}
+.wmTask .wmSkipAction,.wmPopupTaskActions .wmSkipAction{
+  display:inline-flex!important;align-items:center!important;justify-content:center!important;
+  flex:0 0 24px!important;width:24px!important;min-width:24px!important;
+  height:24px!important;min-height:24px!important;
+  margin:0!important;padding:0!important;box-sizing:border-box!important;
+  border:1px solid transparent!important;border-radius:4px!important;
+  background:transparent!important;color:#8994a0!important;
+  font-family:"Malgun Gothic", "맑은 고딕",sans-serif!important;
+  font-size:17px!important;font-weight:400!important;line-height:1!important;
+  box-shadow:none!important;white-space:nowrap!important;
+}
+.wmTask .wmSkipAction:hover,.wmPopupTaskActions .wmSkipAction:hover{background:#eef1f5!important;border-color:#d8dfe6!important;color:#43556b!important}
+.wmTask .wmSkipAction.active,.wmPopupTaskActions .wmSkipAction.active{background:#eef1f5!important;color:#516174!important}
+@media(max-width:760px){
+  #eventForm .eventDialogTitleLine #eventSkipBtn{width:30px!important;min-width:30px!important;height:30px!important;min-height:30px!important;padding:0!important;font-size:19px!important}
+  .eventPopoverActions #eventPopoverSkip{width:30px!important;min-width:30px!important;height:30px!important;min-height:30px!important;padding:0!important}
+  .wmTask .wmSkipAction,.wmPopupTaskActions .wmSkipAction{width:28px!important;min-width:28px!important;height:28px!important;min-height:28px!important;padding:0!important}
+}

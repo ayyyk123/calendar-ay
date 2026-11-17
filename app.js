@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '2.114',
+  version: '2.115',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -366,7 +366,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '2.114',
+    version: '2.115',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -1315,7 +1315,7 @@ function buildOccurrenceMap(rangeStart, rangeEnd, options={}){
   }
   return map;
 }
-// v2.114: '안 함' means not needed, not completed and not pending.
+// v2.115: '안 함' means not needed, not completed and not pending.
 // It is saved by occurrence date; a repeated event's other dates stay untouched.
 function isSkipped(e){
   return !!e && Array.isArray(e.skipDates) && e.skipDates.includes(e._occurrenceStart||e.date);
@@ -3242,8 +3242,10 @@ function refreshSkipButton(button,skipped){
   if(!button) return;
   button.classList.toggle('active',skipped);
   button.setAttribute('aria-pressed',String(skipped));
-  button.textContent=skipped?'↩ 미완료로':'− 안 함';
-  button.title=skipped?'안 함 상태를 해제하고 미완료로 되돌리기':'실행할 필요가 없었던 일로 기록 (일정 유지)';
+  // Small icon instead of long status text: × records "안 함", ↶ restores unfinished.
+  button.textContent=skipped?'↶':'×';
+  button.setAttribute('aria-label',skipped?'미완료로 되돌리기':'안 함으로 기록');
+  button.title=skipped?'안 함 상태 해제 · 미완료로 되돌리기':'안 함으로 기록 · 일정은 삭제되지 않습니다';
 }
 
 const LANE_MIN_HEIGHT=40;
@@ -4322,7 +4324,7 @@ function refreshWorkGroupPopup(){
   pop.innerHTML=`<div class="wmGroupPopupHeader"><strong>${esc(workMemoShortDate(date))} ${esc(label)} <small>${esc(workMemoStats(rows).label)}</small></strong><button type="button" data-wm-popup-close aria-label="목록 닫기">✕</button></div><details class="wmGroupPopupDetails" data-wm-fold-key="${esc(popupFoldKey)}"${wmFoldOpen(popupFoldKey)}><summary class="wmGroupPopupFold">${esc(label)} 목록 <b>${rows.length}건</b></summary><p class="wmGroupPopupHelp">미완료 업무를 잡아 달력의 다른 날짜로 드래그하세요. 휴대폰은 날짜를 선택해 이동할 수 있어요.</p><div class="wmGroupPopupList">${rows.length?rows.map(row=>{
     const moveable=!row.done && !row.skipped && (!!row.e || !!row.custom);
     const origin=row.originDate&&row.originDate!==date?` <small>(${esc(workMemoShortDate(row.originDate))})</small>`:'';
-    return `<div class="wmPopupTask ${row.done?'completed':''} ${row.skipped?'skipped':''}" data-wm-popup-key="${esc(row.key)}" ${moveable?'draggable="true"':''}><div class="wmPopupTaskMain"><input type="checkbox" data-wm-popup-check="${esc(row.key)}" ${row.done?'checked':''} ${(row.e?.kind==='anniversary'||row.skipped)?'disabled':''}><span title="${moveable?'드래그해서 날짜 이동':''}">${moveable?'<span class="wmDragGrip">⠿</span> ':''}${workMemoStarMarkup(row)}${esc(row.title)}${origin}</span></div>${workMemoSubtasksMarkup(row)}<div class="wmPopupTaskActions">${row.skipped?'<span class="wmSkippedMark">안 함</span>':''}${row.e&&canSkipEvent(row.e)?`<button type="button" class="wmSkipAction" data-wm-popup-skip>${row.skipped?'↩ 되돌리기':'− 안 함'}</button>`:''}<button type="button" data-wm-popup-edit>✎ 수정·삭제</button>${moveable?`<input type="date" aria-label="이동할 날짜" value="${date}"><button type="button" data-wm-popup-move>이동</button>`:''}</div></div>`;
+    return `<div class="wmPopupTask ${row.done?'completed':''} ${row.skipped?'skipped':''}" data-wm-popup-key="${esc(row.key)}" ${moveable?'draggable="true"':''}><div class="wmPopupTaskMain"><input type="checkbox" data-wm-popup-check="${esc(row.key)}" ${row.done?'checked':''} ${(row.e?.kind==='anniversary'||row.skipped)?'disabled':''}><span title="${moveable?'드래그해서 날짜 이동':''}">${moveable?'<span class="wmDragGrip">⠿</span> ':''}${workMemoStarMarkup(row)}${esc(row.title)}${origin}</span></div>${workMemoSubtasksMarkup(row)}<div class="wmPopupTaskActions">${row.skipped?'<span class="wmSkippedMark">안 함</span>':''}${row.e&&canSkipEvent(row.e)?`<button type="button" class="wmSkipAction ${row.skipped?'active':''}" data-wm-popup-skip aria-label="${row.skipped?'미완료로 되돌리기':'안 함으로 기록'}" title="${row.skipped?'미완료로 되돌리기':'안 함으로 기록 · 삭제되지 않음'}">${row.skipped?'↶':'×'}</button>`:''}<button type="button" data-wm-popup-edit>✎ 수정·삭제</button>${moveable?`<input type="date" aria-label="이동할 날짜" value="${date}"><button type="button" data-wm-popup-move>이동</button>`:''}</div></div>`;
   }).join(''):'<div class="wmGroupPopupEmpty">해당 날짜의 업무가 없습니다.</div>'}</div></details>`;
   pop.classList.remove('hidden');
   const list=pop.querySelector('.wmGroupPopupList');if(list)list.scrollTop=currentScroll;
@@ -4580,7 +4582,7 @@ function workMemoTaskMarkup(row,date){
   const type=row.e?row.e.kind==='payment'?'납부':row.e._prepDay?'준비':row.e._purchaseDue?'구매':row.e.kind==='appointment'?'약속':'일정':'';
   const noCheck=(!!row.e?.kind && row.e.kind==='anniversary')||skipped;
   const subtasks=workMemoSubtasksMarkup(row);
-  return `<div class="wmTask ${done?'done':''} ${skipped?'skipped':''} ${subtasks?'wmTaskWithSubtasks':''}" data-wm-task="${esc(row.key)}" data-wm-kind="${kind}"><label><input type="checkbox" data-wm-check="${esc(row.key)}" ${done?'checked':''} ${noCheck?'disabled':''}>${workMemoStarMarkup(row)}<span class="wmTaskLabel">${esc(row.title)}${label}</span>${skipped?'<span class="wmSkippedMark">안 함</span>':''}</label>${type&&row.kind!=='daily'?`<small>${esc(type)}</small>`:''}${row.e&&canSkipEvent(row.e)?`<button type="button" class="wmSkipAction" data-wm-skip="${esc(row.key)}">${skipped?'↩ 되돌리기':'− 안 함'}</button>`:''}<button type="button" class="wmTaskEditBtn" data-wm-edit="${esc(row.key)}" title="수정 · 삭제" aria-label="${esc(row.title)} 수정 또는 삭제">✎</button>${subtasks}</div>`;
+  return `<div class="wmTask ${done?'done':''} ${skipped?'skipped':''} ${subtasks?'wmTaskWithSubtasks':''}" data-wm-task="${esc(row.key)}" data-wm-kind="${kind}"><label><input type="checkbox" data-wm-check="${esc(row.key)}" ${done?'checked':''} ${noCheck?'disabled':''}>${workMemoStarMarkup(row)}<span class="wmTaskLabel">${esc(row.title)}${label}</span>${skipped?'<span class="wmSkippedMark">안 함</span>':''}</label>${type&&row.kind!=='daily'?`<small>${esc(type)}</small>`:''}${row.e&&canSkipEvent(row.e)?`<button type="button" class="wmSkipAction ${skipped?'active':''}" data-wm-skip="${esc(row.key)}" aria-label="${skipped?'미완료로 되돌리기':'안 함으로 기록'}" title="${skipped?'미완료로 되돌리기':'안 함으로 기록 · 삭제되지 않음'}">${skipped?'↶':'×'}</button>`:''}<button type="button" class="wmTaskEditBtn" data-wm-edit="${esc(row.key)}" title="수정 · 삭제" aria-label="${esc(row.title)} 수정 또는 삭제">✎</button>${subtasks}</div>`;
 }
 function workMemoMissedTasks(date){
   const previous=ds(add(parse(date),-1)),note=workMemoDay(previous);
@@ -6277,7 +6279,7 @@ $('#prev').onclick=()=>{ const step=view==='week'?7:view==='2week'?14:view==='3w
 $('#next').onclick=()=>{ const step=view==='week'?7:view==='2week'?14:view==='3week'?21:view==='4week'?28:1; cursor=(view==='month'||view==='diary')?new Date(cursor.getFullYear(),cursor.getMonth()+1,1):add(cursor,step); mobileSelectedDate=''; render(); };
 $('#today').onclick=()=>{cursor=new Date();mobileSelectedDate=ds(new Date());render();};
 
-// v2.114: 모바일에서는 헤더 버튼만 두 줄로 재배치한다.
+// v2.115: 모바일에서는 헤더 버튼만 두 줄로 재배치한다.
 // HTML 요소 자체를 이동하므로 기존 이벤트 연결과 Firebase 데이터 처리에는 영향이 없다.
 function syncMobileHeaderToolbars(){
   const header=document.querySelector('header');
@@ -6590,7 +6592,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.114',
+    appVersion:'2.115',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
