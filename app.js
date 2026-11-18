@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '2.118',
+  version: '2.119',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -366,7 +366,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '2.118',
+    version: '2.119',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -4839,7 +4839,6 @@ function workMemoAddTask(date,title){
 function initWorkMemo(){
   const panel=$('#workMemoPanel');
   $('#workMemoOpenBtn')?.addEventListener('click',()=>workMemoVisible?closeWorkMemo():openWorkMemo(ds(new Date())));
-  $('#workTodayWindowBtn')?.addEventListener('click',()=>openTodayWorkWindow());
   // The work-board toolbar opens its current start day; each day card can pop out independently.
   $('#wmTodayPopupBtn')?.addEventListener('click',()=>openTodayWorkWindow(workMemoDate));
   $('#wmClose')?.addEventListener('click',closeWorkMemo);
@@ -6347,11 +6346,10 @@ function syncMobileHeaderToolbars(){
   if(!header||!nav||!views||!top||!bottom||!range||!dateNav||!viewWrap) return;
   const mobile=window.matchMedia('(max-width:760px)').matches;
   const work=$('#workMemoOpenBtn');
-  const workPopup=$('#workTodayWindowBtn');
   const shortcuts=['naverMailShortcut','accountBookShortcut','diaryMainShortcut','searchBtn','settingsBtn']
     .map(id=>document.getElementById(id)).filter(Boolean);
   if(mobile){
-    [work,workPopup,viewWrap].filter(Boolean).forEach(el=>top.appendChild(el));
+    [work,viewWrap].filter(Boolean).forEach(el=>top.appendChild(el));
     [...shortcuts,range,dateNav].forEach(el=>bottom.appendChild(el));
   }else{
     // PC 원래 구조를 복원한다. 각각의 id와 클릭 동작은 그대로 유지된다.
@@ -6360,7 +6358,7 @@ function syncMobileHeaderToolbars(){
     nav.insertBefore(dateNav,jump||viewWrap);
     nav.appendChild(viewWrap);
     // 작업/바로가기 원래 순서. 저장 상태와 저장 버튼은 아래에서 제 위치로 옮긴다.
-    [work,workPopup,...shortcuts].filter(Boolean).forEach(el=>views.appendChild(el));
+    [work,...shortcuts].filter(Boolean).forEach(el=>views.appendChild(el));
   }
 }
 function syncSaveControlsPlacement(){
@@ -6384,10 +6382,12 @@ function syncDesktopCompactHeader(){
   const workHost=$('#desktopCompactWork');
   const toolsHost=$('#desktopCompactTools');
   if(!header||!workHost||!toolsHost)return;
-  // 761~1200px: first line title/work/status/save; second line dates/views/shortcuts.
+  // v2.119: narrowed desktop: top row title/date/status/save;
+  // bottom row view selector/work button/shortcuts. Reuse existing elements
+  // so click handlers and saved calendar data stay unchanged.
   const compact=window.matchMedia('(min-width:761px) and (max-width:1200px)').matches;
   if(!compact)return; // Other layouts are restored in the two sync functions above.
-  ['workMemoOpenBtn','workTodayWindowBtn'].forEach(id=>{
+  ['currentViewWrap','workMemoOpenBtn'].forEach(id=>{
     const el=document.getElementById(id);if(el)workHost.appendChild(el);
   });
   ['naverMailShortcut','accountBookShortcut','diaryMainShortcut','searchBtn','settingsBtn'].forEach(id=>{
@@ -6665,7 +6665,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.118',
+    appVersion:'2.119',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state

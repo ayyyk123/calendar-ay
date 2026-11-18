@@ -4252,3 +4252,67 @@ button,.primaryViewBtn,.dateNavButtons button,.views button,#sidebar .secHead bu
 }
 .wmDayCard .wmSection-payment .wmTask{background:#fffefb}
 .wmDayCard .wmSection-payment .wmTask.done{background:#f5f7f7}
+
+
+/* v2.119 — compact desktop toolbar follows the requested two-row order.
+   Above 1200px the established single-row desktop toolbar is unchanged;
+   760px and below keeps the mobile-specific toolbar. */
+@media(min-width:761px) and (max-width:1200px){
+  body:not(.todayWorkPopup)>header{
+    grid-template-columns:auto minmax(0,1fr) auto auto!important;
+    grid-template-areas:
+      "brand nav badge save"
+      "work work tools tools"!important;
+  }
+  body:not(.todayWorkPopup)>header nav{
+    width:auto!important;min-width:0!important;justify-content:flex-start!important;
+    gap:6px!important;
+  }
+  body:not(.todayWorkPopup)>header nav #range{
+    flex:0 1 auto!important;max-width:230px!important;
+    margin:0!important;white-space:nowrap!important;
+  }
+  body:not(.todayWorkPopup)>header #desktopCompactWork{
+    display:inline-flex!important;justify-self:start!important;
+    align-items:center!important;justify-content:flex-start!important;gap:8px!important;
+    width:auto!important;min-width:0!important;
+  }
+  body:not(.todayWorkPopup)>header #desktopCompactWork>#currentViewWrap{
+    display:inline-flex!important;position:relative!important;
+    left:auto!important;right:auto!important;top:auto!important;
+    transform:none!important;margin:0!important;
+    flex:0 0 auto!important;width:auto!important;max-width:none!important;
+  }
+  body:not(.todayWorkPopup)>header #desktopCompactWork #currentViewMenu{
+    right:0!important;left:auto!important;top:calc(100% + 4px)!important;
+  }
+  body:not(.todayWorkPopup)>header #desktopCompactWork>#workMemoOpenBtn{
+    flex:0 0 auto!important;
+  }
+  body:not(.todayWorkPopup)>header #desktopCompactTools{
+    justify-self:end!important;justify-content:flex-end!important;
+  }
+}
+@media(min-width:761px) and (max-width:1200px){
+  body:not(.todayWorkPopup)>header #desktopCompactWork .primaryViewButtons{
+    display:inline-flex!important;align-items:stretch!important;gap:0!important;
+    width:auto!important;min-width:0!important;
+    border:1px solid #c9c9c9!important;background:#fff!important;
+  }
+  body:not(.todayWorkPopup)>header #desktopCompactWork .primaryViewBtn,
+  body:not(.todayWorkPopup)>header #desktopCompactWork #extraViewMenuToggle{
+    display:inline-flex!important;align-items:center!important;justify-content:center!important;
+    flex:0 0 auto!important;width:auto!important;min-width:35px!important;
+    height:29px!important;min-height:29px!important;
+    padding:0 7px!important;line-height:27px!important;
+    border:0!important;border-right:1px solid #c9c9c9!important;
+    border-radius:0!important;background:#fff!important;color:#202020!important;
+    font-size:11px!important;font-weight:500!important;box-shadow:none!important;
+  }
+  body:not(.todayWorkPopup)>header #desktopCompactWork #extraViewMenuToggle{
+    min-width:21px!important;padding:0 4px!important;border-right:0!important;
+  }
+  body:not(.todayWorkPopup)>header #desktopCompactWork .primaryViewBtn.on{
+    background:#6758e9!important;color:#fff!important;border-color:#6758e9!important;
+  }
+}
