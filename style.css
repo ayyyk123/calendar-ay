@@ -4192,3 +4192,63 @@ button,.primaryViewBtn,.dateNavButtons button,.views button,#sidebar .secHead bu
   .wmMissedAction button{padding:4px 7px}
   .wmMissedDatePicker,.wmMissedDateTools{gap:4px}
 }
+
+/* v2.117 — PC toolbar: one row when roomy, two intentional rows when narrowed.
+   Existing mobile three-row toolbar (<=760px) and all button handlers are unchanged. */
+.desktopCompactWork,.desktopCompactTools{display:none}
+@media(min-width:1201px){
+ body:not(.todayWorkPopup)>header{--header-h:52px;height:52px!important;min-height:52px!important;display:flex!important;flex-wrap:nowrap!important;align-items:center!important;gap:9px!important;padding:0 10px!important}
+ body:not(.todayWorkPopup)>header .brand{flex:0 0 auto!important;margin:0!important;font-size:14px!important}
+ body:not(.todayWorkPopup)>header nav{flex:1 1 auto!important;min-width:0!important;display:flex!important;align-items:center!important;gap:6px!important;overflow:visible!important}
+ body:not(.todayWorkPopup)>header nav #range{position:static!important;order:0!important;flex:0 1 auto!important;width:auto!important;min-width:0!important;max-width:235px!important;margin:0!important;font-size:12px!important}
+ body:not(.todayWorkPopup)>header nav .dateNavButtons{order:1!important;flex:none!important}
+ body:not(.todayWorkPopup)>header nav #currentViewWrap{position:relative!important;top:auto!important;left:auto!important;right:auto!important;transform:none!important;order:4!important;flex:none!important;margin:0 0 0 auto!important}
+ body:not(.todayWorkPopup)>header .views{flex:0 0 auto!important;width:auto!important;display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:3px!important;margin:0!important;min-width:0!important}
+ body:not(.todayWorkPopup)>header .views>#workMemoOpenBtn{order:0!important;flex:0 0 68px!important;width:68px!important;min-width:68px!important}
+ body:not(.todayWorkPopup)>header .views>#workTodayWindowBtn{order:1!important}
+ body:not(.todayWorkPopup)>header .views>#saveBadge{order:2!important;flex:0 0 150px!important;width:150px!important;min-width:150px!important;max-width:150px!important;margin:0 2px 0 0!important}
+ body:not(.todayWorkPopup)>header .views>#manualSaveBtn{order:3!important;margin:0 2px 0 0!important}
+ body:not(.todayWorkPopup)>header .views>#naverMailShortcut{order:4!important;margin-left:0!important}
+ body:not(.todayWorkPopup)>header .views>#accountBookShortcut{order:5!important}
+ body:not(.todayWorkPopup)>header .views>#diaryMainShortcut{order:6!important}
+ body:not(.todayWorkPopup)>header .views>#searchBtn{order:7!important}
+ body:not(.todayWorkPopup)>header .views>#settingsBtn{order:8!important}
+}
+@media(min-width:761px) and (max-width:1200px){
+ :root{--header-h:76px}
+ body:not(.todayWorkPopup)>header{
+   height:76px!important;min-height:76px!important;box-sizing:border-box!important;
+   display:grid!important;grid-template-columns:auto auto minmax(0,1fr) auto auto!important;
+   grid-template-rows:30px 30px!important;
+   grid-template-areas:"brand work gap badge save" "nav nav nav tools tools"!important;
+   align-items:center!important;align-content:center!important;
+   gap:5px 7px!important;padding:5px 9px!important;overflow:visible!important;
+ }
+ body:not(.todayWorkPopup)>header .brand{grid-area:brand!important;order:initial!important;flex:none!important;min-width:0!important;white-space:nowrap!important;font-size:13px!important}
+ body:not(.todayWorkPopup)>header #desktopCompactWork{grid-area:work!important;display:inline-flex!important;align-items:center!important;justify-content:flex-start!important;gap:4px!important;min-width:0!important}
+ body:not(.todayWorkPopup)>header #desktopCompactWork>#workMemoOpenBtn{width:68px!important;min-width:68px!important;max-width:68px!important;height:29px!important;padding:0 5px!important;margin:0!important;font-size:12px!important;white-space:nowrap!important}
+ body:not(.todayWorkPopup)>header #desktopCompactWork>#workTodayWindowBtn{height:29px!important;min-width:28px!important;padding:0 5px!important}
+ body:not(.todayWorkPopup)>header #saveBadge{grid-area:badge!important;flex:none!important;width:168px!important;min-width:168px!important;max-width:168px!important;height:29px!important;margin:0!important;box-sizing:border-box!important;font-size:10px!important}
+ body:not(.todayWorkPopup)>header #manualSaveBtn{grid-area:save!important;flex:none!important;width:32px!important;min-width:32px!important;height:29px!important;margin:0!important;padding:0!important}
+ body:not(.todayWorkPopup)>header nav{grid-area:nav!important;order:initial!important;width:100%!important;flex:none!important;display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:6px!important;min-width:0!important;margin:0!important;overflow:visible!important}
+ body:not(.todayWorkPopup)>header nav #range{order:0!important;flex:0 1 auto!important;min-width:0!important;max-width:240px!important;width:auto!important;margin:0!important;font-size:11px!important;text-overflow:ellipsis!important}
+ body:not(.todayWorkPopup)>header nav .dateNavButtons{order:1!important;flex:none!important}
+ body:not(.todayWorkPopup)>header nav #currentViewWrap{order:4!important;position:relative!important;top:auto!important;left:auto!important;right:auto!important;transform:none!important;flex:none!important;margin:0!important;max-width:none!important}
+ body:not(.todayWorkPopup)>header .views{display:none!important}
+ body:not(.todayWorkPopup)>header #desktopCompactTools{grid-area:tools!important;display:flex!important;align-items:center!important;gap:4px!important;justify-content:flex-end!important;margin:0!important}
+ body:not(.todayWorkPopup)>header #desktopCompactTools>a,
+ body:not(.todayWorkPopup)>header #desktopCompactTools>button{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:29px!important;min-width:29px!important;height:29px!important;min-height:29px!important;padding:0!important;margin:0!important;border-radius:2px!important;box-sizing:border-box!important}
+ body:not(.todayWorkPopup)>.layout{height:calc(100dvh - 76px)!important}
+ body:not(.todayWorkPopup)>.layout aside{top:76px!important}
+}
+@media(max-width:760px){.desktopCompactWork,.desktopCompactTools{display:none!important}}
+
+/* v2.117 — '납부일정' separate box in work board, visually distinct from 월업무.
+   Only work-board presentation is changed; event.kind and payment history stay intact. */
+.wmDayCard .wmSection-payment{border-color:#e8d9ad!important}
+.wmDayCard .wmSection-payment>.wmSectionTitle{
+  border-left:3px solid #cfaa58!important;background:#fffaf0!important;
+  color:#735b2d!important;border-bottom-color:#eadfbf!important;
+}
+.wmDayCard .wmSection-payment .wmTask{background:#fffefb}
+.wmDayCard .wmSection-payment .wmTask.done{background:#f5f7f7}

@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '2.116',
+  version: '2.118',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -366,7 +366,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '2.116',
+    version: '2.118',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -383,7 +383,7 @@ function normalizeState(raw){
       ...(typeof e.memoEnabled==='boolean' ? {memoEnabled:e.memoEnabled} : {}),
       ...( ['off','daily','today','weekly','monthly','extra'].includes(e.memoCategory) ? {memoCategory:e.memoCategory} : {}),
       memoOriginalDate:String(e.memoOriginalDate||''),
-      memoOriginalCategory:['daily','weekly','monthly','extra'].includes(e.memoOriginalCategory)?e.memoOriginalCategory:'',
+      memoOriginalCategory:['daily','weekly','monthly','payment','extra'].includes(e.memoOriginalCategory)?e.memoOriginalCategory:'',
       memoFromDaily:!!e.memoFromDaily,
       memoPrepOrigins:(e.memoPrepOrigins&&typeof e.memoPrepOrigins==='object')?e.memoPrepOrigins:{},
       repeatRule:e.repeatRule||null,
@@ -436,7 +436,7 @@ function normalizeState(raw){
     workMemos: (s.workMemos && typeof s.workMemos==='object') ? Object.fromEntries(Object.entries(s.workMemos).filter(([date,v])=>/^\d{4}-\d{2}-\d{2}$/.test(date)&&v&&typeof v==='object').map(([date,v])=>[date,{
       imports:Array.isArray(v.imports)?v.imports.filter(x=>x&&typeof x.key==='string').map(x=>({key:String(x.key),title:String(x.title||'')})):[],
       custom:Array.isArray(v.custom)?v.custom.filter(x=>x&&x.id&&x.title).map(x=>({id:String(x.id),title:String(x.title),done:!!x.done,originDate:String(x.originDate||''),movedTo:String(x.movedTo||'')})):[],
-      movedOut:Array.isArray(v.movedOut)?v.movedOut.filter(x=>x&&x.key&&x.toDate).map(x=>({key:String(x.key),toDate:String(x.toDate),title:String(x.title||''),daily:!!x.daily,group:['daily','weekly','monthly','extra'].includes(x.group)?x.group:(x.daily?'daily':'extra'),eventId:String(x.eventId||'')})) :[],
+      movedOut:Array.isArray(v.movedOut)?v.movedOut.filter(x=>x&&x.key&&x.toDate).map(x=>({key:String(x.key),toDate:String(x.toDate),title:String(x.title||''),daily:!!x.daily,group:['daily','weekly','monthly','payment','extra'].includes(x.group)?x.group:(x.daily?'daily':'extra'),eventId:String(x.eventId||'')})) :[],
       freeText:String(v.freeText||'')
     }])) : {},
     diary: s.diary && typeof s.diary === 'object' ? s.diary : {},
@@ -4171,7 +4171,7 @@ function isAdorableCalendar(calId){
 }
 // v2.94 · 반복 요일과 업무 분류는 별도로 선택합니다.
 // 기존 daily/today 값은 구 데이터 호환용으로 해석하며 신규 값은 daily/weekly/monthly/off 입니다.
-const WM_GROUPS=[['daily','일업무'],['weekly','주업무'],['monthly','월업무'],['extra','추가업무']];
+const WM_GROUPS=[['payment','납부일정'],['daily','일업무'],['weekly','주업무'],['monthly','월업무'],['extra','추가업무']];
 function defaultMemoGroupForRepeat(repeat){
   return repeat==='daily'?'daily':repeat==='monthly'||repeat==='yearly'?'monthly':'weekly';
 }
@@ -4188,6 +4188,8 @@ function memoTaskPlacement(e){
 }
 function workMemoGroup(e){
   if(!e || !isAdorableCalendar(e.calId))return 'off';
+  // 납부일정은 저장된 월업무 분류를 변경하지 않고 업무 화면에서만 독립 구역으로 표시합니다.
+  if(e.kind==='payment')return 'payment';
   if(e._prepDay || e._purchaseDue)return 'extra';
   // 날짜 지정 배치 업무는 월별로 한 번씩 배치되는 업무입니다.
   // 배치 후 생성된 개별 일정의 repeat='none' 때문에 '추가업무'로 분류하지 않습니다.
@@ -4251,7 +4253,7 @@ function workMemoStarMarkup(row){
 function workMemoTitle(e){
   if(e._purchaseDue)return `구매 · ${e.title}`;
   if(e._prepDay)return String(e._prepNote||'').trim()||`준비 · ${e.title}`;
-  return e.kind==='payment'?`납부 · ${e.title}`:e.title;
+  return e.title;
 }
 // An earlier transfer is no longer active when the exact task occurrence
 // has been edited back onto its source date. Keep the saved audit entry but
@@ -4488,7 +4490,7 @@ function compactDailyEventsInCalendar(){
     }
   }
   // v2.94: 날짜별 캘린더 업무 묶음은 원본 일정 등록 순서가 아닌
-  // 일업무 → 주업무 → 월업무 → 추가업무 순서로 보여줍니다.
+  // 납부일정 → 일업무 → 주업무 → 월업무 → 추가업무 순서로 보여줍니다.
   // 업무 묶음 외의 일정 DOM 순서는 변경하지 않습니다.
   const workGroupRank=new Map(WM_GROUPS.map(([kind],index)=>[kind,index]));
   const summariesByDate=new Map();
@@ -4578,11 +4580,11 @@ function workMemoToggleSubtask(key,subId,date){
 function workMemoTaskMarkup(row,date){
   const done=!!row.done,skipped=!!row.skipped,origin=row.originDate && row.originDate!==date;
   const label=origin?` <span class="wmOrigin">(${esc(workMemoShortDate(row.originDate))})</span>`:'';
-  const kind=['daily','weekly','monthly','extra'].includes(row.kind)?row.kind:'extra';
+  const kind=['daily','weekly','monthly','payment','extra'].includes(row.kind)?row.kind:'extra';
   const type=row.e?row.e.kind==='payment'?'납부':row.e._prepDay?'준비':row.e._purchaseDue?'구매':row.e.kind==='appointment'?'약속':'일정':'';
   const noCheck=(!!row.e?.kind && row.e.kind==='anniversary')||skipped;
   const subtasks=workMemoSubtasksMarkup(row);
-  return `<div class="wmTask ${done?'done':''} ${skipped?'skipped':''} ${subtasks?'wmTaskWithSubtasks':''}" data-wm-task="${esc(row.key)}" data-wm-kind="${kind}"><label><input type="checkbox" data-wm-check="${esc(row.key)}" ${done?'checked':''} ${noCheck?'disabled':''}>${workMemoStarMarkup(row)}<span class="wmTaskLabel">${esc(row.title)}${label}</span>${skipped?'<span class="wmSkippedMark">안 함</span>':''}</label>${type&&row.kind!=='daily'?`<small>${esc(type)}</small>`:''}${row.e&&canSkipEvent(row.e)?`<button type="button" class="wmSkipAction ${skipped?'active':''}" data-wm-skip="${esc(row.key)}" aria-label="${skipped?'미완료로 되돌리기':'안 함으로 기록'}" title="${skipped?'미완료로 되돌리기':'안 함으로 기록 · 삭제되지 않음'}">${skipped?'↶':'×'}</button>`:''}<button type="button" class="wmTaskEditBtn" data-wm-edit="${esc(row.key)}" title="수정 · 삭제" aria-label="${esc(row.title)} 수정 또는 삭제">✎</button>${subtasks}</div>`;
+  return `<div class="wmTask ${done?'done':''} ${skipped?'skipped':''} ${subtasks?'wmTaskWithSubtasks':''}" data-wm-task="${esc(row.key)}" data-wm-kind="${kind}"><label><input type="checkbox" data-wm-check="${esc(row.key)}" ${done?'checked':''} ${noCheck?'disabled':''}>${workMemoStarMarkup(row)}<span class="wmTaskLabel">${esc(row.title)}${label}</span>${skipped?'<span class="wmSkippedMark">안 함</span>':''}</label>${type&&row.kind!=='daily'&&row.kind!=='payment'?`<small>${esc(type)}</small>`:''}${row.e&&canSkipEvent(row.e)?`<button type="button" class="wmSkipAction ${skipped?'active':''}" data-wm-skip="${esc(row.key)}" aria-label="${skipped?'미완료로 되돌리기':'안 함으로 기록'}" title="${skipped?'미완료로 되돌리기':'안 함으로 기록 · 삭제되지 않음'}">${skipped?'↶':'×'}</button>`:''}<button type="button" class="wmTaskEditBtn" data-wm-edit="${esc(row.key)}" title="수정 · 삭제" aria-label="${esc(row.title)} 수정 또는 삭제">✎</button>${subtasks}</div>`;
 }
 function workMemoMissedTasks(date){
   const previous=ds(add(parse(date),-1)),note=workMemoDay(previous);
@@ -4593,7 +4595,7 @@ function workMemoMissedTasks(date){
 const workMemoMissedByDate=new Map();
 let workMemoSettingsShown=false;
 function workMemoDailySettingsHtml(){
-  const all=state.events.filter(e=>isAdorableCalendar(e.calId) && e.repeat!=='none' && !e.prepEnabled);
+  const all=state.events.filter(e=>isAdorableCalendar(e.calId) && e.repeat!=='none' && !e.prepEnabled && e.kind!=='payment');
   const opts=[['off','반영 안 함'],['daily','일업무'],['weekly','주업무'],['monthly','월업무']];
   return `<div class="wmDailyConfig"><div class="wmDailyConfigTitle">반복업무 분류 <small>${all.filter(e=>memoTaskPlacement(e)!=='off').length}/${all.length}개 업무 화면 반영</small></div>${all.map(e=>`<div class="wmConfigRow"><span>${esc(e.title)}<small class="wmConfigMeta">${esc(calendarPath(e.calId))} · ${esc(repeatRuleLabel(e))}</small></span><select data-wm-placement="${esc(e.id)}" aria-label="${esc(e.title)} 업무 분류">${opts.map(([value,label])=>`<option value="${value}" ${memoTaskPlacement(e)===value?'selected':''}>${label}</option>`).join('')}</select></div>`).join('')||'<div class="wmEmpty">아도라블에 등록된 반복업무가 없어.</div>'}<p class="wmInfo">반복 요일과 관계없이 일업무 / 주업무 / 월업무를 직접 선택합니다. 날짜 지정으로 한 번만 등록한 업무는 추가업무로 표시됩니다. 변경 시 적용 시작일을 선택할 수 있습니다.</p></div>`;
 }
@@ -6377,9 +6379,28 @@ function syncSaveControlsPlacement(){
     if(saveBtn.parentElement!==views || saveBtn.nextElementSibling!==naver) views.insertBefore(saveBtn,naver);
   }
 }
+function syncDesktopCompactHeader(){
+  const header=document.querySelector('header');
+  const workHost=$('#desktopCompactWork');
+  const toolsHost=$('#desktopCompactTools');
+  if(!header||!workHost||!toolsHost)return;
+  // 761~1200px: first line title/work/status/save; second line dates/views/shortcuts.
+  const compact=window.matchMedia('(min-width:761px) and (max-width:1200px)').matches;
+  if(!compact)return; // Other layouts are restored in the two sync functions above.
+  ['workMemoOpenBtn','workTodayWindowBtn'].forEach(id=>{
+    const el=document.getElementById(id);if(el)workHost.appendChild(el);
+  });
+  ['naverMailShortcut','accountBookShortcut','diaryMainShortcut','searchBtn','settingsBtn'].forEach(id=>{
+    const el=document.getElementById(id);if(el)toolsHost.appendChild(el);
+  });
+  const badge=$('#saveBadge'),saveBtn=$('#manualSaveBtn');
+  if(badge && badge.parentElement!==header)header.appendChild(badge);
+  if(saveBtn && saveBtn.parentElement!==header)header.appendChild(saveBtn);
+}
 function syncHeaderResponsivePlacement(){
   syncMobileHeaderToolbars();
   syncSaveControlsPlacement();
+  syncDesktopCompactHeader();
 }
 syncHeaderResponsivePlacement();
 window.addEventListener('resize',syncHeaderResponsivePlacement,{passive:true});
@@ -6644,7 +6665,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.116',
+    appVersion:'2.118',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
