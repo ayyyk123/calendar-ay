@@ -69,7 +69,7 @@ const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
 const defaultState = () => ({
-  version: '2.115',
+  version: '2.116',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -366,7 +366,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '2.115',
+    version: '2.116',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -4608,7 +4608,7 @@ function workMemoDayCard(date){
     const prev=ds(add(parse(date),-1)),pending=workMemoMissedTasks(date);
     workMemoMissedByDate.set(date,pending);
     const missedKey=`missed|${date}`;
-    missed=`<details class="wmMissedArea" data-wm-fold-key="${esc(missedKey)}"${wmFoldOpen(missedKey)}><summary class="wmSectionTitle">${esc(workMemoShortDate(prev))} 미완료 <b>${pending.length}건</b></summary>${pending.length?pending.map((x,i)=>`<div class="wmMissed" data-wm-missed="${i}"><strong>${workMemoStarMarkup(x)}${esc(x.title)}${x.originDate?` (${esc(workMemoShortDate(x.originDate))})`:''}</strong><div class="wmMissedAction"><button type="button" data-wm-today="${i}">오늘로</button><input type="date" value="${date}" aria-label="이동 날짜"><button type="button" data-wm-move="${i}">날짜 지정</button></div></div>`).join(''):'<div class="wmEmpty">전날 미완료 업무 없음</div>'}</details>`;
+    missed=`<details class="wmMissedArea" data-wm-fold-key="${esc(missedKey)}"${wmFoldOpen(missedKey)}><summary class="wmSectionTitle">${esc(workMemoShortDate(prev))} 미완료 <b>${pending.length}건</b></summary>${pending.length?pending.map((x,i)=>`<div class="wmMissed" data-wm-missed="${i}"><strong>${workMemoStarMarkup(x)}${esc(x.title)}${x.originDate?` (${esc(workMemoShortDate(x.originDate))})`:''}</strong><div class="wmMissedAction"><button type="button" data-wm-today="${i}">오늘로</button><span class="wmMissedDatePicker"><button type="button" data-wm-date-toggle="${i}" aria-expanded="false">날짜 지정</button><span class="wmMissedDateTools" hidden><input type="date" value="${date}" aria-label="이동할 날짜"><button type="button" data-wm-move="${i}">이동</button></span></span><button type="button" data-wm-missed-edit="${i}">수정</button><button type="button" class="wmMissedDelete" data-wm-missed-delete="${i}">삭제</button></div></div>`).join(''):'<div class="wmEmpty">전날 미완료 업무 없음</div>'}</details>`;
   }
   const sections=WM_GROUPS.map(([kind,title])=>{
     const items=rows.filter(x=>x.kind===kind);
@@ -4775,6 +4775,51 @@ function workMemoMoveMissed(index,dest,date=workMemoDate){
   const row=(workMemoMissedByDate.get(date)||[])[index];
   return workMemoMoveRow(row,dest);
 }
+// v2.116 · 미완료 목록에서도 원본 일정과 동일한 수정/삭제 흐름을 사용합니다.
+function workMemoEditMissed(index,date=workMemoDate){
+  const row=(workMemoMissedByDate.get(date)||[])[index];
+  if(!row)return;
+  workMemoEditTask(row,row.sourceDate||ds(add(parse(date),-1)));
+}
+function workMemoDeleteMissed(index,date=workMemoDate){
+  const row=(workMemoMissedByDate.get(date)||[])[index];
+  if(!row)return;
+  const sourceDate=row.sourceDate||ds(add(parse(date),-1));
+  if(row.custom){
+    if(confirm(`「${row.title}」 업무를 삭제할까요? 이 업무 기록도 삭제됩니다.`)){
+      const memo=workMemoDay(sourceDate);
+      memo.custom=memo.custom.filter(x=>x.id!==row.custom.id);
+      save();
+    }
+    return;
+  }
+  const event=row.e;
+  if(!event)return;
+  // 구매 항목은 구매 편집창의 삭제 절차를 그대로 이용합니다.
+  if(event._purchaseDue || (event.sourceType==='purchase'&&event.purchaseSourceId)){
+    openPurchase(event._purchaseDue?event.purchaseId:event.purchaseSourceId);
+    $('#deletePurchase')?.click();
+    return;
+  }
+  // 준비업무는 개별 준비 규칙과 부모 일정이 연결되어 있으므로 원본 편집창에서 삭제합니다.
+  if(event._prepDay){
+    alert('이 업무는 준비일정에 속해 있어요. 원본 일정의 준비업무 목록에서 해당 항목을 삭제해 주세요.');
+    openEvent(null,event.id);
+    return;
+  }
+  const original=state.events.find(x=>x.id===event.id);
+  if(!original)return;
+  if((original.repeat||'none')==='none'){
+    if(confirm(`「${row.title}」 일정을 삭제할까요? 캘린더에서도 삭제됩니다.`)){
+      deleteEventAndUnlink(original.id);
+      save();
+    }
+    return;
+  }
+  // 반복 일정 삭제는 이 날짜만/이후 전체/반복 전체 선택창을 그대로 표시합니다.
+  openEvent(event._occurrenceStart||sourceDate,original.id);
+  $('#deleteEvent')?.click();
+}
 function workMemoAddTask(date,title){
   const root=adorableRoot(),text=String(title||'').trim();
   if(!root){alert('아도라블 캘린더가 없어 업무를 추가할 수 없어.');return false;}
@@ -4841,8 +4886,15 @@ function initWorkMemo(){
     if(btn.dataset.wmEdit){const date=btn.closest('[data-wm-date]')?.dataset.wmDate;const row=date?workMemoTasks(date).find(x=>x.key===btn.dataset.wmEdit):null;if(row)workMemoEditTask(row,date);return;}
     const date=btn.closest('[data-wm-date]')?.dataset.wmDate;
     if(btn.dataset.wmMissedToggle){const d=btn.dataset.wmMissedToggle;workMemoMissedDates.has(d)?workMemoMissedDates.delete(d):workMemoMissedDates.add(d);renderWorkMemoPanel();return;}
+    if(btn.dataset.wmDateToggle!==undefined){
+      const picker=btn.closest('.wmMissedDatePicker'),tools=picker?.querySelector('.wmMissedDateTools');
+      if(tools){tools.hidden=!tools.hidden;btn.setAttribute('aria-expanded',String(!tools.hidden));if(!tools.hidden)tools.querySelector('input[type=date]')?.focus();}
+      return;
+    }
+    if(btn.dataset.wmMissedEdit!==undefined){workMemoEditMissed(Number(btn.dataset.wmMissedEdit),date);return;}
+    if(btn.dataset.wmMissedDelete!==undefined){workMemoDeleteMissed(Number(btn.dataset.wmMissedDelete),date);return;}
     if(btn.dataset.wmToday!==undefined || btn.dataset.wmMove!==undefined){
-      const i=Number(btn.dataset.wmToday??btn.dataset.wmMove),dest=btn.dataset.wmToday!==undefined?date:btn.closest('.wmMissed')?.querySelector('input[type=date]')?.value;
+      const i=Number(btn.dataset.wmToday??btn.dataset.wmMove),dest=btn.dataset.wmToday!==undefined?date:btn.closest('.wmMissedDateTools')?.querySelector('input[type=date]')?.value;
       workMemoMoveMissed(i,dest,date);return;
     }
   });
@@ -6592,7 +6644,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.115',
+    appVersion:'2.116',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state

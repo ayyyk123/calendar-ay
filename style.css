@@ -4176,3 +4176,19 @@ button,.primaryViewBtn,.dateNavButtons button,.views button,#sidebar .secHead bu
   .eventPopoverActions #eventPopoverSkip{width:30px!important;min-width:30px!important;height:30px!important;min-height:30px!important;padding:0!important}
   .wmTask .wmSkipAction,.wmPopupTaskActions .wmSkipAction{width:28px!important;min-width:28px!important;height:28px!important;min-height:28px!important;padding:0!important}
 }
+
+
+/* v2.116 — 전날 미완료: 오늘로 / 날짜 지정(선택 시 날짜 입력 펼침) / 수정 / 삭제. */
+.wmMissedAction{display:flex;align-items:center;flex-wrap:wrap;gap:5px}
+.wmMissedDatePicker{display:inline-flex;align-items:center;flex-wrap:wrap;gap:5px;min-width:0}
+.wmMissedDateTools{display:inline-flex;align-items:center;gap:5px;min-width:0}
+.wmMissedDateTools[hidden]{display:none!important}
+.wmMissedAction .wmMissedDateTools input[type=date]{box-sizing:border-box;width:128px;min-width:0;max-width:100%;height:27px;font-family:inherit;font-size:11px}
+.wmMissedAction button{font-family:inherit;white-space:nowrap;cursor:pointer}
+.wmMissedAction .wmMissedDelete{color:#a44d45;background:#fff7f5;border-color:#eac8c4}
+.wmMissedAction .wmMissedDelete:hover{background:#ffe9e5;border-color:#dca9a2}
+@media(max-width:400px){
+  .wmMissedAction{gap:4px}
+  .wmMissedAction button{padding:4px 7px}
+  .wmMissedDatePicker,.wmMissedDateTools{gap:4px}
+}
