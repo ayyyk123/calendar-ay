@@ -75,7 +75,7 @@ function normalizeHeaderGoals(raw){
 }
 
 const defaultState = () => ({
-  version: '2.120',
+  version: '2.121',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -372,7 +372,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '2.120',
+    version: '2.121',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -6345,10 +6345,22 @@ function renderHeaderGoals(){
   const el=$('#headerGoals'), text=$('#headerGoalsHighlight');
   if(!el||!text)return;
   const hasGoals=goals.length>0;
-  text.textContent=hasGoals?goals.join('  ·  '):'＋ 목표 입력';
+  // A separate highlighter line for each goal (matching the textarea line breaks).
+  // Create text nodes instead of injecting HTML: saved goal content is plain text.
+  if(hasGoals){
+    const fragment=document.createDocumentFragment();
+    for(const goal of goals){
+      const line=document.createElement('span');
+      line.className='headerGoalLine';
+      line.textContent=goal;
+      fragment.appendChild(line);
+    }
+    text.replaceChildren(fragment);
+  }else text.textContent='＋ 목표 입력';
   el.classList.toggle('isEmpty',!hasGoals);
   el.title=hasGoals?goals.join('\n')+'\n클릭해서 목표 수정':'클릭해서 목표 입력';
   document.body.classList.toggle('hasHeaderGoals',hasGoals);
+  requestAnimationFrame(syncHeaderGoalsHeight);
 }
 function openHeaderGoalsEditor(){
   const input=$('#headerGoalsInput');
@@ -6422,7 +6434,7 @@ function syncDesktopCompactHeader(){
   const workHost=$('#desktopCompactWork');
   const toolsHost=$('#desktopCompactTools');
   if(!header||!workHost||!toolsHost)return;
-  // v2.120: narrowed desktop: top row title/date/status/save;
+  // v2.121: narrowed desktop: top row title/date/status/save;
   // bottom row view selector/work button/shortcuts. Reuse existing elements
   // so click handlers and saved calendar data stay unchanged.
   const compact=window.matchMedia('(min-width:761px) and (max-width:1200px)').matches;
@@ -6456,6 +6468,29 @@ function syncHeaderResponsivePlacement(){
 }
 syncHeaderResponsivePlacement();
 window.addEventListener('resize',syncHeaderResponsivePlacement,{passive:true});
+
+// Keep the calendar viewport in sync when multiple goal rows make the header taller.
+// Header sizing is intrinsic when goals are shown; the observed height is for the
+// content area and sidebar offset only (it does not control the header itself).
+function syncHeaderGoalsHeight(){
+  if(!document.body.classList.contains('hasHeaderGoals')){
+    document.body.style.removeProperty('--header-h');
+    return;
+  }
+  const header=document.querySelector('body > header');
+  if(!header)return;
+  const height=Math.ceil(header.getBoundingClientRect().height);
+  if(Number.isFinite(height) && height>=48){
+    const value=height+'px';
+    if(document.body.style.getPropertyValue('--header-h')!==value){
+      document.body.style.setProperty('--header-h',value,'important');
+    }
+  }
+}
+if(typeof ResizeObserver!=='undefined'){
+  new ResizeObserver(syncHeaderGoalsHeight).observe(document.querySelector('body > header'));
+}
+window.addEventListener('resize',()=>requestAnimationFrame(syncHeaderGoalsHeight),{passive:true});
 $('#jumpDate').onchange=e=>{ if(e.target.value){cursor=parse(e.target.value);render();} };
 $('#jumpDateBtn')?.addEventListener('click',()=>{ const input=$('#jumpDate'); if(!input) return; input.value=ds(cursor||new Date()); if(typeof input.showPicker==='function') input.showPicker(); else input.click(); });
 $('#diaryMainShortcut').onclick=()=>{ if(view==='diary'){ view=lastScheduleView||'week'; } else { lastScheduleView=view; view='diary'; } render(); };
@@ -6717,7 +6752,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.120',
+    appVersion:'2.121',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state

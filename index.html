@@ -4,17 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
-  <title>캘린더 v2.120</title>
-  <link rel="manifest" href="manifest.json?v=2.120">
+  <title>캘린더 v2.121</title>
+  <link rel="manifest" href="manifest.json?v=2.121">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="icon-180.png">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="style.css?v=2.120">
+  <link rel="stylesheet" href="style.css?v=2.121">
 </head>
 <body>
 <header>
-  <div class="brand"><b>캘린더</b><small> v2.120</small></div>
+  <div class="brand"><b>캘린더</b><small> v2.121</small></div>
   <div id="saveBadge" class="saveBadge loading" title="Firebase 저장 상태"><span class="saveDot"></span><span id="saveBadgeText">Firebase 확인 중</span></div>
   <button id="manualSaveBtn" class="manualSaveBtn iconOnlyBtn" type="button" title="현재 데이터를 Firebase에 즉시 저장" aria-label="최신자료 저장">💾</button>
   <button id="sidebarToggle" class="mobileOnly" type="button" aria-label="메뉴">☰</button>
@@ -554,7 +554,7 @@
     <p class="hint">목표를 한 줄에 하나씩 입력해 주세요. 상단 빈 공간에 형광펜 표시로 나타나며, PC와 모바일에서 동일하게 저장됩니다.</p>
     <label for="headerGoalsInput">목표 문구</label>
     <textarea id="headerGoalsInput" rows="5" maxlength="1400" placeholder="이번 달 안에 밀린 카드·가수금 정리 끝내기&#10;이번 주 중요한 업무 마무리"></textarea>
-    <p class="hint">최대 10개 · 목표당 120자 · 화면이 좁으면 미리보기는 줄여 표시됩니다.</p>
+    <p class="hint">최대 10개 · 목표당 120자 · 한 줄에 하나씩 표시됩니다. 긴 문구는 자동으로 줄바꿈됩니다.</p>
     <menu>
       <button id="headerGoalsClear" type="button">전체 지우기</button>
       <span></span>
@@ -614,6 +614,6 @@
  <div id="wmBoard" class="wmBoard" aria-label="날짜별 업무"></div>
 </div>
 <div id="wmGroupPopup" class="wmGroupPopup hidden" aria-label="업무 목록"></div>
-<script type="module" src="app.js?v=2.120"></script>
+<script type="module" src="app.js?v=2.121"></script>
 </body>
 </html>

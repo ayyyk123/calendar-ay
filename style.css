@@ -4387,3 +4387,67 @@ body:not(.todayWorkPopup) #headerGoals:focus-visible{outline:2px solid #9b8cf2!i
     justify-content:flex-start!important; padding-left:6px!important;
   }
 }
+
+
+/* v2.121 — display every saved goal on its own highlighted line, without ellipsis. */
+body:not(.todayWorkPopup) #headerGoals{
+  height:auto!important;min-height:29px!important;max-height:none!important;
+  padding:3px 4px!important;white-space:normal!important;
+  align-items:center!important;justify-content:center!important;
+}
+body:not(.todayWorkPopup) #headerGoalsHighlight{
+  display:flex!important;flex-direction:column!important;
+  align-items:center!important;justify-content:center!important;
+  gap:1px!important;flex:1 1 auto!important;max-width:100%!important;
+  min-width:0!important;overflow:visible!important;text-overflow:clip!important;
+  white-space:normal!important;background:none!important;
+  padding:0!important;line-height:1.55!important;
+}
+body:not(.todayWorkPopup) #headerGoalsHighlight .headerGoalLine{
+  display:block;max-width:100%;width:fit-content;
+  white-space:normal;overflow-wrap:anywhere;word-break:keep-all;
+  padding:0 3px;
+  background:linear-gradient(to bottom,transparent 27%,#fff2a1 27%,#fff2a1 92%,transparent 92%);
+  box-decoration-break:clone;-webkit-box-decoration-break:clone;
+}
+body:not(.todayWorkPopup) #headerGoals .headerGoalsPencil{
+  align-self:center!important;
+}
+@media(min-width:1201px){
+  body:not(.todayWorkPopup).hasHeaderGoals>header{
+    height:auto!important;min-height:52px!important;
+    padding-top:5px!important;padding-bottom:5px!important;
+  }
+  body:not(.todayWorkPopup)>header nav #headerGoals{
+    align-self:center!important;flex:1 1 110px!important;
+    min-width:0!important;max-width:100%!important;
+  }
+}
+@media(min-width:761px) and (max-width:1200px){
+  body:not(.todayWorkPopup).hasHeaderGoals>header{
+    height:auto!important;min-height:76px!important;
+    grid-template-rows:minmax(30px,auto) minmax(30px,auto)!important;
+  }
+  body:not(.todayWorkPopup)>header #headerGoals{
+    align-self:center!important;min-height:29px!important;
+  }
+  body:not(.todayWorkPopup).hasHeaderGoals>.layout{
+    height:calc(100dvh - var(--header-h))!important;
+  }
+  body:not(.todayWorkPopup).hasHeaderGoals>.layout aside{
+    top:var(--header-h)!important;
+  }
+}
+@media(max-width:760px){
+  body:not(.todayWorkPopup).hasHeaderGoals>header{
+    height:auto!important;min-height:151px!important;
+    grid-template-rows:32px 32px 32px minmax(24px,auto)!important;
+  }
+  body:not(.todayWorkPopup).hasHeaderGoals>header #headerGoals{
+    height:auto!important;min-height:24px!important;
+    padding:2px 6px!important;
+  }
+  body:not(.todayWorkPopup).hasHeaderGoals>header #headerGoalsHighlight{
+    align-items:flex-start!important;
+  }
+}
