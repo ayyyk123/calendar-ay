@@ -74,8 +74,23 @@ function normalizeHeaderGoals(raw){
   return lines.map(line=>String(line??'').replace(/\s+/g,' ').trim().slice(0,120)).filter(Boolean).slice(0,10);
 }
 
+// Per-goal highlight colors. Text stays in the legacy headerGoals field so older
+// calendar versions can still read the goals if the user temporarily downgrades.
+const HEADER_GOAL_COLOR_OPTIONS = [
+  {key:'yellow', label:'노랑', hex:'#fff2a1'},
+  {key:'pink', label:'분홍', hex:'#ffd6e8'},
+  {key:'mint', label:'민트', hex:'#c7f4dc'},
+  {key:'blue', label:'하늘', hex:'#d5eafa'},
+  {key:'lavender', label:'보라', hex:'#e5d9ff'},
+  {key:'orange', label:'주황', hex:'#ffdfb9'}
+];
+const HEADER_GOAL_PALETTE = Object.fromEntries(HEADER_GOAL_COLOR_OPTIONS.map(c=>[c.key,c]));
+function normalizeHeaderGoalColors(raw,goalCount){
+  return Array.from({length:goalCount},(_,i)=>HEADER_GOAL_PALETTE[raw?.[i]]?raw[i]:'yellow');
+}
+
 const defaultState = () => ({
-  version: '2.121',
+  version: '2.122',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -88,7 +103,7 @@ const defaultState = () => ({
   diary: {},
   actualWork: {},
   workMemos: {},
-  settings: { headerGoals: [], hiddenCalendars: [], weekdayWidths:[100,100,100,100,100,100,100], weekdayWidthMode:'ratio', weekdayWidthReference:0, fixedPanelsCollapsed: { recurring:false, archivedRecurring:true, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, archivedRecurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','dday','diary'], sidebarSectionsCollapsed:{}, laneHeights:{}, laneCollapsed:{}, laneLabelWidth:72, mobileSectionsCollapsed:{}, dayLaneHeights:{}, dayLaneManual:{}, workloadRange:'week', weekViewMode:'detailed', monthShowCommonWithFocus:true, selectedDdayId:'' }
+  settings: { headerGoals: [], headerGoalColors: [], hiddenCalendars: [], weekdayWidths:[100,100,100,100,100,100,100], weekdayWidthMode:'ratio', weekdayWidthReference:0, fixedPanelsCollapsed: { recurring:false, archivedRecurring:true, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, archivedRecurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','dday','diary'], sidebarSectionsCollapsed:{}, laneHeights:{}, laneCollapsed:{}, laneLabelWidth:72, mobileSectionsCollapsed:{}, dayLaneHeights:{}, dayLaneManual:{}, workloadRange:'week', weekViewMode:'detailed', monthShowCommonWithFocus:true, selectedDdayId:'' }
 });
 
 let state = defaultState();
@@ -372,7 +387,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '2.121',
+    version: '2.122',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -483,6 +498,7 @@ function normalizeState(raw){
       weekViewMode: s.settings?.weekViewMode==='compact' ? 'compact' : 'detailed',
       monthShowCommonWithFocus: s.settings?.monthShowCommonWithFocus!==false,
       headerGoals: normalizeHeaderGoals(s.settings?.headerGoals),
+      headerGoalColors: normalizeHeaderGoalColors(s.settings?.headerGoalColors, normalizeHeaderGoals(s.settings?.headerGoals).length),
       selectedDdayId: typeof s.settings?.selectedDdayId==='string' ? s.settings.selectedDdayId : ''
     }
   };
@@ -6342,19 +6358,24 @@ $('#today').onclick=()=>{cursor=new Date();mobileSelectedDate=ds(new Date());ren
 
 function renderHeaderGoals(){
   const goals=normalizeHeaderGoals(state.settings?.headerGoals);
+  const colors=normalizeHeaderGoalColors(state.settings?.headerGoalColors,goals.length);
   const el=$('#headerGoals'), text=$('#headerGoalsHighlight');
   if(!el||!text)return;
   const hasGoals=goals.length>0;
-  // A separate highlighter line for each goal (matching the textarea line breaks).
-  // Create text nodes instead of injecting HTML: saved goal content is plain text.
   if(hasGoals){
     const fragment=document.createDocumentFragment();
-    for(const goal of goals){
+    goals.forEach((goal,i)=>{
+      // An outer row controls alignment. The actual highlighter is inline text,
+      // so even a long goal wrapping onto a second line has no full-width stripe.
+      const row=document.createElement('span');
+      row.className='headerGoalRow';
       const line=document.createElement('span');
       line.className='headerGoalLine';
+      line.style.setProperty('--goal-ink',HEADER_GOAL_PALETTE[colors[i]].hex);
       line.textContent=goal;
-      fragment.appendChild(line);
-    }
+      row.appendChild(line);
+      fragment.appendChild(row);
+    });
     text.replaceChildren(fragment);
   }else text.textContent='＋ 목표 입력';
   el.classList.toggle('isEmpty',!hasGoals);
@@ -6362,25 +6383,138 @@ function renderHeaderGoals(){
   document.body.classList.toggle('hasHeaderGoals',hasGoals);
   requestAnimationFrame(syncHeaderGoalsHeight);
 }
+
+let headerGoalDraft=[];
+function goalEditorRefresh(){
+  const container=$('#headerGoalsList');
+  if(!container)return;
+  const fragment=document.createDocumentFragment();
+  headerGoalDraft.forEach((goal,index)=>{
+    const row=document.createElement('div');
+    row.className='headerGoalEditRow';
+    const head=document.createElement('div');
+    head.className='headerGoalEditHead';
+    const label=document.createElement('label');
+    label.className='headerGoalEditLabel';
+    label.htmlFor=`headerGoalEdit${index}`;
+    label.textContent=`목표 ${index+1}`;
+    const remove=document.createElement('button');
+    remove.type='button';
+    remove.className='headerGoalDelete';
+    remove.textContent='×';
+    remove.title=`목표 ${index+1} 삭제`;
+    remove.setAttribute('aria-label',`목표 ${index+1} 삭제`);
+    remove.addEventListener('click',()=>{
+      headerGoalDraft.splice(index,1);
+      if(!headerGoalDraft.length)headerGoalDraft.push({text:'',color:'yellow'});
+      goalEditorRefresh();
+      const next=Math.min(index,headerGoalDraft.length-1);
+      document.getElementById(`headerGoalEdit${next}`)?.focus();
+    });
+    head.append(label,remove);
+    const input=document.createElement('input');
+    input.id=`headerGoalEdit${index}`;
+    input.type='text';
+    input.className='headerGoalEditInput';
+    input.maxLength=120;
+    input.value=goal.text;
+    input.placeholder='목표를 입력해 주세요';
+    const preview=document.createElement('span');
+    preview.className='headerGoalEditPreview';
+    const previewLine=document.createElement('span');
+    previewLine.className='headerGoalLine';
+    previewLine.style.setProperty('--goal-ink',HEADER_GOAL_PALETTE[goal.color].hex);
+    previewLine.textContent=goal.text||'형광펜 미리보기';
+    preview.appendChild(previewLine);
+    input.addEventListener('input',()=>{
+      goal.text=input.value;
+      previewLine.textContent=goal.text||'형광펜 미리보기';
+    });
+    input.addEventListener('keydown',e=>{
+      if(e.key==='Enter'&&!e.isComposing){
+        e.preventDefault();
+        if(headerGoalDraft.length<10){
+          headerGoalDraft.splice(index+1,0,{text:'',color:goal.color});
+          goalEditorRefresh();
+          document.getElementById(`headerGoalEdit${index+1}`)?.focus();
+        }else document.getElementById(`headerGoalEdit${Math.min(index+1,9)}`)?.focus();
+      }
+    });
+    const swatches=document.createElement('div');
+    swatches.className='headerGoalColorOptions';
+    swatches.setAttribute('role','group');
+    swatches.setAttribute('aria-label',`목표 ${index+1} 형광펜 색상`);
+    HEADER_GOAL_COLOR_OPTIONS.forEach(color=>{
+      const btn=document.createElement('button');
+      btn.type='button';
+      btn.className='headerGoalColorBtn'+(goal.color===color.key?' selected':'');
+      btn.style.setProperty('--swatch-color',color.hex);
+      btn.title=color.label;
+      btn.setAttribute('aria-label',`${color.label} 형광펜`);
+      btn.setAttribute('aria-pressed',goal.color===color.key?'true':'false');
+      const swatch=document.createElement('span');
+      swatch.className='headerGoalSwatch';
+      const mark=document.createElement('span');
+      mark.className='headerGoalSwatchMark';
+      mark.textContent=goal.color===color.key?'✓':'';
+      swatch.appendChild(mark);
+      const name=document.createElement('span');
+      name.textContent=color.label;
+      btn.append(swatch,name);
+      btn.addEventListener('click',()=>{
+        goal.color=color.key;
+        for(const other of swatches.children){
+          const chosen=other===btn;
+          other.classList.toggle('selected',chosen);
+          other.setAttribute('aria-pressed',chosen?'true':'false');
+          other.querySelector('.headerGoalSwatchMark').textContent=chosen?'✓':'';
+        }
+        previewLine.style.setProperty('--goal-ink',color.hex);
+      });
+      swatches.appendChild(btn);
+    });
+    row.append(head,input,swatches,preview);
+    fragment.appendChild(row);
+  });
+  container.replaceChildren(fragment);
+  const add=$('#headerGoalsAdd');
+  if(add){add.disabled=headerGoalDraft.length>=10;add.textContent=headerGoalDraft.length>=10?'최대 10개까지 등록 가능':'＋ 목표 추가';}
+}
 function openHeaderGoalsEditor(){
-  const input=$('#headerGoalsInput');
-  if(!input)return;
-  input.value=normalizeHeaderGoals(state.settings?.headerGoals).join('\n');
+  const goals=normalizeHeaderGoals(state.settings?.headerGoals);
+  const colors=normalizeHeaderGoalColors(state.settings?.headerGoalColors,goals.length);
+  headerGoalDraft=goals.map((text,i)=>({text,color:colors[i]}));
+  if(!headerGoalDraft.length)headerGoalDraft=[{text:'',color:'yellow'}];
+  goalEditorRefresh();
   openDialog($('#headerGoalsDlg'));
-  input.focus();
+  $('#headerGoalEdit0')?.focus();
 }
 $('#headerGoals').onclick=openHeaderGoalsEditor;
 $('#editHeaderGoalsSettings').onclick=()=>{closeDialog($('#settingsDlg'));openHeaderGoalsEditor();};
 $('#headerGoalsCancel').onclick=()=>closeDialog($('#headerGoalsDlg'));
-$('#headerGoalsClear').onclick=()=>{const input=$('#headerGoalsInput');input.value='';input.focus();};
+$('#headerGoalsAdd').onclick=()=>{
+  if(headerGoalDraft.length>=10)return;
+  headerGoalDraft.push({text:'',color:'yellow'});
+  goalEditorRefresh();
+  document.getElementById(`headerGoalEdit${headerGoalDraft.length-1}`)?.focus();
+};
+$('#headerGoalsClear').onclick=()=>{
+  headerGoalDraft=[{text:'',color:'yellow'}];
+  goalEditorRefresh();
+  $('#headerGoalEdit0')?.focus();
+};
 $('#headerGoalsForm').onsubmit=e=>{
   e.preventDefault();
-  const goals=normalizeHeaderGoals($('#headerGoalsInput').value);
-  const prev=normalizeHeaderGoals(state.settings?.headerGoals);
+  const lines=headerGoalDraft.map(g=>({text:String(g.text||'').replace(/\s+/g,' ').trim().slice(0,120),color:g.color})).filter(g=>g.text).slice(0,10);
+  const goals=lines.map(g=>g.text);
+  const colors=lines.map(g=>HEADER_GOAL_PALETTE[g.color]?g.color:'yellow');
+  const prevGoals=normalizeHeaderGoals(state.settings?.headerGoals);
+  const prevColors=normalizeHeaderGoalColors(state.settings?.headerGoalColors,prevGoals.length);
   closeDialog($('#headerGoalsDlg'));
-  if(JSON.stringify(goals)===JSON.stringify(prev))return;
+  if(JSON.stringify(goals)===JSON.stringify(prevGoals)&&JSON.stringify(colors)===JSON.stringify(prevColors))return;
   state.settings.headerGoals=goals;
-  save(); // Same revision-checked Firebase save flow used by calendar events.
+  state.settings.headerGoalColors=colors;
+  save(); // Keep original revision-checked Firebase synchronization untouched.
 };
 
 
@@ -6752,7 +6886,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.121',
+    appVersion:'2.122',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
