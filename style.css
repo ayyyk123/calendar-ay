@@ -4316,3 +4316,74 @@ button,.primaryViewBtn,.dateNavButtons button,.views button,#sidebar .secHead bu
     background:#6758e9!important;color:#fff!important;border-color:#6758e9!important;
   }
 }
+
+
+/* v2.120 — editable highlighter-style goals, matching the two marked toolbar gaps. */
+body:not(.todayWorkPopup) #headerGoals{
+  box-sizing:border-box!important;display:inline-flex!important;align-items:center!important;
+  justify-content:center!important;gap:5px!important;
+  flex:1 1 100px!important;min-width:0!important;max-width:none!important;
+  height:29px!important;min-height:29px!important;padding:0 4px!important;margin:0!important;
+  border:0!important;border-radius:0!important;box-shadow:none!important;
+  background:transparent!important;cursor:pointer!important;
+  color:#343a44!important;font-family:"Malgun Gothic","맑은 고딕",sans-serif!important;
+  font-size:12px!important;font-weight:400!important;line-height:1.55!important;
+  white-space:nowrap!important;
+}
+body:not(.todayWorkPopup) #headerGoalsHighlight{
+  display:block;max-width:100%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  padding:0 2px;font:inherit!important;letter-spacing:0!important;
+  background:linear-gradient(to bottom,transparent 27%,#fff2a1 27%,#fff2a1 92%,transparent 92%);
+}
+body:not(.todayWorkPopup) #headerGoals.isEmpty #headerGoalsHighlight{
+  background:none;color:#939aa6;font-size:11px!important;
+}
+body:not(.todayWorkPopup) #headerGoals .headerGoalsPencil{
+  flex:none;font-family:inherit;font-size:11px;color:#9197a1;
+  opacity:0;transition:opacity .15s;
+}
+body:not(.todayWorkPopup) #headerGoals:hover .headerGoalsPencil,
+body:not(.todayWorkPopup) #headerGoals:focus-visible .headerGoalsPencil,
+body:not(.todayWorkPopup) #headerGoals.isEmpty .headerGoalsPencil{opacity:1}
+body:not(.todayWorkPopup) #headerGoals:focus-visible{outline:2px solid #9b8cf2!important;outline-offset:1px}
+.headerGoalsDlg{max-width:min(92vw,490px)}
+.headerGoalsDlg form{min-width:0}
+.headerGoalsDlg label{display:block;margin:10px 0 5px;color:#525f6b;font-size:12px;font-weight:500}
+.headerGoalsDlg textarea{display:block;width:100%;box-sizing:border-box;min-height:116px;padding:9px 10px;
+  border:1px solid #cfd4dc;border-radius:5px;resize:vertical;font-size:13px;line-height:1.65;
+  color:#343a44;background:#fff;font-family:"Malgun Gothic","맑은 고딕",sans-serif}
+.headerGoalsDlg textarea:focus{outline:2px solid #aab2f8;outline-offset:0}
+@media(min-width:1201px){
+  body:not(.todayWorkPopup)>header nav #headerGoals{
+    order:3!important;flex:1 1 110px!important;min-width:0!important;margin:0 4px!important;
+  }
+}
+@media(min-width:761px) and (max-width:1200px){
+  body:not(.todayWorkPopup)>header{
+    grid-template-columns:auto minmax(0,1fr) auto auto auto!important;
+    grid-template-areas:
+      "brand nav nav badge save"
+      "work goal goal tools tools"!important;
+  }
+  body:not(.todayWorkPopup)>header #headerGoals{
+    grid-area:goal!important;justify-self:stretch!important;align-self:center!important;
+    width:100%!important;min-width:0!important;max-width:100%!important;flex:none!important;
+  }
+}
+@media(max-width:760px){
+  body:not(.todayWorkPopup)>header #headerGoals{display:none!important}
+  body:not(.todayWorkPopup).hasHeaderGoals{--header-h:151px!important}
+  body:not(.todayWorkPopup).hasHeaderGoals>header{
+    grid-template-rows:32px 32px 32px 24px!important;
+    grid-template-areas:
+      "brand badge save menu"
+      "mainbar mainbar mainbar mainbar"
+      "toolsbar toolsbar toolsbar toolsbar"
+      "goal goal goal goal"!important;
+  }
+  body:not(.todayWorkPopup).hasHeaderGoals>header #headerGoals{
+    display:inline-flex!important;grid-area:goal!important;justify-self:stretch!important;
+    width:100%!important;height:24px!important;min-height:24px!important;
+    justify-content:flex-start!important; padding-left:6px!important;
+  }
+}

@@ -68,8 +68,14 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 await setPersistence(auth, browserLocalPersistence);
 
+// Each line is a separate goal; keep the shared Firebase field bounded and safe.
+function normalizeHeaderGoals(raw){
+  const lines=Array.isArray(raw)?raw:(typeof raw==='string'?raw.split(/\r?\n/):[]);
+  return lines.map(line=>String(line??'').replace(/\s+/g,' ').trim().slice(0,120)).filter(Boolean).slice(0,10);
+}
+
 const defaultState = () => ({
-  version: '2.119',
+  version: '2.120',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -82,7 +88,7 @@ const defaultState = () => ({
   diary: {},
   actualWork: {},
   workMemos: {},
-  settings: { hiddenCalendars: [], weekdayWidths:[100,100,100,100,100,100,100], weekdayWidthMode:'ratio', weekdayWidthReference:0, fixedPanelsCollapsed: { recurring:false, archivedRecurring:true, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, archivedRecurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','dday','diary'], sidebarSectionsCollapsed:{}, laneHeights:{}, laneCollapsed:{}, laneLabelWidth:72, mobileSectionsCollapsed:{}, dayLaneHeights:{}, dayLaneManual:{}, workloadRange:'week', weekViewMode:'detailed', monthShowCommonWithFocus:true, selectedDdayId:'' }
+  settings: { headerGoals: [], hiddenCalendars: [], weekdayWidths:[100,100,100,100,100,100,100], weekdayWidthMode:'ratio', weekdayWidthReference:0, fixedPanelsCollapsed: { recurring:false, archivedRecurring:true, manual:false, flexible:false, purchase:false, payment:false }, sidebarCalendarGroupsCollapsed: { recurring:{}, archivedRecurring:{}, manual:{}, flexible:{}, payment:{} }, sidebarSectionOrder:['calendar','fixed','flexible','purchase','payment','dday','diary'], sidebarSectionsCollapsed:{}, laneHeights:{}, laneCollapsed:{}, laneLabelWidth:72, mobileSectionsCollapsed:{}, dayLaneHeights:{}, dayLaneManual:{}, workloadRange:'week', weekViewMode:'detailed', monthShowCommonWithFocus:true, selectedDdayId:'' }
 });
 
 let state = defaultState();
@@ -366,7 +372,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '2.119',
+    version: '2.120',
     calendars,
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
@@ -476,6 +482,7 @@ function normalizeState(raw){
       workloadRange: ['week','month','year'].includes(s.settings?.workloadRange) ? s.settings.workloadRange : 'week',
       weekViewMode: s.settings?.weekViewMode==='compact' ? 'compact' : 'detailed',
       monthShowCommonWithFocus: s.settings?.monthShowCommonWithFocus!==false,
+      headerGoals: normalizeHeaderGoals(s.settings?.headerGoals),
       selectedDdayId: typeof s.settings?.selectedDdayId==='string' ? s.settings.selectedDdayId : ''
     }
   };
@@ -4933,6 +4940,7 @@ window.addEventListener('storage',e=>{
 });
 
 function render(){
+  renderHeaderGoals();
   const sidebar=$('#sidebar'), main=$('#main');
   const keep={sidebarTop:sidebar?.scrollTop||0,sidebarLeft:sidebar?.scrollLeft||0,mainTop:main?.scrollTop||0,mainLeft:main?.scrollLeft||0};
   renderSide();
@@ -6332,6 +6340,38 @@ $('#prev').onclick=()=>{ const step=view==='week'?7:view==='2week'?14:view==='3w
 $('#next').onclick=()=>{ const step=view==='week'?7:view==='2week'?14:view==='3week'?21:view==='4week'?28:1; cursor=(view==='month'||view==='diary')?new Date(cursor.getFullYear(),cursor.getMonth()+1,1):add(cursor,step); mobileSelectedDate=''; render(); };
 $('#today').onclick=()=>{cursor=new Date();mobileSelectedDate=ds(new Date());render();};
 
+function renderHeaderGoals(){
+  const goals=normalizeHeaderGoals(state.settings?.headerGoals);
+  const el=$('#headerGoals'), text=$('#headerGoalsHighlight');
+  if(!el||!text)return;
+  const hasGoals=goals.length>0;
+  text.textContent=hasGoals?goals.join('  ·  '):'＋ 목표 입력';
+  el.classList.toggle('isEmpty',!hasGoals);
+  el.title=hasGoals?goals.join('\n')+'\n클릭해서 목표 수정':'클릭해서 목표 입력';
+  document.body.classList.toggle('hasHeaderGoals',hasGoals);
+}
+function openHeaderGoalsEditor(){
+  const input=$('#headerGoalsInput');
+  if(!input)return;
+  input.value=normalizeHeaderGoals(state.settings?.headerGoals).join('\n');
+  openDialog($('#headerGoalsDlg'));
+  input.focus();
+}
+$('#headerGoals').onclick=openHeaderGoalsEditor;
+$('#editHeaderGoalsSettings').onclick=()=>{closeDialog($('#settingsDlg'));openHeaderGoalsEditor();};
+$('#headerGoalsCancel').onclick=()=>closeDialog($('#headerGoalsDlg'));
+$('#headerGoalsClear').onclick=()=>{const input=$('#headerGoalsInput');input.value='';input.focus();};
+$('#headerGoalsForm').onsubmit=e=>{
+  e.preventDefault();
+  const goals=normalizeHeaderGoals($('#headerGoalsInput').value);
+  const prev=normalizeHeaderGoals(state.settings?.headerGoals);
+  closeDialog($('#headerGoalsDlg'));
+  if(JSON.stringify(goals)===JSON.stringify(prev))return;
+  state.settings.headerGoals=goals;
+  save(); // Same revision-checked Firebase save flow used by calendar events.
+};
+
+
 // v2.115: 모바일에서는 헤더 버튼만 두 줄로 재배치한다.
 // HTML 요소 자체를 이동하므로 기존 이벤트 연결과 Firebase 데이터 처리에는 영향이 없다.
 function syncMobileHeaderToolbars(){
@@ -6382,7 +6422,7 @@ function syncDesktopCompactHeader(){
   const workHost=$('#desktopCompactWork');
   const toolsHost=$('#desktopCompactTools');
   if(!header||!workHost||!toolsHost)return;
-  // v2.119: narrowed desktop: top row title/date/status/save;
+  // v2.120: narrowed desktop: top row title/date/status/save;
   // bottom row view selector/work button/shortcuts. Reuse existing elements
   // so click handlers and saved calendar data stay unchanged.
   const compact=window.matchMedia('(min-width:761px) and (max-width:1200px)').matches;
@@ -6397,10 +6437,22 @@ function syncDesktopCompactHeader(){
   if(badge && badge.parentElement!==header)header.appendChild(badge);
   if(saveBtn && saveBtn.parentElement!==header)header.appendChild(saveBtn);
 }
+function syncHeaderGoalsPlacement(){
+  const header=document.querySelector('header'),nav=header?.querySelector('nav');
+  const goals=$('#headerGoals'),viewWrap=$('#currentViewWrap');
+  if(!header||!nav||!goals||!viewWrap)return;
+  // Wide desktop: between date controls and view buttons.
+  // Narrow desktop: second row, between view/work buttons and shortcuts.
+  // Mobile: separate short row, only when goals have been saved.
+  if(window.matchMedia('(min-width:1201px)').matches){
+    if(goals.parentElement!==nav || goals.nextElementSibling!==viewWrap)nav.insertBefore(goals,viewWrap);
+  }else if(goals.parentElement!==header){header.appendChild(goals);}
+}
 function syncHeaderResponsivePlacement(){
   syncMobileHeaderToolbars();
   syncSaveControlsPlacement();
   syncDesktopCompactHeader();
+  syncHeaderGoalsPlacement();
 }
 syncHeaderResponsivePlacement();
 window.addEventListener('resize',syncHeaderResponsivePlacement,{passive:true});
@@ -6665,7 +6717,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.119',
+    appVersion:'2.120',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
