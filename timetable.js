@@ -1,4 +1,4 @@
-/* v2.125 · Independent weekly timetable module.
+/* v2.126 · Independent weekly timetable module.
    Only the state.timetable subtree is written; host calendar occurrences are read-only. */
 const WD=['일','월','화','수','목','금','토'];
 const WEEK=[1,2,3,4,5,6,0];
@@ -82,22 +82,35 @@ export function createTimetableFeature({getState,save,buildOccurrenceMap,getCurs
     const tiny=rawHeight<=20;
     return `<button type="button" class="ttBlock ${tiny?'ttBlockTiny':''}" data-tt-block="${escapeHtml(b.id)}" style="top:${y};height:${h};background:${b.color}" title="${escapeHtml(b.start+'–'+b.end+' '+b.title)}" aria-label="${escapeHtml(b.title)} ${b.start}~${b.end}${canEdit?' 수정':''}"><span class="ttBlockTitle">${escapeHtml(b.title)}</span><span class="ttBlockHours">${escapeHtml(b.start)}–${escapeHtml(b.end)}</span></button>`;
   }
-  function markedMinutes(r){
+  // Build visible ticks from the selected timetable, without writing them into
+  // extraTicks. Editing, deleting, or copying a block therefore updates ticks
+  // immediately; manual ticks remain independently editable and persistent.
+  function markedMinutes(r,days=[]){
     const values=new Set([r.start,r.end]);
     for(let m=Math.ceil(r.start/60)*60;m<=r.end;m+=60)values.add(m);
-    for(const t of (data().extraTicks||[])){const m=minutes(t);if(m>r.start&&m<r.end)values.add(m);}
+    for(const t of (data().extraTicks||[])){
+      const m=minutes(t);if(Number.isFinite(m)&&m>r.start&&m<r.end)values.add(m);
+    }
+    for(const blocks of days){
+      for(const block of (blocks||[])){
+        for(const time of [block.start,block.end]){
+          const m=minutes(time);
+          if(Number.isFinite(m)&&m>=r.start&&m<=r.end)values.add(m);
+        }
+      }
+    }
     return [...values].sort((a,b)=>a-b);
   }
-  function axisMarks(r,fit){
+  function axisMarks(r,fit,days=[]){
     const pos=m=>fit?`${(m-r.start)/(r.end-r.start)*100}%`:`${(m-r.start)*r.ppm}px`;
-    const ticks=markedMinutes(r);
+    const ticks=markedMinutes(r,days);
     return {
-      marks:ticks.map(m=>`<span class="ttAxisTick ${m%60===0?'major':'detail'}" style="top:${pos(m)}">${clock(m)}</span>`).join(''),
+      marks:ticks.map(m=>`<span class="ttAxisTick ${m%60===0?'major':'detail'}" style="top:${pos(m)}" title="${clock(m)}">${clock(m)}</span>`).join(''),
       lines:ticks.map(m=>`<span class="ttTrackLine ${m%60===0?'major':'custom'}" style="top:${pos(m)}"></span>`).join('')
     };
   }
   function gridHtml(days,r,editable=true){
-    const {marks,lines}=axisMarks(r,true);
+    const {marks,lines}=axisMarks(r,true,days);
     return `<div class="ttWeekBoard"><div class="ttWeekGrid"><div class="ttCorner">시간</div>${WEEK.map(d=>`<div class="ttGridHead">${WD[d]}요일</div>`).join('')}<div class="ttTimeAxis">${marks}</div>${WEEK.map((d,i)=>`<div class="ttDayTrack" data-tt-track="${d}">${lines}${(days[i]||[]).map(b=>blockHtml(b,r,editable,true)).join('')}</div>`).join('')}</div></div>`;
   }
   function draw(){
@@ -113,9 +126,9 @@ export function createTimetableFeature({getState,save,buildOccurrenceMap,getCurs
         <button type="button" id="ttNewBlock">＋ 시간 등록</button>
         <div class="ttCopyTools"><select id="ttCopyDay" aria-label="복사할 요일">${WEEK.map(d=>`<option value="${d}">${WD[d]}요일 전체</option>`).join('')}</select><button type="button" id="ttCopyDayBtn">요일 복사</button></div>
         <div class="ttRangeTools"><label for="ttRangeStart">시작</label><input type="time" id="ttRangeStart" aria-label="표시 시작시간" value="${data().range.start}" step="600"><label for="ttRangeEnd">종료</label><input type="time" id="ttRangeEnd" aria-label="표시 종료시간" value="${data().range.end}" step="600"></div>
-        <button type="button" id="ttEditTicks" title="1시간 눈금 외에 필요한 시간만 10분 단위로 추가">🕒 눈금 편집</button>
+        <button type="button" id="ttEditTicks" title="등록한 일정 시작·종료 눈금은 자동 표시 · 다른 눈금은 수동 추가">🕒 눈금 편집</button>
       </div>
-      ${gridHtml(days,r)}<div class="ttFootnote">기본 눈금은 1시간 단위 · 필요한 시각만 눈금 편집에서 추가 · 블록은 실제 분 단위 길이에 비례</div>
+      ${gridHtml(days,r)}<div class="ttFootnote">정각 눈금은 1시간 간격 · 일정 시작·종료 시각은 자동 표시 · 추가 눈금은 수동 편집</div>
     </div>`;
     host.querySelector('#ttClose').onclick=close;
     host.querySelectorAll('[data-tt-case]').forEach(b=>b.onclick=()=>{ui.selected=b.dataset.ttCase;draw();});
@@ -216,9 +229,9 @@ export function createTimetableFeature({getState,save,buildOccurrenceMap,getCurs
   function openTicks(){
     const extra=(data().extraTicks||[]);
     ticksDlg.innerHTML=`<div class="ttModal ttTicksModal"><header><h3>🕒 시간 눈금 편집</h3><button type="button" data-close="1">×</button></header>
-      <p class="ttTicksIntro">기본은 정각마다 1시간 눈금이 보여. 필요한 시간만 추가하면 시간표를 짧고 깔끔하게 볼 수 있어. 실제 일정 시간은 그대로 유지돼.</p>
+      <p class="ttTicksIntro">기본은 1시간 눈금이고, 등록한 일정의 시작·종료 시각은 자동으로 눈금에 표시돼. 아래에서는 일정과 관계없이 항상 표시할 눈금만 추가·삭제할 수 있어.</p>
       <form id="ttTickForm"><label>추가할 시각 (10분 단위)<input type="time" id="ttTickTime" name="tickTime" step="600" value="06:30" required></label><button type="submit" class="ttPrimary">＋ 눈금 추가</button></form>
-      <div class="ttTickList">${extra.length?extra.map(t=>`<div class="ttTickItem"><span>${escapeHtml(t)}</span><button type="button" data-tick-remove="${escapeHtml(t)}" aria-label="${escapeHtml(t)} 눈금 삭제">×</button></div>`).join(''):'<span class="ttMuted">추가 눈금이 없어. 정각 눈금만 표시돼.</span>'}</div><footer class="ttManageFooter"><span></span><button type="button" data-close="1">닫기</button></footer></div>`;
+      <div class="ttTickList">${extra.length?extra.map(t=>`<div class="ttTickItem"><span>${escapeHtml(t)}</span><button type="button" data-tick-remove="${escapeHtml(t)}" aria-label="${escapeHtml(t)} 눈금 삭제">×</button></div>`).join(''):'<span class="ttMuted">수동 추가 눈금이 없어. 일정의 시작·종료 시각은 자동 표시돼.</span>'}</div><footer class="ttManageFooter"><span></span><button type="button" data-close="1">닫기</button></footer></div>`;
     show(ticksDlg);
     ticksDlg.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>hide(ticksDlg));
     ticksDlg.querySelector('#ttTickForm').onsubmit=e=>{
@@ -290,7 +303,7 @@ export function createTimetableFeature({getState,save,buildOccurrenceMap,getCurs
     const labels=found.matched.map(c=>`${c.name} (우선순위 ${c.priority})`).join(' · ');
     ui.lastPreview=date;
     const range=minmax([blocks]);const height=(range.end-range.start)*range.ppm;
-    const {marks,lines}=axisMarks(range,false);
+    const {marks,lines}=axisMarks(range,false,[blocks]);
     previewDlg.innerHTML=`<div class="ttPreviewWindow"><header><div><h2>🕒 ${formatDay(date)}</h2><p>적용 시간표: <strong>${escapeHtml(s.name)}</strong></p>${labels?`<small>충족 조건: ${escapeHtml(labels)}</small>`:''}</div><button data-close="1" type="button">×</button></header><div class="ttPreviewActions"><button id="ttPreviewEdit" type="button">주간 시간표 크게 보기·편집</button></div>${blocks.length?`<div class="ttPreviewScroll"><div class="ttPreviewTrack"><div class="ttTimeAxis" style="height:${height}px">${marks}</div><div class="ttDayTrack" style="height:${height}px">${lines}${blocks.map(b=>blockHtml(b,range,false)).join('')}</div></div></div>`:'<div class="ttEmptyDay">이 경우의 수에 등록된 시간표가 없어. 주간 편집 화면에서 추가할 수 있어.</div>'}</div>`;
     show(previewDlg);previewDlg.querySelector('[data-close]').onclick=()=>hide(previewDlg);
     previewDlg.querySelector('#ttPreviewEdit').onclick=()=>{hide(previewDlg);open(s.id);};
