@@ -4495,3 +4495,9 @@ body:not(.todayWorkPopup) #headerGoalsHighlight .headerGoalRow .headerGoalLine,
  .headerGoalsDlg button.headerGoalColorBtn{font-size:11px!important;min-height:32px!important}
  .headerGoalsDlg input.headerGoalEditInput{font-size:16px!important}
 }
+
+/* Anniversary count selector, v2.123 */
+.anniversaryCountFields{border:1px solid #e8edf2;background:#f9fafc;border-radius:6px;padding:9px 11px;margin:5px 0 9px;}
+.anniversaryCountFields label{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:400;}
+.anniversaryCountFields small{display:block;font-size:11px;font-weight:400;color:#66758a;line-height:1.55;margin-top:5px;}
+.anniversaryCountFields.hidden{display:none!important;}

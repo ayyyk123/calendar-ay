@@ -1,3 +1,4 @@
+import { createTimetableFeature, defaultTimetable, normalizeTimetable } from './timetable.js?v=2.123';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
 import {
   getAuth, setPersistence, browserLocalPersistence, onAuthStateChanged,
@@ -90,13 +91,14 @@ function normalizeHeaderGoalColors(raw,goalCount){
 }
 
 const defaultState = () => ({
-  version: '2.122',
+  version: '2.123',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
     {id:'family',name:'가족/개인',color:'#f6e8a6',order:3,period:'저녁',capacity:2,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:2,unknown:false}])),parentId:''}
   ],
   events: [],
+  timetable: defaultTimetable(),
   fixed: [],
   flexible: [],
   purchases: [],
@@ -387,8 +389,9 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '2.122',
+    version: '2.123',
     calendars,
+    timetable: normalizeTimetable(s.timetable),
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
       endDate:e.endDate||e.date,
@@ -396,6 +399,8 @@ function normalizeState(raw){
       hours:Number(e.hours)||0,
       noDuration:!!e.noDuration,
       kind:e.kind||'event',
+      anniversaryCountEnabled:e.kind==='anniversary'&&!!e.anniversaryCountEnabled,
+      anniversaryOriginDate:/^\d{4}-\d{2}-\d{2}$/.test(String(e.anniversaryOriginDate||'')) ? String(e.anniversaryOriginDate) : String(e.date),
       important:!!e.important,
       availabilityBlock:!!e.availabilityBlock,
       availabilityTargetCalId:typeof e.availabilityTargetCalId==='string'?e.availabilityTargetCalId:'',
@@ -1399,6 +1404,18 @@ function repeatRuleLabel(e){
   return repeat;
 }
 
+// Optional anniversary count. Keep the stored event title unchanged; calculate only at render time.
+function anniversaryDisplayTitle(e, forDate){
+  const original=String(e?.title||'');
+  if(e?.kind!=='anniversary'||!e.anniversaryCountEnabled) return original;
+  const anchor=String(e.anniversaryOriginDate||e.date||'');
+  const date=String(forDate||e._renderDate||e._occurrenceStart||e.date||'');
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(anchor)||!/^\d{4}-\d{2}-\d{2}$/.test(date))return original;
+  const years=Number(date.slice(0,4))-Number(anchor.slice(0,4));
+  // The original date is the wedding day, not the 0th anniversary.
+  return years>=1 ? `${original} (${years}주년)` : original;
+}
+
 function kindPrefix(e){
   if(e.kind==='appointment') return '◆ ';
   if(e.kind==='todo') return '☐ ';
@@ -1493,7 +1510,7 @@ function eventItemHtml(e, compact=false){
   const prepDisplayTitle=done?`✓ ${basePrepTitle}`:basePrepTitle;
   const shownTitle=prepDay
     ? prepDisplayTitle
-    : (deadlineItem?`마감 · ${e.title}`:e.title)+(e.memoOriginalDate&&e.memoOriginalDate!==renderDate?` (${Number(e.memoOriginalDate.slice(5,7))}/${Number(e.memoOriginalDate.slice(8,10))})`:'');
+    : (deadlineItem?`마감 · ${e.title}`:anniversaryDisplayTitle(e,renderDate))+(e.memoOriginalDate&&e.memoOriginalDate!==renderDate?` (${Number(e.memoOriginalDate.slice(5,7))}/${Number(e.memoOriginalDate.slice(8,10))})`:'');
   const detail=[];
   if(prepDay){ detail.push(preparationSummary(e)); if(prepNote) detail.push(prepNote); }
   else if(!e.allDay && e.start) detail.push(e.start + (e.end?`–${e.end}`:''));
@@ -2456,7 +2473,7 @@ function renderDdays(){
   const list=rows.map(({e,target,diff})=>{
     const selected=e.id===selectedId;
     const ddayText=diff===0?'D-Day':diff>0?`D-${diff}`:`D+${Math.abs(diff)}`;
-    return `<div class="ddayRow ${selected?'selectedDday':''}" data-eid="${esc(e.id)}" role="button" tabindex="0" title="클릭: 달력 D-Day 기준 ${selected?'해제':'선택'}"><div class="ddayInfo">${esc(e.title)}<small>${target}</small>${selected?'<em class="ddaySelectedTag">기준</em>':''}</div><div class="ddayActions"><b>${ddayText}</b><button type="button" class="ddayEditBtn" data-dday-edit="${esc(e.id)}" title="D-Day 수정" aria-label="D-Day 수정">✎</button></div></div>`;
+    return `<div class="ddayRow ${selected?'selectedDday':''}" data-eid="${esc(e.id)}" role="button" tabindex="0" title="클릭: 달력 D-Day 기준 ${selected?'해제':'선택'}"><div class="ddayInfo">${esc(anniversaryDisplayTitle(e,target))}<small>${target}</small>${selected?'<em class="ddaySelectedTag">기준</em>':''}</div><div class="ddayActions"><b>${ddayText}</b><button type="button" class="ddayEditBtn" data-dday-edit="${esc(e.id)}" title="D-Day 수정" aria-label="D-Day 수정">✎</button></div></div>`;
   }).join('')||`<div class="empty">${active==='elapsed'?'지난 D-Day가 없습니다.':'다가올 D-Day가 없습니다.'}</div>`;
   $('#ddayList').innerHTML=tabs+`<div class="ddayEntries">${list}</div>`;
   $$('#ddayList [data-dday-tab]').forEach(btn=>btn.onclick=()=>{
@@ -2779,7 +2796,7 @@ function openEventPopover(anchor,id,occ){
   const occurrence=occ||base.date;
   const e={...base,_occurrenceStart:occurrence,_renderDate:anchor?.dataset?.renderDate||occurrence};
   eventPopoverState={id,occ:occurrence};
-  $('#eventPopoverTitle').textContent=base.title;
+  $('#eventPopoverTitle').textContent=anniversaryDisplayTitle(e,occurrence);
   $('#eventPopoverKind').textContent=eventKindLabel(base);
   const meta=[];
   meta.push(occurrence);
@@ -4981,6 +4998,7 @@ function render(){
   }
   ({week:renderWeek,'2week':()=>renderMultiWeek(2),'3week':()=>renderMultiWeek(3),'4week':()=>renderMultiWeek(4),month:renderMonth,day:renderDay,list:renderList,diary:renderDiaryMain}[view]||renderWeek)();
   compactDailyEventsInCalendar();
+  timetableFeature.injectIcons();
   if(workGroupPopupState)refreshWorkGroupPopup();
   if(workMemoVisible) renderWorkMemoPanel();
   const sidebar2=$('#sidebar'), main2=$('#main');
@@ -5024,6 +5042,8 @@ function defaultAvailabilityTargetForSelectedCalendar(){
   return root?.id || topLevelCals()[0]?.id || '';
 }
 function updateKindUI(){
+  const anniversary=$('#kind').value==='anniversary';
+  $('#anniversaryCountFields')?.classList.toggle('hidden',!anniversary);
   const payment=$('#kind').value==='payment';
   $('#paymentFields').classList.toggle('hidden',!payment);
   $('#carryEvent').classList.toggle('paymentHidden',payment);
@@ -5458,7 +5478,7 @@ function openEvent(date,id,options={}){
   $('#date').classList.toggle('seriesAnchorReadonly',sidebarSeriesEditActive && editingRecurring);
   $('#date').title=sidebarSeriesEditActive && editingRecurring?'기존 반복 시작일 (수정 적용일은 저장 다음 화면에서 선택)':'';
   $('#allDay').checked=e?.allDay??true; $('#start').value=e?.start||''; $('#end').value=e?.end||''; setDurationInputs(e?.hours??1); $('#noDuration').checked=paymentPreset?true:(e ? !!e.noDuration : true);
-  $('#kind').value=e?.kind||(paymentPreset?'payment':(quickPreset?'todo':(commonPreset?'appointment':(recurringPreset?'todo':'event')))); $('#place').value=e?.place||''; $('#repeat').value=e?.repeat||(paymentPreset?'monthly':(recurringPreset?'weekly':'none')); lastRepeatFormType=$('#repeat').value; $('#memo').value=e?.memo||'';
+  $('#kind').value=e?.kind||(paymentPreset?'payment':(quickPreset?'todo':(commonPreset?'appointment':(recurringPreset?'todo':'event')))); $('#place').value=e?.place||''; $('#anniversaryCountEnabled').checked=!!e?.anniversaryCountEnabled; $('#repeat').value=e?.repeat||(paymentPreset?'monthly':(recurringPreset?'weekly':'none')); lastRepeatFormType=$('#repeat').value; $('#memo').value=e?.memo||'';
   // 새 일정은 이전에 열었던 일정의 준비/마감 정보를 절대 이어받지 않는다.
   if(e){
     prepDraftNotes={...(e.prepDailyNotes||{})};
@@ -5789,6 +5809,7 @@ $('#eventForm').onsubmit=e=>{
   if($('#repeat').value!=='none' && $('#repeatEndType').value==='date' && !$('#repeatEndDate').value){ alert('반복 종료 날짜를 선택하세요.'); return; }
   if($('#repeat').value!=='none' && $('#repeatEndType').value==='date' && $('#repeatEndDate').value<comparisonAnchor){ alert('반복 종료 날짜는 시작 날짜보다 빠를 수 없습니다.'); return; }
   if($('#repeat').value==='yearly' && $('#yearlyCalendar').value==='lunar' && !lunarFormatter){ alert('현재 브라우저에서는 음력 날짜 변환을 지원하지 않습니다.'); return; }
+  if($('#kind').value==='anniversary' && $('#anniversaryCountEnabled').checked && repeat!=='yearly'){ alert('주년 자동 표시는 반복을 ‘매년’으로 설정한 기념일에 사용할 수 있어.');return; }
   const prepEnabled=!!$('#prepEnabled').checked && !['anniversary','payment'].includes($('#kind').value);
   if(prepEnabled && $('#repeat').value!=='none'){ alert('준비기간이 있는 기한 일정은 반복 없음으로 등록해 주세요.'); return; }
   if(prepEnabled && !$('#prepDeadline').value){ alert('기한 날짜를 선택하세요.'); return; }
@@ -5817,6 +5838,8 @@ $('#eventForm').onsubmit=e=>{
     endDate:internalEndDate, allDay:$('#allDay').checked,
     start:$('#allDay').checked?'':$('#start').value, end:$('#allDay').checked?'':$('#end').value,
     hours:$('#kind').value==='payment'?0:(timedHoursFromForm()??getDurationInputs()), noDuration:$('#kind').value==='payment'?true:($('#noDuration').checked && timedHoursFromForm()===null), kind:$('#kind').value, place:$('#place').value.trim(),
+    anniversaryCountEnabled:$('#kind').value==='anniversary' && $('#anniversaryCountEnabled').checked,
+    anniversaryOriginDate:$('#kind').value==='anniversary' ? (old?.anniversaryOriginDate || old?.date || $('#date').value) : '',
     paymentAmount:$('#kind').value==='payment'?Math.max(0,Number($('#paymentAmount').value)||0):0, paymentMethod:$('#kind').value==='payment'?$('#paymentMethod').value.trim():'',
     prepEnabled, prepDeadline:prepEnabled?$('#prepDeadline').value:'', prepMode:prepEnabled&&$('#prepMode').value==='custom'?'custom':'auto', prepAutoEnabled:prepEnabled&&!!prepDraftAutoEnabled, prepDays:prepEnabled?Math.max(1,Number($('#prepDays').value)||1):5, prepWeekdaysOnly:prepEnabled&&!!$('#prepWeekdaysOnly').checked, prepIncludeDeadline:prepEnabled&&!!$('#prepIncludeDeadline').checked, prepDailyNotes:prepEnabled&&prepDraftAutoEnabled?Object.fromEntries(prepFormDates().map(d=>[d,String(prepDraftNotes[d]||'').trim()]).filter(([,v])=>v)):{}, prepTasks:prepEnabled?prepDraftTasks.map(x=>({...x})):[], prepDone:prepEnabled?{...(old?.prepDone||{})}:{}, prepMissed:prepEnabled?{...(old?.prepMissed||{})}:{}, prepMoves:prepEnabled?{...prepDraftMoves}:{},
     availabilityBlock:!['payment','anniversary'].includes($('#kind').value) && !!$('#availabilityBlock').checked,
@@ -6013,6 +6036,7 @@ $('#togglePurchase').onclick=()=>{ state.settings.fixedPanelsCollapsed.purchase=
 $('#purchaseForm').onsubmit=e=>{ e.preventDefault(); const id=$('#purchaseId').value, old=state.purchases.find(x=>x.id===id), maxOrder=(state.purchases||[]).reduce((m,p)=>Math.max(m,Number(p.order)||0),-1), obj={id:id||uid(),name:$('#purchaseName').value.trim(),qty:Math.max(1,Number($('#purchaseQty').value)||1),dueDate:$('#purchaseDueDate').value||'',memo:$('#purchaseMemo').value,done:false,createdAt:old?.createdAt||new Date().toISOString(),order:old?.order??(maxOrder+1)}; if(!obj.name) return; if(id) state.purchases[state.purchases.findIndex(x=>x.id===id)]=obj; else state.purchases.push(obj); closeDialog($('#purchaseDlg')); save(); };
 $('#cancelPurchase').onclick=()=>closeDialog($('#purchaseDlg'));
 $('#deletePurchase').onclick=()=>{ const id=$('#purchaseId').value; if(id&&confirm('이 구매항목을 삭제할까요?')){ state.purchases=state.purchases.filter(x=>x.id!==id); closeDialog($('#purchaseDlg')); save(); } };
+$('#anniversaryCountEnabled').addEventListener('change',()=>{if($('#anniversaryCountEnabled').checked && $('#repeat').value==='none'){$('#repeat').value='yearly';handleRepeatTypeChange();}});
 $('#allDay').onchange=updateAllDayUI; $('#noDuration').onchange=()=>updateDurationMode(); $('#kind').onchange=()=>{updateKindUI(); updateMemoDailyOptIn();}; $('#availabilityBlock').onchange=updateAvailabilityBlockUI; $('#cal').onchange=()=>{ updateMemoDailyOptIn(); if($('#availabilityBlock').checked){ const v=defaultAvailabilityTargetForSelectedCalendar(); if([...$('#availabilityTarget').options].some(o=>o.value===v)) $('#availabilityTarget').value=v; } }; $('#repeatInterval').addEventListener('input',updateMemoDailyOptIn); $('#memoTaskPlacement').addEventListener('change',()=>{memoCategoryManuallySet=true;updateMemoDailyOptIn();}); $('#start').onchange=updateDurationMode; $('#end').onchange=updateDurationMode; $('#endDate').onchange=()=>{ if($('#repeat').value!=='none') syncRepeatEndFromTop(); updateDurationMode(); }; $('#repeat').onchange=handleRepeatTypeChange;
 $('#prepEnabled').onchange=()=>{ if($('#prepEnabled').checked){ if(!$('#eid').value){ prepDraftNotes={}; prepDraftTasks=[]; prepDraftMoves={}; prepDraftAutoEnabled=$('#prepMode')?.value!=='custom'; } $('#prepDeadline').value=$('#date').value||ds(cursor); $('#repeat').value='none'; updateRepeatUI(); } updatePrepUI(); };
 $('#prepDeadline').onchange=()=>{ if($('#prepDeadline').value){ $('#date').value=$('#prepDeadline').value; $('#endDate').value=$('#prepDeadline').value; updateDurationMode(); } updatePrepRepeatRuleUI(); renderPrepDailyRows(); };
@@ -6532,7 +6556,7 @@ function syncMobileHeaderToolbars(){
   if(!header||!nav||!views||!top||!bottom||!range||!dateNav||!viewWrap) return;
   const mobile=window.matchMedia('(max-width:760px)').matches;
   const work=$('#workMemoOpenBtn');
-  const shortcuts=['naverMailShortcut','accountBookShortcut','diaryMainShortcut','searchBtn','settingsBtn']
+  const shortcuts=['timetableOpenBtn','naverMailShortcut','accountBookShortcut','diaryMainShortcut','searchBtn','settingsBtn']
     .map(id=>document.getElementById(id)).filter(Boolean);
   if(mobile){
     [work,viewWrap].filter(Boolean).forEach(el=>top.appendChild(el));
@@ -6576,7 +6600,7 @@ function syncDesktopCompactHeader(){
   ['currentViewWrap','workMemoOpenBtn'].forEach(id=>{
     const el=document.getElementById(id);if(el)workHost.appendChild(el);
   });
-  ['naverMailShortcut','accountBookShortcut','diaryMainShortcut','searchBtn','settingsBtn'].forEach(id=>{
+  ['timetableOpenBtn','naverMailShortcut','accountBookShortcut','diaryMainShortcut','searchBtn','settingsBtn'].forEach(id=>{
     const el=document.getElementById(id);if(el)toolsHost.appendChild(el);
   });
   const badge=$('#saveBadge'),saveBtn=$('#manualSaveBtn');
@@ -6886,7 +6910,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.122',
+    appVersion:'2.123',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
@@ -6941,5 +6965,7 @@ $('#restoreFile').onchange=e=>restoreBackupFile(e.target.files?.[0]);
   const d=$(`#${id}`); d.addEventListener('cancel',()=>{});
 });
 
+const timetableFeature=createTimetableFeature({getState:()=>state,save:()=>save(),buildOccurrenceMap,getCursorDate:()=>ds(cursor)});
+timetableFeature.init();
 loadHolidayData();
 render();

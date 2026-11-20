@@ -1,0 +1,113 @@
+/* v2.123 timetable UI: isolated from the original calendar styles. */
+.ttOverlay{position:fixed;inset:0;z-index:35000;display:flex;align-items:center;justify-content:center;background:rgba(24,29,38,.39);padding:14px;box-sizing:border-box;font-family:'Malgun Gothic','맑은 고딕',sans-serif;color:#29313e;font-size:12px;font-weight:400}
+.ttOverlay.hidden{display:none!important}
+.ttOverlay button,.ttOverlay input,.ttOverlay select{font:inherit;font-weight:400;box-sizing:border-box}
+.ttOverlay button{cursor:pointer;border-radius:4px;border:1px solid #ced5e1;background:#fff;color:#334154;min-height:30px;padding:5px 10px}
+.ttOverlay button:hover{background:#f1f4fb}
+.ttOverlay button:focus-visible,.ttOverlay input:focus-visible,.ttOverlay select:focus-visible{outline:2px solid #6972db;outline-offset:1px}
+.ttOverlay .ttPrimary{background:#6459d9;border-color:#6459d9;color:#fff;font-weight:500}
+.ttOverlay .ttPrimary:hover{background:#5549c9;color:#fff}
+.ttOverlay .ttDanger{color:#bb4242;border-color:#e8cdcd}
+.ttWindow{display:flex;flex-direction:column;width:min(98vw,1730px);height:min(96dvh,1080px);min-height:450px;background:#fff;border:1px solid #e7eaf1;border-radius:8px;box-shadow:0 14px 60px #15203540;overflow:hidden}
+.ttWinHead,.ttPreviewWindow>header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 18px;border-bottom:1px solid #e7eaf1;flex:none;background:white}
+.ttWinHead h2,.ttPreviewWindow h2{font-size:18px;font-weight:500;margin:0 0 4px}
+.ttWinHead small,.ttPreviewWindow small{font-size:11px;color:#777f8e}
+.ttWinHead #ttClose,.ttModal>header button,.ttPreviewWindow>header button{border:0;background:transparent;font-size:24px;min-width:32px;padding:0}
+.ttCaseNav{display:flex;gap:5px;flex:none;align-items:center;padding:9px 14px 3px;overflow-x:auto;max-width:100%;box-sizing:border-box}
+.ttOverlay .ttCaseTab{flex:none;border-radius:3px;border-color:#e1e5ee;background:#f9fafd;padding:7px 12px;max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ttOverlay .ttCaseTab.selected{border-color:#655bdc;background:#f1efff;color:#4f43ba;font-weight:500}
+.ttOverlay .ttAddCase{flex:none;color:#5b4fbc;border-style:dashed}
+.ttActionBar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:8px 14px;border-bottom:1px solid #edf0f5;flex:none}
+.ttCaseInfo{font-size:11px;color:#6f7b8b;margin-right:auto}
+.ttActionBar select,.ttRangeBar input,.ttFormRow input,.ttFormRow select{min-height:30px;padding:3px 6px;border:1px solid #ccd4df;background:#fff;color:#273449;border-radius:4px}
+.ttRangeBar{display:flex;align-items:center;gap:12px;padding:6px 14px;color:#68768b;border-bottom:1px solid #e7eaf1;flex-wrap:wrap;font-size:11px;flex:none}
+.ttRangeBar label{display:flex;align-items:center;gap:5px;white-space:nowrap}
+.ttRangeBar input{height:29px;width:105px}
+.ttWeekBoard{overflow:auto;flex:1;min-height:0;overscroll-behavior:contain}
+.ttWeekGrid{display:grid;grid-template-columns:62px repeat(7,minmax(166px,1fr));grid-template-rows:36px auto;min-width:1240px;position:relative;background:white}
+.ttCorner,.ttGridHead{position:sticky;top:0;z-index:9;background:#f8f9fb;border-bottom:1px solid #d3dae5;display:flex;justify-content:center;align-items:center;font-weight:500;font-size:12px;color:#414c60}
+.ttCorner{left:0;z-index:11;border-right:1px solid #d3dae5}
+.ttGridHead{border-right:1px solid #e7ebf1}
+.ttTimeAxis{position:relative;grid-column:1;grid-row:2;background:#fafbfd;border-right:1px solid #cfd6e0;position:sticky;left:0;z-index:8}
+.ttAxisTick{position:absolute;right:6px;transform:translateY(-50%);font-size:10px;line-height:12px;color:#9ba4b1;font-variant-numeric:tabular-nums;pointer-events:none}
+.ttAxisTick.major{font-size:11px;color:#5d6a7d}
+.ttDayTrack{position:relative;border-right:1px solid #e3e7ed;background:#fff;cursor:crosshair;min-width:0}
+.ttDayTrack:nth-child(2n){background-color:#fcfdff}
+.ttTrackLine{position:absolute;left:0;right:0;height:1px;background:#f3f4f6;pointer-events:none}
+.ttTrackLine.half{background:#e8ebf0}
+.ttTrackLine.major{background:#d9dee7}
+.ttOverlay .ttBlock{position:absolute;left:4px;right:4px;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;min-height:0;overflow:hidden;gap:3px;padding:5px 7px;border:1px solid rgba(58,76,108,.18);border-left:3px solid rgba(58,76,108,.35);border-radius:4px;font-size:11px;line-height:1.25;text-align:left;z-index:3;color:#273248;box-shadow:none;white-space:normal}
+.ttOverlay .ttBlock:hover{filter:brightness(.985);outline:1px solid #767db9;outline-offset:-2px}
+.ttBlockTitle{font-weight:500;max-width:100%;overflow-wrap:anywhere;display:block}
+.ttBlockHours{font-size:10px;opacity:.7;font-variant-numeric:tabular-nums;display:block}
+.ttOverlay .ttBlockTiny{padding:0 5px;flex-direction:row;align-items:center;gap:5px;font-size:10px}
+.ttBlockTiny .ttBlockHours{display:none}
+.ttFootnote{padding:8px 14px;border-top:1px solid #edf0f3;color:#788293;font-size:11px;flex:none}
+.ttModal{width:min(92vw,530px);max-height:min(88dvh,860px);overflow:auto;background:#fff;border-radius:7px;box-shadow:0 12px 50px #20263335;padding:0;border:1px solid #e1e5eb}
+.ttModal>header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 16px;border-bottom:1px solid #e7ebf0}
+.ttModal>header h3{font-size:16px;font-weight:500;margin:0}
+.ttModal form{padding:16px;display:grid;gap:14px}
+.ttModal label{display:grid;gap:6px;font-size:12px;color:#505e70}
+.ttModal input:not([type=radio]):not([type=checkbox]),.ttModal select{width:100%;min-height:34px;border:1px solid #ced5df;border-radius:3px;background:#fff;padding:6px 8px;font-size:12px;color:#303849}
+.ttFormRow{display:flex;gap:10px;align-items:end}
+.ttFormRow>label{flex:1;min-width:0}
+.ttModal footer{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding-top:9px;border-top:1px solid #edf0f4}
+.ttModal footer>span{flex:1}
+.ttColors{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}
+.ttColors label{display:inline-flex;position:relative;cursor:pointer}
+.ttColors input{position:absolute;opacity:0;width:1px;height:1px}
+.ttColors span{display:inline-block;border-radius:3px;width:29px;height:25px;border:1px solid #cbd2dc}
+.ttColors input:checked+span{outline:2px solid #5862c6;outline-offset:2px}
+.ttMuted{color:#748093;font-size:11px;line-height:1.5;margin:0}
+.ttManageModal{width:min(93vw,630px)}
+.ttLinks{display:grid;gap:7px;margin-top:3px}
+.ttLinks strong{font-size:12px;font-weight:500}
+.ttLinkChoices{display:grid;gap:4px;max-height:230px;overflow:auto;padding:8px;border:1px solid #e1e5ee;border-radius:4px;background:#fcfdff}
+.ttModal .ttLinkItem{display:flex;flex-direction:row;align-items:start;gap:7px;padding:4px;cursor:pointer;color:#3b4655;font-size:12px}
+.ttLinkItem input{margin-top:3px;flex:none}
+.ttLinkItem span{display:block;overflow-wrap:anywhere}
+.ttLinkItem small{font-size:10px;color:#8892a1}
+.ttCopyModal{width:min(94vw,820px);padding-bottom:12px}
+.ttCopyModal>.ttMuted,.ttCopyModal>footer{margin:10px 16px}
+.ttCopyTargets{padding:6px 16px 10px;overflow:auto;max-height:50dvh}
+.ttTargetRow{display:grid;grid-template-columns:130px minmax(0,1fr);align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid #edf0f4}
+.ttTargetRow b{font-weight:500;font-size:12px;overflow-wrap:anywhere}
+.ttTargetRow>div{display:flex;flex-wrap:wrap;gap:7px}
+.ttModal .ttTargetRow label{display:inline-flex;align-items:center;gap:4px;padding:5px 8px;border:1px solid #e0e5ed;border-radius:3px;white-space:nowrap;cursor:pointer}
+.ttTargetRow input{margin:0}
+.ttCopyModal>footer{display:flex;align-items:center;gap:8px;padding-top:10px}
+.ttCopyModal>footer span{flex:1}
+.ttPreviewWindow{display:flex;flex-direction:column;max-height:min(94dvh,960px);width:min(92vw,510px);background:#fff;border-radius:8px;overflow:hidden}
+.ttPreviewWindow>header p{margin:4px 0;font-size:12px}
+.ttPreviewWindow>header strong{color:#5046ba;font-weight:500}
+.ttPreviewActions{padding:8px 14px;border-bottom:1px solid #e5e9f0}
+.ttPreviewScroll{overflow:auto;max-height:74dvh}
+.ttPreviewTrack{display:grid;grid-template-columns:60px minmax(0,1fr)}
+.ttPreviewTrack .ttTimeAxis{position:relative;grid-column:auto;grid-row:auto}
+.ttPreviewTrack .ttDayTrack{min-width:0}
+.ttEmptyDay{padding:45px 22px;text-align:center;color:#8792a2;line-height:1.6}
+.ttDateClock{font-family:'Apple Color Emoji','Segoe UI Emoji',sans-serif!important;font-weight:400!important;font-size:12px!important;line-height:1!important;display:inline-flex!important;align-items:center;justify-content:center;min-width:17px!important;min-height:17px!important;width:20px!important;height:20px!important;flex:0 0 20px!important;padding:1px!important;margin:0 1px!important;border:0!important;background:transparent!important;vertical-align:middle;cursor:pointer;box-shadow:none!important;white-space:nowrap}
+.ttDateClock:hover{background:#eceffa!important;border-radius:4px!important}
+.mobileDayTab .ttDateClock{position:absolute!important;right:2px;top:2px;width:18px!important;height:18px!important;min-width:18px!important;min-height:18px!important;font-size:10px!important;z-index:4}
+.monthHeadRight .ttDateClock,.dateHeadRight .ttDateClock{flex:none!important}
+.multiCompactDate .ttDateClock{margin-left:auto!important}
+.listDate .ttDateClock{margin-left:5px!important}
+#timetableOpenBtn{font-size:15px!important;line-height:1!important;flex-shrink:0!important}
+@media(max-width:760px){
+  .ttOverlay{padding:4px;align-items:stretch}
+  .ttWindow{width:100%;height:100%;max-height:100%;min-height:0;border-radius:5px}
+  .ttWinHead{padding:10px 12px}
+  .ttWinHead h2{font-size:16px}
+  .ttActionBar{padding:7px;gap:4px}
+  .ttCaseNav{padding:8px 7px 4px}
+  .ttRangeBar{gap:6px;padding:7px}
+  .ttWeekGrid{grid-template-columns:50px repeat(7,minmax(145px,1fr));min-width:1065px}
+  .ttTimeAxis .ttAxisTick{font-size:9px;right:3px}
+  .ttModal{align-self:center;max-height:96dvh}
+  .ttFormRow{flex-wrap:wrap}
+  .ttFormRow label{flex:1 1 30%}
+  .ttModal footer{gap:5px}
+  .ttTargetRow{grid-template-columns:1fr}
+  #mobileToolbarTools #timetableOpenBtn{height:30px!important;min-width:30px!important;width:30px!important;flex:0 0 30px!important;padding:0!important;font-size:14px!important}
+  .mobileSelectedDayHead>.ttDateClock{min-width:27px!important;width:27px!important;height:27px!important;flex-basis:27px!important}
+}
