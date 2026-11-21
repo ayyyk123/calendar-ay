@@ -1,4 +1,4 @@
-/* v2.126 · Independent weekly timetable module.
+/* v2.127 · Independent weekly timetable module.
    Only the state.timetable subtree is written; host calendar occurrences are read-only. */
 const WD=['일','월','화','수','목','금','토'];
 const WEEK=[1,2,3,4,5,6,0];
@@ -16,7 +16,7 @@ function normalizeBlock(b){
   if(!validTime(start)||!validTime(end,true)||minutes(end)<=minutes(start))return null;
   const title=String(b.title||'').trim().slice(0,100);
   if(!title)return null;
-  return {id:String(b.id||id()),title,start,end,color:goodColor(b.color)};
+  return {id:String(b.id||id()),title,start,end,color:goodColor(b.color),...(typeof b.copyGroupId==='string'&&b.copyGroupId.trim()?{copyGroupId:b.copyGroupId.slice(0,100)}:{})};
 }
 export function defaultTimetable(){return {version:1,range:{...DEFAULT_RANGE},extraTicks:[],scenarios:[{id:'base',name:'기본 시간표',mode:'always',eventIds:[],priority:0,days:{}}]};}
 export function normalizeTimetable(input){
@@ -59,7 +59,7 @@ function formatDay(date){const d=new Date(`${date}T12:00:00`);return `${d.getMon
 function targetOverlapCount(target,source){return target.filter(b=>overlap(b,source)).length;}
 
 export function createTimetableFeature({getState,save,buildOccurrenceMap,getCursorDate}){
-  const ui={selected:'base',day:'1',open:false,editingBlock:null,copySource:null,manageId:null,manageSelected:new Set(),manageSearch:'',lastPreview:null};
+  const ui={selected:'base',day:'1',open:false,editingBlock:null,copySource:null,manageId:null,manageSelected:new Set(),manageSearch:'',lastPreview:null,ignoreBlockClickUntil:0};
   let host=null,editor=null,blockDlg=null,caseDlg=null,copyDlg=null,previewDlg=null,ticksDlg=null;
   const data=()=>getState().timetable;
   const notify=()=>save();
@@ -80,7 +80,8 @@ export function createTimetableFeature({getState,save,buildOccurrenceMap,getCurs
     const y=fit?`${(minutes(b.start)-r.start)/duration*100}%`:`${(minutes(b.start)-r.start)*r.ppm}px`;
     const h=fit?`${rawHeight/duration*100}%`:`${rawHeight*r.ppm}px`;
     const tiny=rawHeight<=20;
-    return `<button type="button" class="ttBlock ${tiny?'ttBlockTiny':''}" data-tt-block="${escapeHtml(b.id)}" style="top:${y};height:${h};background:${b.color}" title="${escapeHtml(b.start+'–'+b.end+' '+b.title)}" aria-label="${escapeHtml(b.title)} ${b.start}~${b.end}${canEdit?' 수정':''}"><span class="ttBlockTitle">${escapeHtml(b.title)}</span><span class="ttBlockHours">${escapeHtml(b.start)}–${escapeHtml(b.end)}</span></button>`;
+    const grips=canEdit&&rawHeight>=30?'<span class="ttResizeHandle ttResizeStart" data-tt-resize="start" aria-hidden="true" title="위쪽을 드래그해 시작시간 변경"></span><span class="ttResizeHandle ttResizeEnd" data-tt-resize="end" aria-hidden="true" title="아래쪽을 드래그해 종료시간 변경"></span>':'';
+    return `<button type="button" class="ttBlock ${tiny?'ttBlockTiny':''}" data-tt-block="${escapeHtml(b.id)}" style="top:${y};height:${h};background:${b.color}" title="${escapeHtml(b.start+'–'+b.end+' '+b.title)}" aria-label="${escapeHtml(b.title)} ${b.start}~${b.end}${canEdit?' 수정':''}"><span class="ttBlockMain"><span class="ttBlockTitle">${escapeHtml(b.title)}</span><span class="ttBlockHours">${escapeHtml(b.start)}–${escapeHtml(b.end)}</span></span>${grips}</button>`;
   }
   // Build visible ticks from the selected timetable, without writing them into
   // extraTicks. Editing, deleting, or copying a block therefore updates ticks
@@ -136,7 +137,8 @@ export function createTimetableFeature({getState,save,buildOccurrenceMap,getCurs
     host.querySelector('#ttEditTicks').onclick=openTicks;
     host.querySelector('#ttNewBlock').onclick=()=>openBlock(null,Number(ui.day)||1);
     host.querySelector('#ttCopyDayBtn').onclick=()=>openCopy({type:'day',caseId:s.id,day:Number(host.querySelector('#ttCopyDay').value)});
-    host.querySelectorAll('[data-tt-block]').forEach(btn=>btn.onclick=e=>{e.stopPropagation();const track=btn.closest('[data-tt-track]'),dow=Number(track.dataset.ttTrack);ui.day=String(dow);openBlock(btn.dataset.ttBlock,dow);});
+    host.querySelectorAll('[data-tt-block]').forEach(btn=>btn.onclick=e=>{e.stopPropagation();if(Date.now()<ui.ignoreBlockClickUntil)return;const track=btn.closest('[data-tt-track]'),dow=Number(track.dataset.ttTrack);ui.day=String(dow);openBlock(btn.dataset.ttBlock,dow);});
+    bindResizeHandles(r);
     host.querySelectorAll('[data-tt-track]').forEach(track=>track.onclick=e=>{
       if(e.target.closest('[data-tt-block]'))return;
       const box=track.getBoundingClientRect(),offset=Math.round((e.clientY-box.top)/Math.max(1,box.height)*(r.end-r.start)/10)*10;
@@ -174,27 +176,84 @@ export function createTimetableFeature({getState,save,buildOccurrenceMap,getCurs
   }
   function close(){ui.open=false;hide(host);}
   function formColors(value){return `<div class="ttColors">${COLORS.map(c=>`<label title="블록 색상"><input type="radio" name="ttColor" value="${c}" ${c===value?'checked':''}><span style="background:${c}"></span></label>`).join('')}</div>`;}
-  function openBlock(blockId,dow,defaultTime){
+  // Keep a durable, opt-in relationship for newly copied blocks. Older copies
+  // lack metadata: offer identical-content candidates, never auto-select them.
+  function copiesFor(block,caseId,dow){
+    const result=[];
+    for(const sc of data().scenarios)for(const day of WEEK)for(const other of (sc.days[day]||[])){
+      if(sc.id===caseId&&day===dow&&other.id===block.id)continue;
+      const linked=!!block.copyGroupId&&other.copyGroupId===block.copyGroupId;
+      const same=!other.copyGroupId&&other.title===block.title&&other.start===block.start&&other.end===block.end&&other.color===block.color;
+      if(linked||same)result.push({caseId:sc.id,day,id:other.id,linked,name:sc.name,title:other.title});
+    }
+    return result;
+  }
+  function saveBlockEdit({caseId,dow,original,formValue,copies=[]}){
+    const sc=scenarioById(data(),caseId);
+    const {title,start,end,color,targetDow}=formValue;
+    const changes={};
+    for(const field of ['title','start','end','color'])if(!original||original[field]!==formValue[field])changes[field]=formValue[field];
+    const groupId=copies.length?(original?.copyGroupId||id()):original?.copyGroupId;
+    const main={...original,id:original?.id||id(),title,start,end,color,...(groupId?{copyGroupId:groupId}:{})};
+    const plans=[{sc,day:targetDow,oldDay:dow,oldId:original?.id||null,newBlock:main}];
+    if(original&&copies.length){
+      for(const item of copies){
+        const dest=scenarioById(data(),item.caseId),block=(dest.days[item.day]||[]).find(x=>x.id===item.id);
+        if(!block)continue;
+        plans.push({sc:dest,day:item.day,oldDay:item.day,oldId:block.id,newBlock:{...block,...changes,copyGroupId:groupId}});
+      }
+    }
+    // Preflight before touching state: changes must not silently overwrite a
+    // different appointment. Check planned copies as well as existing blocks.
+    const key=(scenario,day,blockId)=>`${scenario.id}:${day}:${blockId}`;
+    const moving=new Set(plans.filter(p=>p.oldId).map(p=>key(p.sc,p.oldDay,p.oldId)));
+    for(let i=0;i<plans.length;i++)for(let j=i+1;j<plans.length;j++){
+      if(plans[i].sc.id===plans[j].sc.id&&plans[i].day===plans[j].day&&overlap(plans[i].newBlock,plans[j].newBlock)){
+        alert('변경할 일정끼리 시간이 겹쳐. 요일이나 시간을 다시 확인해 줘.');return false;
+      }
+    }
+    const conflicts=new Map();
+    for(const p of plans){
+      for(const existing of (p.sc.days[p.day]||[])){
+        const k=key(p.sc,p.day,existing.id);
+        if(!moving.has(k)&&overlap(existing,p.newBlock))conflicts.set(k,{sc:p.sc,day:p.day,id:existing.id});
+      }
+    }
+    if(conflicts.size&&!confirm(`변경 후 ${conflicts.size}개의 기존 일정과 시간이 겹쳐. 겹치는 일정을 삭제하고 변경할까? 취소하면 아무것도 바뀌지 않아.`))return false;
+    // Only after all validation has passed do we modify the saved timetable.
+    for(const sc of data().scenarios)for(const day of WEEK){
+      sc.days[day]=(sc.days[day]||[]).filter(b=>!moving.has(key(sc,day,b.id))&&!conflicts.has(key(sc,day,b.id)));
+    }
+    for(const p of plans){
+      (p.sc.days[p.day] ||= []).push(p.newBlock);
+      p.sc.days[p.day].sort((a,b)=>minutes(a.start)-minutes(b.start));
+    }
+    ui.day=String(targetDow);notify();draw();return true;
+  }
+  function openBlock(blockId,dow,defaultTime,prefill=null){
     const s=getCase(),curr=(s.days[dow]||[]).find(b=>b.id===blockId)||null;
     ui.editingBlock={blockId:curr?.id||null,dow,caseId:s.id};
-    const from=curr?.start||defaultTime||'06:30';const to=curr?.end||clock(Math.min(1440,minutes(from)+60));
-    blockDlg.innerHTML=`<div class="ttModal"><header><h3>${curr?'시간표 수정':'시간표 일정 추가'}</h3><button type="button" data-close="1">×</button></header><form id="ttBlockForm"><label>일정명<input name="title" required maxlength="100" value="${escapeHtml(curr?.title||'')}" placeholder="예: 개인시간"></label><div class="ttFormRow"><label>요일<select name="dow">${WEEK.map(d=>`<option value="${d}" ${d===dow?'selected':''}>${WD[d]}요일</option>`).join('')}</select></label><label>시작<input name="start" type="time" step="600" value="${from}" required></label><label>종료<input name="end" type="time" step="600" value="${to}" required></label></div><div><small>색상</small>${formColors(curr?.color||COLORS[0])}</div><footer>${curr?'<button type="button" id="ttBlockDelete" class="ttDanger">삭제</button><button type="button" id="ttBlockCopy">다른 요일·경우의 수로 복사</button>':''}<span></span><button type="button" data-close="1">취소</button><button type="submit" class="ttPrimary">저장</button></footer></form></div>`;
-    show(blockDlg);blockDlg.querySelector('[data-close]').onclick=()=>hide(blockDlg);
+    const from=prefill?.start||curr?.start||defaultTime||'06:30';
+    const to=prefill?.end||curr?.end||clock(Math.min(1440,minutes(from)+60));
+    const duplicates=curr?copiesFor(curr,s.id,dow):[];
+    const copyNote=duplicates.length?`<section class="ttSyncBox"><label class="ttSyncSwitch"><input type="checkbox" id="ttSyncCopies"><span>변경한 항목을 다른 복사본에도 적용</span></label><small>선택한 경우에만 변경된 항목(이름·시간·색상)을 함께 수정해. 복사본의 요일은 그대로 유지돼.</small><div id="ttSyncTargets" class="ttSyncTargets" hidden>${duplicates.map((item,index)=>`<label class="ttSyncTarget"><input type="checkbox" value="${index}" ${item.linked?'checked':''}><span>${escapeHtml(item.name)} · ${WD[item.day]}요일 ${item.linked?'(연결된 복사본)':'(같은 내용의 일정 후보)'}</span></label>`).join('')}</div></section>`:'';
+    blockDlg.innerHTML=`<div class="ttModal"><header><h3>${curr?'시간표 수정':'시간표 일정 추가'}</h3><button type="button" data-close="1">×</button></header><form id="ttBlockForm"><label>일정명<input name="title" required maxlength="100" value="${escapeHtml(curr?.title||'')}" placeholder="예: 개인시간"></label><div class="ttFormRow"><label>요일<select name="dow">${WEEK.map(d=>`<option value="${d}" ${d===dow?'selected':''}>${WD[d]}요일</option>`).join('')}</select></label><label>시작<input name="start" type="time" step="600" value="${from}" required></label><label>종료<input name="end" type="time" step="600" value="${to}" required></label></div><div><small>색상</small>${formColors(curr?.color||COLORS[0])}</div>${copyNote}<footer>${curr?'<button type="button" id="ttBlockDelete" class="ttDanger">삭제</button><button type="button" id="ttBlockCopy">다른 요일·경우의 수로 복사</button>':''}<span></span><button type="button" data-close="1">취소</button><button type="submit" class="ttPrimary">저장</button></footer></form></div>`;
+    show(blockDlg);
+    // The header × and footer 취소 must BOTH discard edits and close the modal.
+    blockDlg.querySelectorAll('[data-close]').forEach(btn=>btn.onclick=()=>hide(blockDlg));
+    const toggle=blockDlg.querySelector('#ttSyncCopies'),targets=blockDlg.querySelector('#ttSyncTargets');
+    if(toggle)toggle.onchange=()=>{targets.hidden=!toggle.checked;};
     blockDlg.querySelector('#ttBlockForm').onsubmit=e=>{
       e.preventDefault();const fd=new FormData(e.currentTarget);
       const title=String(fd.get('title')||'').trim(),start=String(fd.get('start')),end=String(fd.get('end'));
-      const targetDow=Number(fd.get('dow'));const color=goodColor(fd.get('ttColor'));
-      if(!title||!validTime(start)||!validTime(end,true)||minutes(end)<=minutes(start)){alert('일정명과 시작·종료 시각을 확인해 줘.');return;}
+      const targetDow=Number(fd.get('dow')),color=goodColor(fd.get('ttColor'));
+      if(!title||!validTime(start)||!validTime(end,true)||minutes(end)<=minutes(start)||!WEEK.includes(targetDow)){alert('일정명과 시작·종료 시각을 확인해 줘.');return;}
       if(minutes(start)%10!==0||minutes(end)%10!==0){alert('시간은 10분 단위로 입력해 줘.');return;}
-      const current=scenarioById(data(),ui.editingBlock.caseId);const block={id:ui.editingBlock.blockId||id(),title,start,end,color};
-      const conflicts=(current.days[targetDow]||[]).filter(b=>b.id!==block.id&&overlap(b,block));
-      if(conflicts.length&&!confirm(`${WD[targetDow]}요일에 겹치는 일정 ${conflicts.length}개가 있어. 겹치는 일정을 삭제하고 새 일정으로 교체할까?`))return;
-      for(let day=0;day<7;day++)current.days[day]=(current.days[day]||[]).filter(b=>b.id!==block.id && !(day===targetDow&&conflicts.some(c=>c.id===b.id)));
-      current.days[targetDow].push(block);current.days[targetDow].sort((a,b)=>minutes(a.start)-minutes(b.start));
-      ui.day=String(targetDow);hide(blockDlg);notify();draw();
+      const selected=toggle?.checked?[...targets.querySelectorAll('input:checked')].map(el=>duplicates[Number(el.value)]).filter(Boolean):[];
+      if(saveBlockEdit({caseId:s.id,dow,original:curr,formValue:{title,start,end,color,targetDow},copies:selected}))hide(blockDlg);
     };
     blockDlg.querySelector('#ttBlockDelete')?.addEventListener('click',()=>{
-      if(!confirm('이 시간표 일정만 삭제할까? 캘린더 일정은 삭제되지 않아.'))return;
+      if(!confirm('이 시간표 일정을 삭제할까?'))return;
       const sc=scenarioById(data(),ui.editingBlock.caseId);
       sc.days[dow]=(sc.days[dow]||[]).filter(b=>b.id!==ui.editingBlock.blockId);
       hide(blockDlg);notify();draw();
@@ -202,6 +261,50 @@ export function createTimetableFeature({getState,save,buildOccurrenceMap,getCurs
     blockDlg.querySelector('#ttBlockCopy')?.addEventListener('click',()=>{
       const sc=scenarioById(data(),ui.editingBlock.caseId),block=(sc.days[dow]||[]).find(b=>b.id===blockId);
       if(!block)return;hide(blockDlg);openCopy({type:'block',caseId:sc.id,day:dow,block:{...block}});
+    });
+  }
+  function bindResizeHandles(r){
+    const range=r.end-r.start;
+    host.querySelectorAll('[data-tt-resize]').forEach(handle=>{
+      handle.addEventListener('pointerdown',down=>{
+        if(down.pointerType==='mouse'&&down.button!==0)return;
+        const el=handle.closest('[data-tt-block]'),track=handle.closest('[data-tt-track]');
+        const block=(getCase().days[Number(track.dataset.ttTrack)]||[]).find(b=>b.id===el.dataset.ttBlock);
+        if(!block)return;
+        down.preventDefault();down.stopPropagation();
+        const bound=track.getBoundingClientRect(),edge=handle.dataset.ttResize;
+        const first=minutes(block.start),last=minutes(block.end);
+        let next=edge==='start'?first:last,dragged=false;
+        const move=e=>{
+          if(e.pointerId!==down.pointerId)return;
+          e.preventDefault();
+          const at=Math.round((r.start+(e.clientY-bound.top)/Math.max(1,bound.height)*range)/10)*10;
+          next=edge==='start'?Math.max(r.start,Math.min(last-10,at)):Math.min(r.end,Math.max(first+10,at));
+          if(next===(edge==='start'?first:last))return;
+          dragged=true;
+          const start=edge==='start'?next:first,end=edge==='end'?next:last;
+          el.style.top=`${(start-r.start)/range*100}%`;
+          el.style.height=`${(end-start)/range*100}%`;
+          el.querySelector('.ttBlockHours').textContent=`${clock(start)}–${clock(end)}`;
+          el.title=`${clock(start)}–${clock(end)} ${block.title}`;
+        };
+        const cleanup=()=>{
+          window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',finish);
+          window.removeEventListener('pointercancel',cancel);
+        };
+        const finish=e=>{
+          if(e.pointerId!==down.pointerId)return;
+          cleanup();
+          ui.ignoreBlockClickUntil=Date.now()+450;
+          if(dragged&&next!==(edge==='start'?first:last)){
+            openBlock(block.id,Number(track.dataset.ttTrack),null,{start:clock(edge==='start'?next:first),end:clock(edge==='end'?next:last)});
+          }else draw();
+        };
+        const cancel=e=>{if(e.pointerId!==down.pointerId)return;cleanup();draw();};
+        window.addEventListener('pointermove',move,{passive:false});
+        window.addEventListener('pointerup',finish);window.addEventListener('pointercancel',cancel);
+        try{handle.setPointerCapture(down.pointerId);}catch(_e){}
+      });
     });
   }
   function linkedChoices(selectedIds=new Set(),filter=''){
@@ -215,7 +318,7 @@ export function createTimetableFeature({getState,save,buildOccurrenceMap,getCurs
     const rows=data().scenarios.map(sc=>`<div class="ttManageItem"><div><strong>${escapeHtml(sc.name)}</strong><small>${sc.id==='base'?'기본 적용':`${sc.mode==='has'?'일정 있음':'일정 없음'} · 우선순위 ${sc.priority} · 연결 ${sc.eventIds.length}개`}</small></div><button type="button" data-tt-manage-item="${escapeHtml(sc.id)}">수정</button>${sc.id==='base'?'':`<button type="button" class="ttDanger" data-tt-delete-item="${escapeHtml(sc.id)}">삭제</button>`}</div>`).join('');
     caseDlg.innerHTML=`<div class="ttModal ttManageModal"><header><h3>⚙ 경우의 수 관리</h3><button type="button" data-close="1">×</button></header><p class="ttManageIntro">기본 시간표는 조건이 맞는 경우의 수가 없을 때 적용돼.</p><div class="ttManageList">${rows}</div><footer class="ttManageFooter"><span></span><button type="button" id="ttCaseListClose">닫기</button><button type="button" id="ttCaseListAdd" class="ttPrimary">＋ 경우의 수 추가</button></footer></div>`;
     show(caseDlg);
-    caseDlg.querySelector('[data-close]').onclick=()=>hide(caseDlg);
+    caseDlg.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>hide(caseDlg));
     caseDlg.querySelector('#ttCaseListClose').onclick=()=>hide(caseDlg);
     caseDlg.querySelector('#ttCaseListAdd').onclick=()=>openManage(null);
     caseDlg.querySelectorAll('[data-tt-manage-item]').forEach(btn=>btn.onclick=()=>openManage(btn.dataset.ttManageItem));
@@ -250,7 +353,7 @@ export function createTimetableFeature({getState,save,buildOccurrenceMap,getCurs
     ui.manageId=sc?.id||null;ui.manageSelected=new Set(sc?.eventIds||[]);ui.manageSearch='';
     const isBase=sc?.id==='base';
     caseDlg.innerHTML=`<div class="ttModal ttManageModal"><header><h3>${sc?'경우의 수 설정':'경우의 수 추가'}</h3><button type="button" data-close="1">×</button></header><form id="ttManageForm"><label>이름<input name="name" maxlength="60" required value="${escapeHtml(sc?.name||'')}" placeholder="예: 운동 O, 출근 X"></label>${isBase?'<p class="ttMuted">기본 시간표는 조건 없이 적용되는 기본값이야.</p>':`<div class="ttFormRow"><label>적용 조건<select name="mode"><option value="has" ${sc?.mode==='has'?'selected':''}>연결된 일정이 있는 날 (O)</option><option value="not" ${sc?.mode==='not'?'selected':''}>연결된 일정이 없는 날 (X)</option></select></label><label>우선순위<input name="priority" type="number" min="1" max="9999" value="${sc?.priority||10}"></label></div><small class="ttMuted">여러 조건이 동시에 맞으면 숫자가 큰 경우의 수가 적용돼. 같은 숫자라면 먼저 등록한 경우가 우선이야.</small><div class="ttLinks"><strong>연결할 캘린더 일정 선택</strong><input id="ttLinkSearch" type="search" placeholder="일정명 검색 (예: 헬스장)"><div id="ttLinkChoices">${linkedChoices(ui.manageSelected)}</div></div>`}<footer>${sc&&!isBase?'<button type="button" id="ttCaseDelete" class="ttDanger">경우의 수 삭제</button>':''}<span></span><button type="button" data-close="1">취소</button><button type="submit" class="ttPrimary">저장</button></footer></form></div>`;
-    show(caseDlg);caseDlg.querySelector('[data-close]').onclick=()=>hide(caseDlg);
+    show(caseDlg);caseDlg.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>hide(caseDlg));
     const choices=caseDlg.querySelector('#ttLinkChoices');
     function bindChoiceEvents(){choices?.querySelectorAll('input[type=checkbox]').forEach(box=>box.onchange=()=>{if(box.checked)ui.manageSelected.add(box.value);else ui.manageSelected.delete(box.value);});}
     bindChoiceEvents();caseDlg.querySelector('#ttLinkSearch')?.addEventListener('input',e=>{ui.manageSearch=e.target.value;choices.innerHTML=linkedChoices(ui.manageSelected,ui.manageSearch);bindChoiceEvents();});
@@ -276,7 +379,7 @@ export function createTimetableFeature({getState,save,buildOccurrenceMap,getCurs
     const label=source.type==='day'?`${sc.name} · ${WD[source.day]}요일 전체`:`${sc.name} · ${WD[source.day]}요일 · ${source.block?.title}`;
     const rows=data().scenarios.map(s=>`<div class="ttTargetRow"><b>${escapeHtml(s.name)}</b><div>${WEEK.map(d=>`<label><input type="checkbox" class="ttCopyTarget" data-tt-dest-case="${escapeHtml(s.id)}" data-tt-dest-day="${d}" ${s.id===source.caseId&&d===source.day?'disabled':''}><span>${WD[d]}</span></label>`).join('')}</div></div>`).join('');
     copyDlg.innerHTML=`<div class="ttModal ttCopyModal"><header><h3>${source.type==='day'?'요일 전체 복사':'일정 복사'}</h3><button type="button" data-close="1">×</button></header><p class="ttMuted">원본: ${escapeHtml(label)}</p><p class="ttMuted">대상 요일을 여러 개 선택해 한 번에 붙여넣을 수 있어. 같은 시간이 겹치면 실행 전에 확인해.</p><div class="ttCopyTargets">${rows}</div><footer><span></span><button type="button" data-close="1">취소</button><button type="button" class="ttPrimary" id="ttCopyApply">선택한 곳에 복사</button></footer></div>`;
-    show(copyDlg);copyDlg.querySelector('[data-close]').onclick=()=>hide(copyDlg);
+    show(copyDlg);copyDlg.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>hide(copyDlg));
     copyDlg.querySelector('#ttCopyApply').onclick=()=>{
       const targets=[...copyDlg.querySelectorAll('.ttCopyTarget:checked')].map(e=>({caseId:e.dataset.ttDestCase,day:Number(e.dataset.ttDestDay)}));
       if(!targets.length){alert('복사할 경우의 수와 요일을 선택해 줘.');return;}
@@ -288,11 +391,17 @@ export function createTimetableFeature({getState,save,buildOccurrenceMap,getCurs
         else collisions+=targetOverlapCount(dest,src[0]);
       }
       if((collisions||replaceDays)&&!confirm(source.type==='day'?`선택한 ${targets.length}곳 중 기존 일정이 있는 요일 ${replaceDays}개를 전부 교체할까?`:`선택한 ${targets.length}곳 중 겹치는 일정 ${collisions}개를 삭제하고 복사할까?`))return;
+      // Give both the source and newly created copies a persistent group ID.
+      // Existing saved blocks still work without one, via the identical-content
+      // candidates offered in the edit dialog.
+      const sourceBlocks=source.type==='day'?(from.days[source.day]||[]):[(from.days[source.day]||[]).find(b=>b.id===source.block.id)].filter(Boolean);
+      for(const b of sourceBlocks)if(!b.copyGroupId)b.copyGroupId=id();
+      const originals=sourceBlocks.map(b=>({...b}));
       for(const t of targets){
         const dest=scenarioById(data(),t.caseId);
         if(!dest.days[t.day])dest.days[t.day]=[];
-        if(source.type==='day')dest.days[t.day]=src.map(b=>({...b,id:id()}));
-        else{dest.days[t.day]=dest.days[t.day].filter(b=>!overlap(b,src[0]));dest.days[t.day].push({...src[0],id:id()});}
+        if(source.type==='day')dest.days[t.day]=originals.map(b=>({...b,id:id()}));
+        else{dest.days[t.day]=dest.days[t.day].filter(b=>!overlap(b,originals[0]));dest.days[t.day].push({...originals[0],id:id()});}
         dest.days[t.day].sort((a,b)=>minutes(a.start)-minutes(b.start));
       }
       hide(copyDlg);notify();draw();alert(`${targets.length}곳에 복사했어.`);
@@ -305,7 +414,7 @@ export function createTimetableFeature({getState,save,buildOccurrenceMap,getCurs
     const range=minmax([blocks]);const height=(range.end-range.start)*range.ppm;
     const {marks,lines}=axisMarks(range,false,[blocks]);
     previewDlg.innerHTML=`<div class="ttPreviewWindow"><header><div><h2>🕒 ${formatDay(date)}</h2><p>적용 시간표: <strong>${escapeHtml(s.name)}</strong></p>${labels?`<small>충족 조건: ${escapeHtml(labels)}</small>`:''}</div><button data-close="1" type="button">×</button></header><div class="ttPreviewActions"><button id="ttPreviewEdit" type="button">주간 시간표 크게 보기·편집</button></div>${blocks.length?`<div class="ttPreviewScroll"><div class="ttPreviewTrack"><div class="ttTimeAxis" style="height:${height}px">${marks}</div><div class="ttDayTrack" style="height:${height}px">${lines}${blocks.map(b=>blockHtml(b,range,false)).join('')}</div></div></div>`:'<div class="ttEmptyDay">이 경우의 수에 등록된 시간표가 없어. 주간 편집 화면에서 추가할 수 있어.</div>'}</div>`;
-    show(previewDlg);previewDlg.querySelector('[data-close]').onclick=()=>hide(previewDlg);
+    show(previewDlg);previewDlg.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>hide(previewDlg));
     previewDlg.querySelector('#ttPreviewEdit').onclick=()=>{hide(previewDlg);open(s.id);};
     previewDlg.querySelectorAll('[data-tt-block]').forEach(el=>el.onclick=()=>{hide(previewDlg);open(s.id);openBlock(el.dataset.ttBlock,day);});
   }
