@@ -1,4 +1,4 @@
-/* v2.127 · Independent weekly timetable module.
+/* v2.128 · Independent weekly timetable module.
    Only the state.timetable subtree is written; host calendar occurrences are read-only. */
 const WD=['일','월','화','수','목','금','토'];
 const WEEK=[1,2,3,4,5,6,0];
@@ -274,14 +274,24 @@ export function createTimetableFeature({getState,save,buildOccurrenceMap,getCurs
         down.preventDefault();down.stopPropagation();
         const bound=track.getBoundingClientRect(),edge=handle.dataset.ttResize;
         const first=minutes(block.start),last=minutes(block.end);
-        let next=edge==='start'?first:last,dragged=false;
+        const original=edge==='start'?first:last;
+        // Resize by distance MOVED, rather than using the pointer's absolute
+        // location. A hidden 8px hit area has its centre a few pixels away
+        // from the real boundary; absolute snapping made the original time
+        // difficult to reach and caused the block to jump on first movement.
+        const pressY=down.clientY;
+        const pxPerMinute=bound.height/Math.max(1,range);
+        let next=original,dragged=false;
         const move=e=>{
           if(e.pointerId!==down.pointerId)return;
           e.preventDefault();
-          const at=Math.round((r.start+(e.clientY-bound.top)/Math.max(1,bound.height)*range)/10)*10;
-          next=edge==='start'?Math.max(r.start,Math.min(last-10,at)):Math.min(r.end,Math.max(first+10,at));
-          if(next===(edge==='start'?first:last))return;
-          dragged=true;
+          const deltaY=e.clientY-pressY;
+          if(Math.abs(deltaY)>3)dragged=true;
+          const shifted=original+Math.round(deltaY/Math.max(0.01,pxPerMinute)/10)*10;
+          next=edge==='start'?Math.max(r.start,Math.min(last-10,shifted)):Math.min(r.end,Math.max(first+10,shifted));
+          // Always update the preview, including when the drag comes BACK to
+          // the original boundary. Returning early used to leave it visually
+          // stuck at a previously previewed time.
           const start=edge==='start'?next:first,end=edge==='end'?next:last;
           el.style.top=`${(start-r.start)/range*100}%`;
           el.style.height=`${(end-start)/range*100}%`;
@@ -297,7 +307,14 @@ export function createTimetableFeature({getState,save,buildOccurrenceMap,getCurs
           cleanup();
           ui.ignoreBlockClickUntil=Date.now()+450;
           if(dragged&&next!==(edge==='start'?first:last)){
-            openBlock(block.id,Number(track.dataset.ttTrack),null,{start:clock(edge==='start'?next:first),end:clock(edge==='end'?next:last)});
+            // The drag is a visual PREVIEW only. Reset the block immediately
+            // before showing the edit dialog; Save commits the new times, while
+            // Cancel/×/Escape/backdrop leave the original calendar untouched.
+            const proposed={start:clock(edge==='start'?next:first),end:clock(edge==='end'?next:last)};
+            const day=Number(track.dataset.ttTrack);
+            const blockId=block.id;
+            draw();
+            openBlock(blockId,day,null,proposed);
           }else draw();
         };
         const cancel=e=>{if(e.pointerId!==down.pointerId)return;cleanup();draw();};

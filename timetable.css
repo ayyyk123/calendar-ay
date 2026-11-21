@@ -1,4 +1,4 @@
-/* v2.127 timetable UI: isolated from the original calendar styles. */
+/* v2.128 timetable UI: isolated from the original calendar styles. */
 .ttOverlay{position:fixed;inset:0;z-index:35000;display:flex;align-items:center;justify-content:center;background:rgba(24,29,38,.39);padding:14px;box-sizing:border-box;font-family:'Malgun Gothic','맑은 고딕',sans-serif;color:#29313e;font-size:12px;font-weight:400}
 .ttOverlay.hidden{display:none!important}
 .ttOverlay button,.ttOverlay input,.ttOverlay select{font:inherit;font-weight:400;box-sizing:border-box}
@@ -184,11 +184,11 @@
 @container (max-width:140px){
   .ttOverlay .ttBlockMain .ttBlockHours{flex-basis:100%;margin-left:0}
 }
-/* Resize affordance: stays inside each block, preserves proportional height. */
-.ttOverlay .ttResizeHandle{position:absolute;left:50%;width:38px;height:7px;transform:translateX(-50%);z-index:2;cursor:ns-resize;touch-action:none;border-radius:3px;opacity:.32;background:#526784;box-shadow:inset 0 0 0 1px #fff8;pointer-events:auto}
+/* Invisible resize hit zones: keep edge dragging without gray handle bars. */
+.ttOverlay .ttResizeHandle{position:absolute;left:0;width:100%;height:8px;transform:none;z-index:2;cursor:ns-resize;touch-action:none;border-radius:0;opacity:0;background:transparent;box-shadow:none;pointer-events:auto}
 .ttOverlay .ttResizeStart{top:0}
 .ttOverlay .ttResizeEnd{bottom:0}
-.ttOverlay .ttBlock:hover .ttResizeHandle,.ttOverlay .ttResizeHandle:hover{opacity:.75}
+.ttOverlay .ttBlock:hover .ttResizeHandle,.ttOverlay .ttResizeHandle:hover{opacity:0}
 .ttOverlay .ttBlock:has(.ttResizeHandle:active){outline:2px solid #655bdc;outline-offset:-2px}
 /* Optional grouped edits: never checked by default. */
 .ttSyncBox{border:1px solid #dfe5ef;border-radius:5px;background:#f8faff;padding:10px 11px;display:grid;gap:6px}
@@ -198,4 +198,4 @@
 .ttSyncBox small{font-size:11px;color:#738093;line-height:1.5}
 .ttSyncTargets{display:grid;gap:5px;max-height:126px;overflow:auto;border-top:1px solid #e3e7ef;padding-top:7px}
 .ttSyncTargets[hidden]{display:none!important}
-@media(max-width:760px){.ttOverlay .ttBlockMain .ttBlockHours{font-size:9px}.ttOverlay .ttResizeHandle{opacity:.43}}
+@media(max-width:760px){.ttOverlay .ttBlockMain .ttBlockHours{font-size:9px}.ttOverlay .ttResizeHandle{opacity:0}}
