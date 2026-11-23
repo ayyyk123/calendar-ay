@@ -1,4 +1,4 @@
-import { createTimetableFeature, defaultTimetable, normalizeTimetable } from './timetable.js?v=2.128';
+import { createTimetableFeature, defaultTimetable, normalizeTimetable } from './timetable.js?v=2.129';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
 import {
   getAuth, setPersistence, browserLocalPersistence, onAuthStateChanged,
@@ -91,13 +91,14 @@ function normalizeHeaderGoalColors(raw,goalCount){
 }
 
 const defaultState = () => ({
-  version: '2.128',
+  version: '2.129',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
     {id:'family',name:'가족/개인',color:'#f6e8a6',order:3,period:'저녁',capacity:2,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:2,unknown:false}])),parentId:''}
   ],
   events: [],
+  trash: [], // 삭제한 원본의 복구 정보 (Firebase/JSON 백업에 포함)
   timetable: defaultTimetable(),
   fixed: [],
   flexible: [],
@@ -389,9 +390,10 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '2.128',
+    version: '2.129',
     calendars,
     timetable: normalizeTimetable(s.timetable),
+    trash: Array.isArray(s.trash) ? s.trash.filter(x=>x && x.id && x.type && x.title && x.deletedAt).slice(0,50).map(x=>({...x})) : [],
     events: Array.isArray(s.events) ? s.events.filter(e=>e && e.id && e.title && e.date).map(e=>({
       ...e,
       endDate:e.endDate||e.date,
@@ -699,6 +701,112 @@ function save({rerender=true}={}){
   queueRemoteSave();
   if(rerender)render();
 }
+
+// v2.129 · 최근 삭제 내역: 기존 엔티티는 원래 컬렉션에서만 삭제하고
+// 복구용 사본은 별도 필드에 보존합니다. 하위 버전의 기존 데이터는 변경하지 않습니다.
+const TRASH_KEEP_COUNT=50;
+const TRASH_KEEP_BYTES=130000; // Firebase 문서 크기 증가 방지
+function trashLog(type, payload, title, date='', detail=''){
+  if(!Array.isArray(state.trash))state.trash=[];
+  let snap=JSON.parse(JSON.stringify(payload));
+  const encoded=new TextEncoder().encode(JSON.stringify(snap)).length;
+  const recoverable=encoded <= TRASH_KEEP_BYTES;
+  if(!recoverable) snap=null;
+  const entry={id:uid(),type,title:String(title||'이름 없는 항목').slice(0,150),date:String(date||''),detail:String(detail||''),deletedAt:new Date().toISOString(),recoverable,snapshot:snap};
+  state.trash.unshift(entry);
+  // 항목 수 및 JSON 크기를 함께 제한해서 기존 Firebase 저장에 부담을 주지 않습니다.
+  while(state.trash.length>TRASH_KEEP_COUNT)state.trash.pop();
+  const bytes=()=>new TextEncoder().encode(JSON.stringify(state.trash)).length;
+  while(state.trash.length>1 && bytes()>TRASH_KEEP_BYTES)state.trash.pop();
+  if(!recoverable)alert('삭제 내역은 기록했지만, 이 항목의 데이터가 너무 커서 휴지통 복구본은 저장할 수 없어요. 복구가 필요하면 이전 JSON 백업을 사용해 주세요.');
+  return entry;
+}
+function trashTypeLabel(type){return ({event:'캘린더 일정',occurrence:'반복 일정 1회',future:'반복 일정 이후',calendar:'캘린더와 포함 항목',fixed:'날짜 지정 업무',flexible:'시간날 때 업무',purchase:'구매 항목',diary:'다이어리',memo:'업무 메모',ttBlock:'시간표 일정',ttScenario:'시간표 경우의 수'})[type]||'삭제 항목';}
+function restoreTrashEntry(item){
+  if(!item.recoverable || !item.snapshot){alert('이 항목은 복구할 원본이 없어요. 이전 백업 파일을 확인해 주세요.');return false;}
+  const x=structuredClone(item.snapshot);
+  const conflict=(label)=>{alert(`${label}이 이미 존재해요. 기존 데이터를 덮어쓰지 않았습니다.`);return false;};
+  switch(item.type){
+    case 'event':
+      if(state.events.some(e=>e.id===x.id))return conflict('같은 ID의 일정');
+      state.events.push(x);return true;
+    case 'occurrence':{
+      const ev=state.events.find(e=>e.id===x.eventId);
+      if(!ev){alert('원본 반복 일정이 없어 이 회차를 복구할 수 없어요.');return false;}
+      ev.excludedDates=(ev.excludedDates||[]).filter(d=>d!==x.date);
+      if(x.wasDone && !(ev.doneDates||[]).includes(x.date))ev.doneDates=[...(ev.doneDates||[]),x.date];
+      if(x.wasSkipped && !(ev.skipDates||[]).includes(x.date))ev.skipDates=[...(ev.skipDates||[]),x.date];
+      return true;
+    }
+    case 'future':{
+      const ev=state.events.find(e=>e.id===x.eventId);
+      if(!ev){alert('원본 반복 일정이 없어 이후 회차를 복구할 수 없어요.');return false;}
+      if(!confirm('반복 일정의 종료 규칙을 삭제 전 상태로 복구할까요? 이후에 바꾼 종료 설정은 덮어쓰게 됩니다.'))return false;
+      ev.repeatRule=x.repeatRule;return true;
+    }
+    case 'fixed': case 'flexible': case 'purchase':{
+      const arr=item.type==='fixed'?state.fixed:item.type==='flexible'?state.flexible:state.purchases;
+      if(arr.some(e=>e.id===x.id))return conflict('같은 ID의 항목');
+      arr.push(x);return true;
+    }
+    case 'diary':
+      if(state.diary[x.date]&&!confirm('해당 날짜에 이미 다이어리가 있어요. 삭제 전 내용으로 바꿀까요?'))return false;
+      state.diary[x.date]=x.value;return true;
+    case 'memo':{
+      const day=workMemoDay(x.date);
+      if((day.custom||[]).some(a=>a.id===x.row.id))return conflict('같은 ID의 업무 메모');
+      day.custom=day.custom||[]; day.custom.push(x.row);return true;
+    }
+    case 'ttBlock':{
+      const sc=state.timetable.scenarios.find(c=>c.id===x.scenarioId);
+      if(!sc){alert('시간표 경우의 수가 없어 이 일정을 복구할 수 없어요. 경우의 수를 먼저 복구해 주세요.');return false;}
+      sc.days[x.day]=sc.days[x.day]||[];
+      if(sc.days[x.day].some(b=>b.id===x.block.id))return conflict('같은 ID의 시간표 일정');
+      // Do not silently delete a new block when restoring an older one.
+      const overlap=sc.days[x.day].some(b=>b.start<x.block.end && x.block.start<b.end);
+      if(overlap){alert('해당 요일과 시간에 이미 다른 일정이 있어요. 겹치는 일정을 먼저 옮긴 뒤 복구해 주세요.');return false;}
+      sc.days[x.day].push(x.block);sc.days[x.day].sort((a,b)=>a.start.localeCompare(b.start));return true;
+    }
+    case 'ttScenario':{
+      if(state.timetable.scenarios.some(c=>c.id===x.id))return conflict('같은 ID의 시간표 경우의 수');
+      state.timetable.scenarios.push(x);return true;
+    }
+    case 'calendar':{
+      if(state.calendars.some(c=>c.id===x.calendar.id))return conflict('같은 ID의 캘린더');
+      const collision=(array,items)=>items.some(e=>array.some(v=>v.id===e.id));
+      if(collision(state.events,x.events)||collision(state.fixed,x.fixed)||collision(state.flexible,x.flexible))return conflict('이미 존재하는 하위 일정/업무');
+      state.calendars.push(x.calendar);
+      state.events.push(...x.events);state.fixed.push(...x.fixed);state.flexible.push(...x.flexible);
+      (x.childParents||[]).forEach(c=>{const child=state.calendars.find(v=>v.id===c.id);if(child)child.parentId=c.parentId;});
+      state.settings.hiddenCalendars=(state.settings.hiddenCalendars||[]).filter(v=>v!==x.calendar.id);
+      return true;
+    }
+    default: alert('이 항목의 복구 형식은 지원하지 않아요.');return false;
+  }
+}
+function renderTrashDialog(){
+  const root=$('#trashList');if(!root)return;
+  const list=[...(state.trash||[])].sort((a,b)=>String(b.deletedAt).localeCompare(String(a.deletedAt)));
+  $('#trashCount').textContent=list.length?`최근 삭제 ${list.length}건 (저장된 기록)`:'삭제 기록 없음';
+  root.innerHTML=list.length?list.map(item=>`<div class="trashItem" data-trash-id="${esc(item.id)}"><div class="trashItemInfo"><b>${esc(item.title)}</b><small>${esc(trashTypeLabel(item.type))}${item.date?' · '+esc(item.date):''}${item.detail?' · '+esc(item.detail):''}</small><small>삭제: ${esc(fmtDateTime(item.deletedAt))}${item.recoverable?'':' · 복구본 없음'}</small></div><div class="trashActions"><button type="button" data-trash-restore="${esc(item.id)}" ${item.recoverable?'':'disabled'}>복구</button><button type="button" data-trash-remove="${esc(item.id)}" class="danger">영구 삭제</button></div></div>`).join(''):'<p class="trashEmpty">아직 보관된 삭제 기록이 없어요.<br>이 버전에서 삭제한 항목부터 기록됩니다. 업데이트 전에 삭제한 내용은 이전 백업을 확인해 주세요.</p>';
+}
+function openTrashDialog(){renderTrashDialog();openDialog($('#trashDlg'));}
+$('#openTrashBtn').onclick=()=>{closeDialog($('#settingsDlg'));openTrashDialog();};
+$('#closeTrashBtn').onclick=()=>closeDialog($('#trashDlg'));
+$('#trashList').onclick=e=>{
+  const restore=e.target.closest('[data-trash-restore]'),remove=e.target.closest('[data-trash-remove]');
+  const id=restore?.dataset.trashRestore||remove?.dataset.trashRemove;
+  const item=(state.trash||[]).find(v=>v.id===id);
+  if(!item)return;
+  if(restore){
+    if(!confirm(`「${item.title}」을(를) 복구할까요?`))return;
+    if(!restoreTrashEntry(item))return;
+    state.trash=state.trash.filter(v=>v.id!==id);save();renderTrashDialog();
+  }else if(remove){
+    if(!confirm(`「${item.title}」의 삭제 기록과 복구용 데이터를 영구 삭제할까요?`))return;
+    state.trash=state.trash.filter(v=>v.id!==id);save();renderTrashDialog();
+  }
+};
 
 function sortedRawCals(list=state.calendars){ return [...list].sort((a,b)=>(a.order-b.order)||a.name.localeCompare(b.name)); }
 function cal(id){ return state.calendars.find(x=>x.id===id) || state.calendars[0] || {id:'',name:'미지정',color:'#ddd',order:999,capacity:0,capacityUnknown:false,period:'종일',parentId:''}; }
@@ -4733,7 +4841,7 @@ function workMemoEditTask(row,date){
     // Backward compatibility for records created by older note-only versions.
     const changed=prompt('기존 업무 제목 수정 (삭제하려면 취소 후 확인)',row.custom.title||'');
     if(changed===null){
-      if(confirm('이 메모 전용 업무를 삭제할까요?')){const n=workMemoDay(date);n.custom=n.custom.filter(x=>x.id!==row.custom.id);save();}
+      if(confirm('이 메모 전용 업무를 삭제할까요?')){const n=workMemoDay(date);trashLog('memo',{date,row:structuredClone(row.custom)},row.custom.title,date);n.custom=n.custom.filter(x=>x.id!==row.custom.id);save();}
     }else if(changed.trim()){row.custom.title=changed.trim();save();}
     return;
   }
@@ -4830,6 +4938,7 @@ function workMemoDeleteMissed(index,date=workMemoDate){
   if(row.custom){
     if(confirm(`「${row.title}」 업무를 삭제할까요? 이 업무 기록도 삭제됩니다.`)){
       const memo=workMemoDay(sourceDate);
+      trashLog('memo',{date:sourceDate,row:structuredClone(row.custom)},row.custom.title,sourceDate);
       memo.custom=memo.custom.filter(x=>x.id!==row.custom.id);
       save();
     }
@@ -5924,7 +6033,9 @@ $('#importMemoChecklist').onclick=()=>{
   if($('#checklistText').value.trim() && !confirm('현재 체크리스트를 메모 내용으로 바꿀까요?')) return;
   $('#checklistText').value=lines.join('\n');
 };
-function deleteEventAndUnlink(id){
+function deleteEventAndUnlink(id,{record=true}={}){
+  const removed=state.events.find(x=>x.id===id);
+  if(record && removed)trashLog('event',removed,removed.title,removed.date,'일정 전체');
   state.events=state.events.filter(x=>x.id!==id);
   for(const e of state.events){
     if(Array.isArray(e.carryoverHistory)) e.carryoverHistory=e.carryoverHistory.filter(r=>r.childId!==id);
@@ -5947,7 +6058,10 @@ $('#deleteOccurrenceOnly').onclick=()=>{
   const ev=state.events.find(x=>x.id===pendingRepeatDeleteId); if(!ev) return;
   const occ=activeEventOccurrence||ev.date;
   ev.excludedDates=Array.isArray(ev.excludedDates)?ev.excludedDates:[];
-  if(!ev.excludedDates.includes(occ)) ev.excludedDates.push(occ);
+  if(!ev.excludedDates.includes(occ)){
+    trashLog('occurrence',{eventId:ev.id,date:occ,wasDone:(ev.doneDates||[]).includes(occ),wasSkipped:(ev.skipDates||[]).includes(occ)},ev.title,occ,'이 날짜만 삭제');
+    ev.excludedDates.push(occ);
+  }
   ev.doneDates=(ev.doneDates||[]).filter(x=>x!==occ);
   clearSkipped(ev,occ);
   finishRepeatDelete();
@@ -5956,6 +6070,7 @@ $('#deleteFuture').onclick=()=>{
   const ev=state.events.find(x=>x.id===pendingRepeatDeleteId); if(!ev) return;
   const occ=activeEventOccurrence||ev.date;
   if(occ<=ev.date){ deleteEventAndUnlink(ev.id); finishRepeatDelete(); return; }
+  trashLog('future',{eventId:ev.id,repeatRule:structuredClone(ev.repeatRule)},ev.title,occ,'이후 반복 회차');
   const rule=normalizedRule(ev); rule.endType='date'; rule.until=ds(add(parse(occ),-1));
   ev.repeatRule=rule; finishRepeatDelete();
 };
@@ -5998,7 +6113,7 @@ $('#carryForm').onsubmit=e=>{
   };
   src.carryoverHistory=Array.isArray(src.carryoverHistory)?src.carryoverHistory:[];
   const old=src.carryoverHistory.find(r=>r.fromDate===fromDate);
-  if(old && old.childId){ deleteEventAndUnlink(old.childId); src.carryoverHistory=Array.isArray(src.carryoverHistory)?src.carryoverHistory:[]; }
+  if(old && old.childId){ deleteEventAndUnlink(old.childId,{record:false}); src.carryoverHistory=Array.isArray(src.carryoverHistory)?src.carryoverHistory:[]; }
   src.carryoverHistory=src.carryoverHistory.filter(r=>r.fromDate!==fromDate);
   src.carryoverHistory.push({fromDate,toDate,childId,remainingHours:remaining});
   // v1.57: 다음날로 이월하는 순간, 원래 날짜의 일정은 완료 처리한다.
@@ -6035,7 +6150,7 @@ $('#cancelPurchaseComplete').onclick=()=>{ activePurchaseCompleteId=''; closeDia
 $('#togglePurchase').onclick=()=>{ state.settings.fixedPanelsCollapsed.purchase=!state.settings.fixedPanelsCollapsed.purchase; save(); };
 $('#purchaseForm').onsubmit=e=>{ e.preventDefault(); const id=$('#purchaseId').value, old=state.purchases.find(x=>x.id===id), maxOrder=(state.purchases||[]).reduce((m,p)=>Math.max(m,Number(p.order)||0),-1), obj={id:id||uid(),name:$('#purchaseName').value.trim(),qty:Math.max(1,Number($('#purchaseQty').value)||1),dueDate:$('#purchaseDueDate').value||'',memo:$('#purchaseMemo').value,done:false,createdAt:old?.createdAt||new Date().toISOString(),order:old?.order??(maxOrder+1)}; if(!obj.name) return; if(id) state.purchases[state.purchases.findIndex(x=>x.id===id)]=obj; else state.purchases.push(obj); closeDialog($('#purchaseDlg')); save(); };
 $('#cancelPurchase').onclick=()=>closeDialog($('#purchaseDlg'));
-$('#deletePurchase').onclick=()=>{ const id=$('#purchaseId').value; if(id&&confirm('이 구매항목을 삭제할까요?')){ state.purchases=state.purchases.filter(x=>x.id!==id); closeDialog($('#purchaseDlg')); save(); } };
+$('#deletePurchase').onclick=()=>{ const id=$('#purchaseId').value; if(id&&confirm('이 구매항목을 삭제할까요?')){ trashLog('purchase',state.purchases.find(x=>x.id===id),state.purchases.find(x=>x.id===id)?.name||'구매 항목'); state.purchases=state.purchases.filter(x=>x.id!==id); closeDialog($('#purchaseDlg')); save(); } };
 $('#anniversaryCountEnabled').addEventListener('change',()=>{if($('#anniversaryCountEnabled').checked && $('#repeat').value==='none'){$('#repeat').value='yearly';handleRepeatTypeChange();}});
 $('#allDay').onchange=updateAllDayUI; $('#noDuration').onchange=()=>updateDurationMode(); $('#kind').onchange=()=>{updateKindUI(); updateMemoDailyOptIn();}; $('#availabilityBlock').onchange=updateAvailabilityBlockUI; $('#cal').onchange=()=>{ updateMemoDailyOptIn(); if($('#availabilityBlock').checked){ const v=defaultAvailabilityTargetForSelectedCalendar(); if([...$('#availabilityTarget').options].some(o=>o.value===v)) $('#availabilityTarget').value=v; } }; $('#repeatInterval').addEventListener('input',updateMemoDailyOptIn); $('#memoTaskPlacement').addEventListener('change',()=>{memoCategoryManuallySet=true;updateMemoDailyOptIn();}); $('#start').onchange=updateDurationMode; $('#end').onchange=updateDurationMode; $('#endDate').onchange=()=>{ if($('#repeat').value!=='none') syncRepeatEndFromTop(); updateDurationMode(); }; $('#repeat').onchange=handleRepeatTypeChange;
 $('#prepEnabled').onchange=()=>{ if($('#prepEnabled').checked){ if(!$('#eid').value){ prepDraftNotes={}; prepDraftTasks=[]; prepDraftMoves={}; prepDraftAutoEnabled=$('#prepMode')?.value!=='custom'; } $('#prepDeadline').value=$('#date').value||ds(cursor); $('#repeat').value='none'; updateRepeatUI(); } updatePrepUI(); };
@@ -6156,6 +6271,7 @@ $('#deleteCal').onclick=()=>{
   const target=state.calendars.find(c=>c.id===id), kids=directChildren(id);
   const msg=kids.length?`이 캘린더의 일정·고정업무·시간날때 업무를 삭제할까요? 부속캘린더 ${kids.length}개는 한 단계 위로 이동되어 유지됩니다.`:'이 캘린더와 포함된 일정·고정업무·시간날때 업무를 모두 삭제할까요?';
   if(confirm(msg)){
+    trashLog('calendar',{calendar:structuredClone(target),events:structuredClone(state.events.filter(x=>x.calId===id)),fixed:structuredClone(state.fixed.filter(x=>x.calId===id)),flexible:structuredClone((state.flexible||[]).filter(x=>x.calId===id)),childParents:kids.map(x=>({id:x.id,parentId:x.parentId}))},target?.name||'캘린더','','포함된 일정 및 업무');
     const newParent=target?.parentId||'';
     kids.forEach(c=>c.parentId=newParent);
     state.calendars=state.calendars.filter(x=>x.id!==id); state.events=state.events.filter(x=>x.calId!==id); state.fixed=state.fixed.filter(x=>x.calId!==id); state.flexible=(state.flexible||[]).filter(x=>x.calId!==id);
@@ -6175,7 +6291,7 @@ $('#fixedForm').onsubmit=e=>{
 };
 $('#fnoDuration').onchange=()=>updateDurationUI('f');
 $('#cancelFixed').onclick=()=>closeDialog($('#fixedDlg'));
-$('#deleteFixed').onclick=()=>{ const id=$('#fid').value; if(id&&confirm('이 고정업무를 삭제할까요?')){state.fixed=state.fixed.filter(x=>x.id!==id);closeDialog($('#fixedDlg'));save();} };
+$('#deleteFixed').onclick=()=>{ const id=$('#fid').value; if(id&&confirm('이 고정업무를 삭제할까요?')){const f=state.fixed.find(x=>x.id===id);if(f)trashLog('fixed',f,f.name);state.fixed=state.fixed.filter(x=>x.id!==id);closeDialog($('#fixedDlg'));save();} };
 
 function openFlexible(id){
   const f=(state.flexible||[]).find(x=>x.id===id);
@@ -6198,7 +6314,7 @@ $('#cancelFlexible').onclick=()=>closeDialog($('#flexibleDlg'));
 $('#deleteFlexible').onclick=()=>{
   const id=$('#flexid').value; if(!id) return;
   if(confirm('이 시간날때 업무를 삭제할까요? 이미 달력에 배치된 일정과 완료기록은 그대로 남습니다.')){
-    state.flexible=(state.flexible||[]).filter(x=>x.id!==id); closeDialog($('#flexibleDlg')); save();
+    const f=(state.flexible||[]).find(x=>x.id===id);if(f)trashLog('flexible',f,f.name);state.flexible=(state.flexible||[]).filter(x=>x.id!==id); closeDialog($('#flexibleDlg')); save();
   }
 };
 
@@ -6206,9 +6322,9 @@ function openDiary(date){
   $('#diaryDate').value=date; $('#diaryTitle').textContent=`다이어리 · ${date}`; $('#diaryText').value=state.diary[date]?.text||'';
   $('#deleteDiary').style.visibility=state.diary[date]?.text?'visible':'hidden'; openDialog($('#diaryDlg'));
 }
-$('#diaryForm').onsubmit=e=>{ e.preventDefault(); const date=$('#diaryDate').value,text=$('#diaryText').value.trim(); if(text) state.diary[date]={text,updatedAt:new Date().toISOString()}; else delete state.diary[date]; closeDialog($('#diaryDlg')); save(); };
+$('#diaryForm').onsubmit=e=>{ e.preventDefault(); const date=$('#diaryDate').value,text=$('#diaryText').value.trim(); if(text) state.diary[date]={text,updatedAt:new Date().toISOString()}; else if(state.diary[date]){trashLog('diary',{date,value:structuredClone(state.diary[date])},'다이어리',date);delete state.diary[date];} closeDialog($('#diaryDlg')); save(); };
 $('#cancelDiary').onclick=()=>closeDialog($('#diaryDlg'));
-$('#deleteDiary').onclick=()=>{ const date=$('#diaryDate').value; if(state.diary[date]&&confirm('이 날짜의 다이어리를 삭제할까요?')){delete state.diary[date];closeDialog($('#diaryDlg'));save();} };
+$('#deleteDiary').onclick=()=>{ const date=$('#diaryDate').value; if(state.diary[date]&&confirm('이 날짜의 다이어리를 삭제할까요?')){trashLog('diary',{date,value:structuredClone(state.diary[date])},'다이어리',date);delete state.diary[date];closeDialog($('#diaryDlg'));save();} };
 
 // v2.109: 검색은 반복 일정의 원본이 아닌 실제 날짜별 발생 회차를 조회한다.
 // 달력 생성과 동일한 generateOccurrenceStarts/isDone/excludedDates 기준 사용.
@@ -6910,7 +7026,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.128',
+    appVersion:'2.129',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
@@ -6965,7 +7081,7 @@ $('#restoreFile').onchange=e=>restoreBackupFile(e.target.files?.[0]);
   const d=$(`#${id}`); d.addEventListener('cancel',()=>{});
 });
 
-const timetableFeature=createTimetableFeature({getState:()=>state,save:()=>save(),buildOccurrenceMap,getCursorDate:()=>ds(cursor)});
+const timetableFeature=createTimetableFeature({getState:()=>state,save:()=>save(),buildOccurrenceMap,getCursorDate:()=>ds(cursor),onTrash:trashLog});
 timetableFeature.init();
 loadHolidayData();
 render();

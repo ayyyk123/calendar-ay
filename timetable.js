@@ -1,4 +1,4 @@
-/* v2.128 · Independent weekly timetable module.
+/* v2.129 · Independent weekly timetable module.
    Only the state.timetable subtree is written; host calendar occurrences are read-only. */
 const WD=['일','월','화','수','목','금','토'];
 const WEEK=[1,2,3,4,5,6,0];
@@ -58,7 +58,7 @@ export function resolveTimetableDay(data,day,occurrences=[],existingEvents=[]){
 function formatDay(date){const d=new Date(`${date}T12:00:00`);return `${d.getMonth()+1}월 ${d.getDate()}일 ${WD[d.getDay()]}요일`;}
 function targetOverlapCount(target,source){return target.filter(b=>overlap(b,source)).length;}
 
-export function createTimetableFeature({getState,save,buildOccurrenceMap,getCursorDate}){
+export function createTimetableFeature({getState,save,buildOccurrenceMap,getCursorDate,onTrash=()=>{}}){
   const ui={selected:'base',day:'1',open:false,editingBlock:null,copySource:null,manageId:null,manageSelected:new Set(),manageSearch:'',lastPreview:null,ignoreBlockClickUntil:0};
   let host=null,editor=null,blockDlg=null,caseDlg=null,copyDlg=null,previewDlg=null,ticksDlg=null;
   const data=()=>getState().timetable;
@@ -220,6 +220,10 @@ export function createTimetableFeature({getState,save,buildOccurrenceMap,getCurs
       }
     }
     if(conflicts.size&&!confirm(`변경 후 ${conflicts.size}개의 기존 일정과 시간이 겹쳐. 겹치는 일정을 삭제하고 변경할까? 취소하면 아무것도 바뀌지 않아.`))return false;
+    for(const conflict of conflicts.values()){
+      const block=(conflict.sc.days[conflict.day]||[]).find(b=>b.id===conflict.id);
+      if(block)onTrash('ttBlock',{scenarioId:conflict.sc.id,day:conflict.day,block:structuredClone(block)},block.title,'',`${conflict.sc.name} · ${WD[conflict.day]}요일 · 겹침으로 교체`);
+    }
     // Only after all validation has passed do we modify the saved timetable.
     for(const sc of data().scenarios)for(const day of WEEK){
       sc.days[day]=(sc.days[day]||[]).filter(b=>!moving.has(key(sc,day,b.id))&&!conflicts.has(key(sc,day,b.id)));
@@ -255,6 +259,8 @@ export function createTimetableFeature({getState,save,buildOccurrenceMap,getCurs
     blockDlg.querySelector('#ttBlockDelete')?.addEventListener('click',()=>{
       if(!confirm('이 시간표 일정을 삭제할까?'))return;
       const sc=scenarioById(data(),ui.editingBlock.caseId);
+      const block=(sc.days[dow]||[]).find(b=>b.id===ui.editingBlock.blockId);
+      if(block)onTrash('ttBlock',{scenarioId:sc.id,day:dow,block:structuredClone(block)},block.title,'',`${sc.name} · ${WD[dow]}요일 · ${block.start}~${block.end}`);
       sc.days[dow]=(sc.days[dow]||[]).filter(b=>b.id!==ui.editingBlock.blockId);
       hide(blockDlg);notify();draw();
     });
@@ -341,6 +347,8 @@ export function createTimetableFeature({getState,save,buildOccurrenceMap,getCurs
     caseDlg.querySelectorAll('[data-tt-manage-item]').forEach(btn=>btn.onclick=()=>openManage(btn.dataset.ttManageItem));
     caseDlg.querySelectorAll('[data-tt-delete-item]').forEach(btn=>btn.onclick=()=>{
       if(!confirm('이 경우의 수와 요일별 시간표를 삭제할까? 다른 경우의 수는 그대로 남아.'))return;
+      const removed=data().scenarios.find(x=>x.id===btn.dataset.ttDeleteItem);
+      if(removed)onTrash('ttScenario',structuredClone(removed),removed.name,'','경우의 수와 전체 주간 시간표');
       data().scenarios=data().scenarios.filter(x=>x.id!==btn.dataset.ttDeleteItem);
       if(ui.selected===btn.dataset.ttDeleteItem)ui.selected='base';
       notify();draw();openManageList();
@@ -387,6 +395,7 @@ export function createTimetableFeature({getState,save,buildOccurrenceMap,getCurs
     };
     caseDlg.querySelector('#ttCaseDelete')?.addEventListener('click',()=>{
       if(!confirm('이 경우의 수와 요일별 시간표를 삭제할까? 다른 경우의 수는 그대로 남아.'))return;
+      onTrash('ttScenario',structuredClone(sc),sc.name,'','경우의 수와 전체 주간 시간표');
       data().scenarios=data().scenarios.filter(x=>x.id!==sc.id);ui.selected='base';notify();draw();openManageList();
     });
   }
@@ -408,6 +417,12 @@ export function createTimetableFeature({getState,save,buildOccurrenceMap,getCurs
         else collisions+=targetOverlapCount(dest,src[0]);
       }
       if((collisions||replaceDays)&&!confirm(source.type==='day'?`선택한 ${targets.length}곳 중 기존 일정이 있는 요일 ${replaceDays}개를 전부 교체할까?`:`선택한 ${targets.length}곳 중 겹치는 일정 ${collisions}개를 삭제하고 복사할까?`))return;
+      // A confirmed overwrite is also a deletion. Keep every displaced block recoverable.
+      for(const t of targets){
+        const dest=scenarioById(data(),t.caseId),blocks=dest.days[t.day]||[];
+        const displaced=source.type==='day'?blocks:blocks.filter(b=>overlap(b,src[0]));
+        for(const b of displaced)onTrash('ttBlock',{scenarioId:dest.id,day:t.day,block:structuredClone(b)},b.title,'',`${dest.name} · ${WD[t.day]}요일 · 복사로 교체`);
+      }
       // Give both the source and newly created copies a persistent group ID.
       // Existing saved blocks still work without one, via the identical-content
       // candidates offered in the edit dialog.
