@@ -4517,3 +4517,37 @@ body:not(.todayWorkPopup) #headerGoalsHighlight .headerGoalRow .headerGoalLine,
 .trashActions button{font-size:12px;padding:6px 9px;white-space:nowrap}
 .trashEmpty{font-size:13px;line-height:1.7;color:#6b7280;text-align:center;margin:0;padding:25px 10px}
 @media(max-width:520px){.trashItem{align-items:flex-start;flex-wrap:wrap}.trashActions{width:100%;justify-content:flex-end}}
+
+
+/* v2.130 · 사용자 지정 날짜 보기 / 업무 카드 날짜 드래그. 기존 데이터 모델 불변. */
+.wmPanel #wmSelectDaysBtn.active,.wmPanel #wmSelectDaysBtn[aria-expanded=true]{background:#eaf1ff;border-color:#9fbced;color:#2658a6}
+.wmPanel .wmDateSelectionPanel[hidden],.wmTaskDirectDateTools[hidden]{display:none!important}
+.wmPanel .wmDateSelectionPanel{box-sizing:border-box;flex:none;background:#fcfdff;border-bottom:1px solid #dbe3ed;padding:12px 16px;max-height:250px;overflow-y:auto;font-size:12px;color:#36495f}
+.wmDatePickerHead,.wmDatePickerNav,.wmDatePickerBottom{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.wmDatePickerHead{margin-bottom:8px}
+.wmDatePickerHead strong{font-size:13px;font-weight:600}
+.wmDatePickerHead strong small{color:#59729a;font-size:11px;margin-left:7px}
+.wmDatePickerHead>span,.wmDateSelectedList{font-size:11px;color:#6b7b8c}
+.wmDatePickerNav{margin-bottom:8px}
+.wmDatePickerNav label,.wmDatePickerBottom label{display:inline-flex;align-items:center;gap:5px;font-size:11px}
+.wmDatePickerNav input,.wmDatePickerBottom input{min-width:0;width:135px;box-sizing:border-box;height:29px;border:1px solid #cbd5e3;border-radius:4px;font-size:12px;padding:3px;background:#fff}
+.wmPanel .wmDateSelectionPanel button{box-sizing:border-box;padding:5px 8px;border:1px solid #cbd5e3;border-radius:4px;font-size:11px;background:#fff;color:#354b62;white-space:nowrap}
+.wmPanel .wmDateSelectionPanel button:hover{background:#edf3fb}
+.wmPanel .wmDateChoices{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:9px}
+.wmPanel .wmDateChoices button.active{background:#e4eeff;border-color:#80a9ee;color:#1d5599;font-weight:600}
+.wmPanel .wmDatePickerApply{background:#6057e9!important;color:#fff!important;border-color:#6057e9!important}
+.wmDateSelectedList{margin-top:8px;line-height:1.4;word-break:break-word}
+.wmPanel .wmBoard.wmCustomDates{grid-template-columns:repeat(var(--wm-columns,3),minmax(225px,1fr));}
+.wmPanel .wmDayCard.wmDropTarget{outline:3px solid #637ce7;outline-offset:-3px;background:#f4f7ff;box-shadow:0 0 0 2px #b6c8ff}
+.wmPanel .wmTask[draggable=true]{cursor:grab}
+.wmPanel .wmTask.wmDragging{opacity:.4;cursor:grabbing}
+.wmPanel .wmTaskMobileMove{display:none!important;align-items:center;justify-content:center;flex:none;padding:0!important;width:22px;min-width:22px;height:22px;border-radius:4px;border:1px solid #d5deea!important;background:#fff!important;color:#536c88!important;font-size:13px!important}
+.wmPanel .wmTask{flex-wrap:wrap}
+.wmPanel .wmTaskDirectDateTools{flex:0 0 100%;display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding:5px 4px}
+.wmTaskDirectDateTools input[type=date]{height:29px;min-width:0;width:140px;box-sizing:border-box;font-size:12px}
+.wmTaskDirectDateTools button{border:1px solid #cbd5e3;background:#edf3ff;border-radius:4px;padding:5px 9px;font-size:11px}
+@media (hover:none), (pointer:coarse){.wmPanel .wmTaskMobileMove{display:inline-flex!important}}
+@media(max-width:760px){
+  .wmPanel .wmDateSelectionPanel{padding:9px;max-height:245px}
+  .wmPanel .wmBoard.wmCustomDates{grid-template-columns:repeat(var(--wm-columns,3),minmax(245px,1fr));}
+}

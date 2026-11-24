@@ -1,4 +1,4 @@
-import { createTimetableFeature, defaultTimetable, normalizeTimetable } from './timetable.js?v=2.129';
+import { createTimetableFeature, defaultTimetable, normalizeTimetable } from './timetable.js?v=2.130';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
 import {
   getAuth, setPersistence, browserLocalPersistence, onAuthStateChanged,
@@ -91,7 +91,7 @@ function normalizeHeaderGoalColors(raw,goalCount){
 }
 
 const defaultState = () => ({
-  version: '2.129',
+  version: '2.130',
   calendars: [
     {id:'work',name:'아도라블',color:'#bfe8c9',order:1,period:'오전',capacity:5,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:5,unknown:false}])),parentId:''},
     {id:'personal',name:'개인업무',color:'#d9d9d9',order:2,period:'오후',capacity:3,capacityUnknown:false,capacityByDay:Object.fromEntries([0,1,2,3,4,5,6].map(d=>[d,{hours:d===0||d===6?0:3,unknown:false}])),parentId:''},
@@ -390,7 +390,7 @@ function normalizeState(raw){
     }
   });
   return {
-    version: '2.129',
+    version: '2.130',
     calendars,
     timetable: normalizeTimetable(s.timetable),
     trash: Array.isArray(s.trash) ? s.trash.filter(x=>x && x.id && x.type && x.title && x.deletedAt).slice(0,50).map(x=>({...x})) : [],
@@ -702,7 +702,7 @@ function save({rerender=true}={}){
   if(rerender)render();
 }
 
-// v2.129 · 최근 삭제 내역: 기존 엔티티는 원래 컬렉션에서만 삭제하고
+// v2.130 · 최근 삭제 내역: 기존 엔티티는 원래 컬렉션에서만 삭제하고
 // 복구용 사본은 별도 필드에 보존합니다. 하위 버전의 기존 데이터는 변경하지 않습니다.
 const TRASH_KEEP_COUNT=50;
 const TRASH_KEEP_BYTES=130000; // Firebase 문서 크기 증가 방지
@@ -4296,6 +4296,71 @@ function exitTodayWorkPopup(){
   window.location.assign(url.href);
 }
 
+// v2.130 · 업무 보드 전용 날짜 표시 설정 (실제 일정/Firebase에는 영향을 주지 않음).
+// 명시적으로 선택하지 않은 경우에는 기존 창 너비별 연속 날짜 보기를 사용합니다.
+const WM_DATES_KEY='myCalendar:workBoardSelectedDates:v2.130';
+let wmSelectedBoardDates=null;
+let wmDatesLoadedFor='';
+let wmDatePickerVisible=false;
+let wmDatePickerDraft=[];
+let wmDatePickerAnchor='';
+let wmDragPointerStartedOnControl=false;
+let wmDraggedTask=null;
+function wmSelectedDaysStorageKey(){return `${WM_DATES_KEY}:${currentUser?.uid||'guest'}`;}
+function wmNormalizeSelectedDays(dates){
+  return [...new Set((Array.isArray(dates)?dates:[]).filter(workMemoDateValid))].sort().slice(0,31);
+}
+function wmLoadSelectedDays(){
+  const key=wmSelectedDaysStorageKey();
+  if(wmDatesLoadedFor===key)return;
+  wmDatesLoadedFor=key;
+  try{const data=JSON.parse(localStorage.getItem(key)||'null');wmSelectedBoardDates=Array.isArray(data)&&data.length?wmNormalizeSelectedDays(data):null;}
+  catch(_err){wmSelectedBoardDates=null;}
+}
+function wmSaveSelectedDays(){
+  try{localStorage.setItem(wmSelectedDaysStorageKey(),JSON.stringify(wmSelectedBoardDates));}catch(_err){}
+}
+function wmVisibleDates(){
+  if(isTodayWorkPopup)return [workMemoDate];
+  wmLoadSelectedDays();
+  if(wmSelectedBoardDates?.length)return wmSelectedBoardDates;
+  return Array.from({length:workMemoBoardDays()},(_,i)=>ds(add(parse(workMemoDate),i)));
+}
+function wmDateChoiceMarkup(){
+  const begin=workMemoDateValid(wmDatePickerAnchor)?wmDatePickerAnchor:workMemoDate;
+  const chosen=new Set(wmDatePickerDraft);
+  const weekday=['일','월','화','수','목','금','토'];
+  return `<div class="wmDatePickerHead"><strong>표시할 날짜 선택 <small>${chosen.size}일 선택</small></strong><span>서로 떨어진 날짜도 함께 표시할 수 있어요.</span></div>
+  <div class="wmDatePickerNav"><button type="button" data-wm-picker-back>‹ 이전 7일</button><label>선택할 날짜 범위 <input type="date" data-wm-picker-anchor value="${begin}"></label><button type="button" data-wm-picker-forward>다음 7일 ›</button></div>
+  <div class="wmDateChoices">${Array.from({length:14},(_,i)=>{
+    const date=ds(add(parse(begin),i)),day=weekday[parse(date).getDay()];
+    return `<button type="button" data-wm-picker-toggle="${date}" aria-pressed="${chosen.has(date)}" class="${chosen.has(date)?'active':''}">${chosen.has(date)?'✓ ':''}${esc(workMemoShortDate(date))} (${day})</button>`;
+  }).join('')}</div>
+  <div class="wmDatePickerBottom"><label>다른 날짜 추가 <input type="date" data-wm-picker-extra aria-label="선택 목록에 추가할 날짜"></label><button type="button" data-wm-picker-add>추가</button><button type="button" data-wm-picker-clear>선택 비우기</button><button type="button" data-wm-picker-default>자동 표시로 돌아가기</button><button type="button" class="wmDatePickerApply" data-wm-picker-apply>선택한 날짜 적용</button></div>
+  <div class="wmDateSelectedList">${wmDatePickerDraft.length?`선택됨: ${wmDatePickerDraft.map(workMemoShortDate).join(' · ')}`:'날짜를 하나 이상 선택해 주세요.'}</div>`;
+}
+function wmRenderDatePicker(){
+  const area=$('#wmDateSelectionPanel');if(!area)return;
+  area.hidden=isTodayWorkPopup||!wmDatePickerVisible;
+  if(!area.hidden)area.innerHTML=wmDateChoiceMarkup();
+  const btn=$('#wmSelectDaysBtn');if(btn){btn.setAttribute('aria-expanded',String(!area.hidden));btn.classList.toggle('active',!!wmSelectedBoardDates?.length);}
+}
+function wmOpenDatePicker(){
+  wmLoadSelectedDays();
+  wmDatePickerVisible=!wmDatePickerVisible;
+  if(wmDatePickerVisible){wmDatePickerDraft=[...wmVisibleDates()];wmDatePickerAnchor=wmVisibleDates()[0]||workMemoDate;}
+  wmRenderDatePicker();
+}
+function wmShiftDates(days){
+  wmLoadSelectedDays();
+  if(wmSelectedBoardDates?.length){
+    wmSelectedBoardDates=wmSelectedBoardDates.map(d=>ds(add(parse(d),days)));
+    wmSaveSelectedDays();
+    workMemoDate=wmSelectedBoardDates[0];
+    renderWorkMemoPanel();return;
+  }
+  setWorkMemoPopupDate(ds(add(parse(workMemoDate),days)));
+}
 const workMemoMissedDates=new Set();
 let workMemoLastPending=[];
 const workMemoDateValid=x=>/^\d{4}-\d{2}-\d{2}$/.test(String(x||''));
@@ -4673,6 +4738,7 @@ function compactDailyEventsInCalendar(){
 }
 function workMemoBoardDays(){
   if(isTodayWorkPopup)return 1;
+  // 실제 표시 날짜는 wmVisibleDates()가 결정합니다. 자동 모드는 기존 칸 수를 유지합니다.
   const width=Math.max(300,window.innerWidth-42);
   return clamp(Math.floor((width+12)/342),1,8);
 }
@@ -4680,6 +4746,8 @@ function openWorkMemo(date=ds(new Date())){
   // 선택한 날짜 앞의 하루도 업무 보드에 함께 표시합니다.
   const target=workMemoDateValid(date)?date:ds(new Date());
   workMemoDate=isTodayWorkPopup?target:ds(add(parse(target),-1));
+  if(!isTodayWorkPopup){wmLoadSelectedDays();if(wmSelectedBoardDates?.length)workMemoDate=wmSelectedBoardDates[0];}
+  wmDatePickerVisible=false;
   workMemoVisible=true;workMemoMissedDates.clear();
   $('#workMemoPanel')?.classList.remove('hidden');
   document.body.classList.add('wmBoardActive');
@@ -4687,7 +4755,7 @@ function openWorkMemo(date=ds(new Date())){
 }
 function closeWorkMemo(){
   if(isTodayWorkPopup){exitTodayWorkPopup();return;}
-  workMemoVisible=false;
+  workMemoVisible=false;wmDatePickerVisible=false;
   $('#workMemoPanel')?.classList.add('hidden');
   document.body.classList.remove('wmBoardActive');
 }
@@ -4732,7 +4800,8 @@ function workMemoTaskMarkup(row,date){
   const type=row.e?row.e.kind==='payment'?'납부':row.e._prepDay?'준비':row.e._purchaseDue?'구매':row.e.kind==='appointment'?'약속':'일정':'';
   const noCheck=(!!row.e?.kind && row.e.kind==='anniversary')||skipped;
   const subtasks=workMemoSubtasksMarkup(row);
-  return `<div class="wmTask ${done?'done':''} ${skipped?'skipped':''} ${subtasks?'wmTaskWithSubtasks':''}" data-wm-task="${esc(row.key)}" data-wm-kind="${kind}"><label><input type="checkbox" data-wm-check="${esc(row.key)}" ${done?'checked':''} ${noCheck?'disabled':''}>${workMemoStarMarkup(row)}<span class="wmTaskLabel">${esc(row.title)}${label}</span>${skipped?'<span class="wmSkippedMark">안 함</span>':''}</label>${type&&row.kind!=='daily'&&row.kind!=='payment'?`<small>${esc(type)}</small>`:''}${row.e&&canSkipEvent(row.e)?`<button type="button" class="wmSkipAction ${skipped?'active':''}" data-wm-skip="${esc(row.key)}" aria-label="${skipped?'미완료로 되돌리기':'안 함으로 기록'}" title="${skipped?'미완료로 되돌리기':'안 함으로 기록 · 삭제되지 않음'}">${skipped?'↶':'×'}</button>`:''}<button type="button" class="wmTaskEditBtn" data-wm-edit="${esc(row.key)}" title="수정 · 삭제" aria-label="${esc(row.title)} 수정 또는 삭제">✎</button>${subtasks}</div>`;
+  const moveable=!done&&!skipped&&!!(row.e||row.custom);
+  return `<div class="wmTask ${done?'done':''} ${skipped?'skipped':''} ${subtasks?'wmTaskWithSubtasks':''}" data-wm-task="${esc(row.key)}" data-wm-kind="${kind}" ${moveable?'draggable="true" title="다른 날짜 칸으로 끌어서 이동"':''}><label><input type="checkbox" data-wm-check="${esc(row.key)}" ${done?'checked':''} ${noCheck?'disabled':''}>${workMemoStarMarkup(row)}<span class="wmTaskLabel">${esc(row.title)}${label}</span>${skipped?'<span class="wmSkippedMark">안 함</span>':''}</label>${type&&row.kind!=='daily'&&row.kind!=='payment'?`<small>${esc(type)}</small>`:''}${row.e&&canSkipEvent(row.e)?`<button type="button" class="wmSkipAction ${skipped?'active':''}" data-wm-skip="${esc(row.key)}" aria-label="${skipped?'미완료로 되돌리기':'안 함으로 기록'}" title="${skipped?'미완료로 되돌리기':'안 함으로 기록 · 삭제되지 않음'}">${skipped?'↶':'×'}</button>`:''}<button type="button" class="wmTaskEditBtn" data-wm-edit="${esc(row.key)}" title="수정 · 삭제" aria-label="${esc(row.title)} 수정 또는 삭제">✎</button>${moveable?`<button type="button" class="wmTaskMobileMove" data-wm-direct-date-toggle="${esc(row.key)}" aria-label="다른 날짜로 이동" title="날짜 이동">↗</button><span class="wmTaskDirectDateTools" hidden><input type="date" value="${date}" aria-label="이동할 날짜"><button type="button" data-wm-direct-date-move="${esc(row.key)}">이동</button></span>`:''}${subtasks}</div>`;
 }
 function workMemoMissedTasks(date){
   const previous=ds(add(parse(date),-1)),note=workMemoDay(previous);
@@ -4788,11 +4857,14 @@ function renderWorkMemoPanel(){
     const area=card.querySelector('.wmDayScroll');
     if(area)dayScrolls.set(card.dataset.wmDate,{top:area.scrollTop,left:area.scrollLeft});
   });
-  const days=workMemoBoardDays();
-  const dates=Array.from({length:days},(_,i)=>ds(add(parse(workMemoDate),i)));
-  $('#wmBoardRange').textContent=isTodayWorkPopup?`${workMemoShortDate(dates[0])} (${['일','월','화','수','목','금','토'][parse(dates[0]).getDay()]})`:`${workMemoShortDate(dates[0])} – ${workMemoShortDate(dates[dates.length-1])}`;
-  $('#wmStartDate').value=workMemoDate;
+  const dates=wmVisibleDates(),days=dates.length;
+  const custom=!isTodayWorkPopup&&!!wmSelectedBoardDates?.length;
+  $('#wmBoardRange').textContent=isTodayWorkPopup?`${workMemoShortDate(dates[0])} (${['일','월','화','수','목','금','토'][parse(dates[0]).getDay()]})`:custom?`선택 ${days}일`:`${workMemoShortDate(dates[0])} – ${workMemoShortDate(dates[days-1])}`;
+  $('#wmBoardRange').title=custom?dates.join(' · '):'';
+  $('#wmStartDate').value=dates[0]||workMemoDate;
   $('#wmBoard').style.setProperty('--wm-columns',String(days));
+  $('#wmBoard').classList.toggle('wmCustomDates',custom);
+  wmRenderDatePicker();
   workMemoMissedByDate.clear();
   $('#wmBoard').innerHTML=dates.map(workMemoDayCard).join('');
   const settings=$('#wmDailySettings');settings.classList.toggle('hidden',!workMemoSettingsShown);
@@ -4992,15 +5064,98 @@ function initWorkMemo(){
   $('#wmTodayPopupBtn')?.addEventListener('click',()=>openTodayWorkWindow(workMemoDate));
   $('#wmClose')?.addEventListener('click',closeWorkMemo);
   $('#wmBack')?.addEventListener('click',closeWorkMemo);
-  $('#wmPrev')?.addEventListener('click',()=>setWorkMemoPopupDate(ds(add(parse(workMemoDate),-workMemoBoardDays()))));
-  $('#wmNext')?.addEventListener('click',()=>setWorkMemoPopupDate(ds(add(parse(workMemoDate),workMemoBoardDays()))));
+  $('#wmPrev')?.addEventListener('click',()=>wmShiftDates(wmSelectedBoardDates?.length?-7:-workMemoBoardDays()));
+  $('#wmNext')?.addEventListener('click',()=>wmShiftDates(wmSelectedBoardDates?.length?7:workMemoBoardDays()));
   $('#wmToday')?.addEventListener('click',()=>{
     workMemoMissedDates.clear();
+    // 오늘은 기본 연속 날짜 보기로 복귀합니다. 선택 보기 상태는 기기에만 저장됩니다.
+    if(!isTodayWorkPopup){wmSelectedBoardDates=null;wmSaveSelectedDays();wmDatePickerVisible=false;}
     setWorkMemoPopupDate(ds(add(new Date(),workMemoBoardDays()>1?-1:0)),{followToday:true});
   });
-  $('#wmStartDate')?.addEventListener('change',e=>setWorkMemoPopupDate(e.target.value));
+  $('#wmStartDate')?.addEventListener('change',e=>{
+    if(!workMemoDateValid(e.target.value))return;
+    if(wmSelectedBoardDates?.length&&!isTodayWorkPopup){
+      const delta=diffDays(wmSelectedBoardDates[0],e.target.value);
+      wmShiftDates(delta);
+    }else setWorkMemoPopupDate(e.target.value);
+  });
+  $('#wmSelectDaysBtn')?.addEventListener('click',wmOpenDatePicker);
+  $('#wmDateSelectionPanel')?.addEventListener('click',e=>{
+    const button=e.target.closest('button');if(!button)return;
+    const date=button.dataset.wmPickerToggle;
+    if(date){
+      wmDatePickerDraft=wmDatePickerDraft.includes(date)?wmDatePickerDraft.filter(x=>x!==date):wmNormalizeSelectedDays([...wmDatePickerDraft,date]);
+      wmRenderDatePicker();return;
+    }
+    if(button.hasAttribute('data-wm-picker-back')||button.hasAttribute('data-wm-picker-forward')){
+      wmDatePickerAnchor=ds(add(parse(wmDatePickerAnchor),button.hasAttribute('data-wm-picker-back')?-7:7));
+      wmRenderDatePicker();return;
+    }
+    if(button.hasAttribute('data-wm-picker-add')){
+      const extra=$('#wmDateSelectionPanel [data-wm-picker-extra]')?.value;
+      if(!workMemoDateValid(extra)){alert('추가할 날짜를 선택해 줘.');return;}
+      wmDatePickerDraft=wmNormalizeSelectedDays([...wmDatePickerDraft,extra]);
+      if(wmDatePickerDraft.length>31)alert('한 번에 최대 31일까지 선택할 수 있어.');
+      wmDatePickerAnchor=extra;wmRenderDatePicker();return;
+    }
+    if(button.hasAttribute('data-wm-picker-clear')){wmDatePickerDraft=[];wmRenderDatePicker();return;}
+    if(button.hasAttribute('data-wm-picker-default')){
+      wmSelectedBoardDates=null;wmSaveSelectedDays();wmDatePickerVisible=false;
+      renderWorkMemoPanel();return;
+    }
+    if(button.hasAttribute('data-wm-picker-apply')){
+      if(!wmDatePickerDraft.length){alert('보려는 날짜를 하나 이상 선택해 줘.');return;}
+      wmSelectedBoardDates=wmNormalizeSelectedDays(wmDatePickerDraft);
+      wmSaveSelectedDays();workMemoDate=wmSelectedBoardDates[0];wmDatePickerVisible=false;
+      renderWorkMemoPanel();return;
+    }
+  });
+  $('#wmDateSelectionPanel')?.addEventListener('change',e=>{
+    if(e.target.matches('[data-wm-picker-anchor]')&&workMemoDateValid(e.target.value)){
+      wmDatePickerAnchor=e.target.value;wmRenderDatePicker();
+    }
+  });
   $('#wmSettingsBtn')?.addEventListener('click',()=>{workMemoSettingsShown=!workMemoSettingsShown;renderWorkMemoPanel();});
-  window.addEventListener('resize',()=>{if(workMemoVisible && workMemoBoardDays()!==Number($('#wmBoard')?.style.getPropertyValue('--wm-columns')||0))renderWorkMemoPanel();});
+  window.addEventListener('resize',()=>{
+    // 선택한 날짜가 있다면 날짜 수는 화면 너비와 무관합니다.
+    if(workMemoVisible && !wmSelectedBoardDates?.length && workMemoBoardDays()!==Number($('#wmBoard')?.style.getPropertyValue('--wm-columns')||0))renderWorkMemoPanel();
+  });
+  const wmClearDragHighlight=()=>{
+    wmDraggedTask=null;
+    panel?.querySelectorAll('.wmDayCard.wmDropTarget,.wmTask.wmDragging').forEach(el=>el.classList.remove('wmDropTarget','wmDragging'));
+    document.body.classList.remove('wmBoardDragging');
+  };
+  panel?.addEventListener('pointerdown',e=>{
+    wmDragPointerStartedOnControl=!!e.target.closest('button,input,textarea,select,summary,.wmSubtaskList');
+  });
+  panel?.addEventListener('dragstart',e=>{
+    const task=e.target.closest('.wmTask[data-wm-task][draggable=true]');
+    if(!task||wmDragPointerStartedOnControl){e.preventDefault();return;}
+    const date=task.closest('.wmDayCard')?.dataset.wmDate;
+    const row=date?workMemoTasks(date).find(x=>x.key===task.dataset.wmTask):null;
+    if(!row||row.done||row.skipped){e.preventDefault();return;}
+    wmDraggedTask={key:row.key,sourceDate:date};
+    e.dataTransfer.effectAllowed='move';
+    try{e.dataTransfer.setData('text/plain',`work-memo:${date}:${row.key}`);}catch(_err){}
+    task.classList.add('wmDragging');document.body.classList.add('wmBoardDragging');
+  });
+  panel?.addEventListener('dragover',e=>{
+    if(!wmDraggedTask)return;
+    const target=e.target.closest('.wmDayCard[data-wm-date]');
+    panel.querySelectorAll('.wmDayCard.wmDropTarget').forEach(el=>{if(el!==target)el.classList.remove('wmDropTarget');});
+    if(!target||target.dataset.wmDate===wmDraggedTask.sourceDate)return;
+    e.preventDefault();e.dataTransfer.dropEffect='move';target.classList.add('wmDropTarget');
+  });
+  panel?.addEventListener('drop',e=>{
+    if(!wmDraggedTask)return;
+    const target=e.target.closest('.wmDayCard[data-wm-date]');
+    const drag=wmDraggedTask;wmClearDragHighlight();
+    if(!target||target.dataset.wmDate===drag.sourceDate)return;
+    e.preventDefault();e.stopPropagation();
+    const row=workMemoTasks(drag.sourceDate).find(x=>x.key===drag.key);
+    if(row)workMemoMoveRow(row,target.dataset.wmDate);
+  });
+  panel?.addEventListener('dragend',wmClearDragHighlight);
   panel?.addEventListener('change',e=>{
     const popupDate=e.target.closest('[data-wm-compact-date]');
     if(popupDate){setWorkMemoPopupDate(popupDate.value,{followToday:popupDate.value===ds(new Date())});return;}
@@ -5032,6 +5187,18 @@ function initWorkMemo(){
     if(btn.hasAttribute('data-wm-compact-next')){setWorkMemoPopupDate(ds(add(parse(workMemoDate),1)));return;}
     if(btn.dataset.wmPopout){openTodayWorkWindow(btn.dataset.wmPopout);return;}
     if(btn.dataset.wmCreate){workMemoCreateTask(btn.dataset.wmCreate);return;}
+    if(btn.dataset.wmDirectDateToggle!==undefined){
+      const tools=btn.closest('.wmTask')?.querySelector('.wmTaskDirectDateTools');
+      if(tools){tools.hidden=!tools.hidden;if(!tools.hidden)tools.querySelector('input[type=date]')?.focus();}
+      return;
+    }
+    if(btn.dataset.wmDirectDateMove!==undefined){
+      const task=btn.closest('.wmTask'),date=btn.closest('.wmDayCard')?.dataset.wmDate;
+      const target=task?.querySelector('.wmTaskDirectDateTools input[type=date]')?.value;
+      const row=date?workMemoTasks(date).find(x=>x.key===btn.dataset.wmDirectDateMove):null;
+      if(row)workMemoMoveRow(row,target);
+      return;
+    }
     if(btn.dataset.wmSkip){const date=btn.closest('[data-wm-date]')?.dataset.wmDate;if(date)workMemoToggleSkip(btn.dataset.wmSkip,date);return;}
     if(btn.dataset.wmEdit){const date=btn.closest('[data-wm-date]')?.dataset.wmDate;const row=date?workMemoTasks(date).find(x=>x.key===btn.dataset.wmEdit):null;if(row)workMemoEditTask(row,date);return;}
     const date=btn.closest('[data-wm-date]')?.dataset.wmDate;
@@ -7026,7 +7193,7 @@ function downloadBackup(){
   const now=new Date();
   const payload={
     type:'my-calendar-backup',
-    appVersion:'2.129',
+    appVersion:'2.130',
     exportedAt:now.toISOString(),
     accountEmail:currentUser.email||'',
     state
